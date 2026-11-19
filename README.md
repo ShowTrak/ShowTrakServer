@@ -113,7 +113,10 @@ turns that check off for one machine.
 - Monitoring target CRUD and live status updates
 - Check actions: methods that can control their device (PJLink projector power,
   shutter, input) expose buttons in the monitor view, starred favourites in the
-  right-click menu, and `/API/Monitor/<slug>/<method>/<action>` over OSC and HTTP
+  right-click menu, and `/API/Monitor/<slug>/<method>/<action>` over OSC and HTTP.
+  Over OSC, an action's values follow as OSC arguments in order (e.g.
+  `/API/Monitor/qsys/qsys-core/snapshot.load "Show" 3 2.5`); the older
+  `/<action>/<value>` path form still fills the first value
 
 ### History
 

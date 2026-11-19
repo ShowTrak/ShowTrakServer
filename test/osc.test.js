@@ -181,6 +181,15 @@ function loadOSC(overrides = {}, { WithSocket = true } = {}) {
                 Label: 'Set Input',
                 Params: [{ Key: 'Input', Label: 'Input', Type: 'string', Default: '' }],
               },
+              {
+                ID: 'snapshot.load',
+                Label: 'Load Snapshot',
+                Params: [
+                  { Key: 'Bank', Label: 'Bank', Type: 'string', Required: true, Default: '' },
+                  { Key: 'Snapshot', Label: 'Snapshot', Type: 'number', Required: true },
+                  { Key: 'Ramp', Label: 'Ramp', Type: 'number', Default: 0 },
+                ],
+              },
             ],
           },
           { ID: 'ping', Name: 'Ping' },
@@ -194,6 +203,35 @@ function loadOSC(overrides = {}, { WithSocket = true } = {}) {
               ID: 'input.set',
               Label: 'Set Input',
               Params: [{ Key: 'Input', Label: 'Input', Type: 'string', Default: '' }],
+            };
+          }
+          // Multi-value actions, shaped like Q-SYS Load Snapshot and Analog Way
+          // Load Memory (a trailing list).
+          if (actionID === 'snapshot.load') {
+            return {
+              ID: 'snapshot.load',
+              Label: 'Load Snapshot',
+              Params: [
+                { Key: 'Bank', Label: 'Bank', Type: 'string', Required: true, Default: '' },
+                { Key: 'Snapshot', Label: 'Snapshot', Type: 'number', Required: true },
+                { Key: 'Ramp', Label: 'Ramp', Type: 'number', Default: 0 },
+              ],
+            };
+          }
+          if (actionID === 'memory.program') {
+            return {
+              ID: 'memory.program',
+              Label: 'Load Memory',
+              Params: [
+                { Key: 'Memory', Label: 'Memory', Type: 'number', Required: true },
+                {
+                  Key: 'Screens',
+                  Label: 'Screens',
+                  Type: 'list',
+                  ItemType: 'number',
+                  Default: [1],
+                },
+              ],
             };
           }
           return null;
@@ -526,6 +564,95 @@ test("OSC surfaces the projector's own refusal rather than a bare failure", asyn
   assert.match(String(error[1]), /busy/i);
 });
 
+// --- Values as OSC arguments ---------------------------------------------------
+// The router dispatches on the address alone; routes that take values also read
+// the message's OSC arguments, in the action's declared parameter order. The
+// original path-value form keeps working and fills the first parameter.
+
+test('OSC fills every parameter of a multi-value action from OSC arguments', async () => {
+  const { handlers, actionCalls, broadcastEvents } = loadOSC();
+  await handlers.message(['/API/Monitor/proj-sl/pjlink/snapshot.load', 'Main Show', 3, 2.5]);
+  assert.deepEqual(actionCalls, [
+    [[4], 'pjlink', 'snapshot.load', { Bank: 'Main Show', Snapshot: 3, Ramp: 2.5 }],
+  ]);
+  assert.ok(broadcastEvents.some(([event, , level]) => event === 'Notify' && level === 'success'));
+});
+
+test('OSC combines a path value with arguments for the parameters after it', async () => {
+  const { handlers, actionCalls } = loadOSC();
+  await handlers.message(['/API/Monitor/proj-sl/pjlink/snapshot.load/Show', 3]);
+  assert.deepEqual(actionCalls, [[[4], 'pjlink', 'snapshot.load', { Bank: 'Show', Snapshot: 3 }]]);
+});
+
+test('OSC treats an empty-string argument as "use the default"', async () => {
+  const { handlers, actionCalls } = loadOSC();
+  await handlers.message(['/API/Monitor/proj-sl/pjlink/snapshot.load', 'Show', 3, '']);
+  assert.deepEqual(actionCalls, [[[4], 'pjlink', 'snapshot.load', { Bank: 'Show', Snapshot: 3 }]]);
+});
+
+test('OSC refuses a multi-value action missing a required value', async () => {
+  const { handlers, actionCalls, broadcastEvents } = loadOSC();
+  await handlers.message(['/API/Monitor/proj-sl/pjlink/snapshot.load/Show']);
+  await handlers.message(['/API/Monitor/proj-sl/pjlink/snapshot.load']);
+  assert.deepEqual(actionCalls, [], 'nothing should reach the device');
+  const errors = broadcastEvents.filter(
+    ([event, , level]) => event === 'Notify' && level === 'error'
+  );
+  assert.equal(errors.length, 2);
+  assert.match(String(errors[0][1]), /needs a value for Snapshot/);
+  assert.match(String(errors[1][1]), /needs a value for Bank/);
+});
+
+test('OSC gathers a trailing list parameter from the remaining arguments', async () => {
+  const { handlers, actionCalls } = loadOSC();
+  await handlers.message(['/API/Monitor/proj-sl/pjlink/memory.program', 4, 1, 2]);
+  await handlers.message(['/API/Monitor/proj-sl/pjlink/memory.program', 4, '1, 3']);
+  await handlers.message(['/API/Monitor/proj-sl/pjlink/memory.program', 4]);
+  assert.deepEqual(actionCalls, [
+    [[4], 'pjlink', 'memory.program', { Memory: 4, Screens: [1, 2] }],
+    [[4], 'pjlink', 'memory.program', { Memory: 4, Screens: ['1', '3'] }],
+    [[4], 'pjlink', 'memory.program', { Memory: 4 }],
+  ]);
+});
+
+test('OSC fills a single-value action from an argument as well as from the path', async () => {
+  const { handlers, actionCalls } = loadOSC();
+  await handlers.message(['/API/Monitor/proj-sl/pjlink/input.set', 'HDMI 1']);
+  await handlers.message(['/API/Monitor/proj-sl/pjlink/input.set/31']);
+  assert.deepEqual(actionCalls, [
+    [[4], 'pjlink', 'input.set', { Input: 'HDMI 1' }],
+    [[4], 'pjlink', 'input.set', { Input: '31' }],
+  ]);
+});
+
+test('OSC still ignores arguments sent to an action that takes no value', async () => {
+  const { handlers, actionCalls } = loadOSC();
+  await handlers.message(['/API/Monitor/proj-sl/pjlink/power.on', 1, 'extra']);
+  assert.deepEqual(actionCalls, [[[4], 'pjlink', 'power.on', {}]]);
+});
+
+test("OSC ignores surplus arguments beyond an action's parameters", async () => {
+  const { handlers, actionCalls } = loadOSC();
+  await handlers.message(['/API/Monitor/proj-sl/pjlink/input.set', '31', 'surplus']);
+  assert.deepEqual(actionCalls, [[[4], 'pjlink', 'input.set', { Input: '31' }]]);
+});
+
+test('OSC reference lists every action on the plain Monitor route with its argument form', () => {
+  const { OSC } = loadOSC();
+  const route = OSC.GetRoutes().find((r) => r.Path === '/API/Monitor/:Slug/:Method/:ActionID');
+  const values = route.Values.Entries.map((e) => e.Value);
+  assert.deepEqual(values, ['pjlink/power.on', 'pjlink/input.set', 'pjlink/snapshot.load']);
+  const snapshot = route.Values.Entries.find((e) => e.Value === 'pjlink/snapshot.load');
+  assert.match(snapshot.Note, /OSC arguments: <Bank> <Snapshot> \[Ramp\]/);
+  const withValue = OSC.GetRoutes().find(
+    (r) => r.Path === '/API/Monitor/:Slug/:Method/:ActionID/:Value'
+  );
+  assert.deepEqual(
+    withValue.Values.Entries.map((e) => e.Value),
+    ['pjlink/input.set/<Input>', 'pjlink/snapshot.load/<Bank>']
+  );
+});
+
 // --- FreeKiosk commands -------------------------------------------------------
 
 const successNotified = (events) =>
@@ -678,10 +805,21 @@ test('the FreeKiosk routes document every allowlisted command, split by whether 
   const bare = byPath.get('/API/FreeKiosk/:Slug/:CommandID').Values;
   const valued = byPath.get('/API/FreeKiosk/:Slug/:CommandID/:Value').Values;
 
-  const documented = [...bare.Entries, ...valued.Entries].map((e) => e.Value.split('/')[0]);
-  assert.deepEqual(documented.sort(), FREEKIOSK_COMMANDS.map((c) => c.ID).sort());
+  // The plain route takes every command (a value can ride as an OSC argument);
+  // the path-value route only those that take one.
+  assert.deepEqual(
+    bare.Entries.map((e) => e.Value).sort(),
+    FREEKIOSK_COMMANDS.map((c) => c.ID).sort()
+  );
+  assert.deepEqual(
+    valued.Entries.map((e) => e.Value.split('/')[0]).sort(),
+    FREEKIOSK_COMMANDS.filter((c) => c.Params && c.Params.length)
+      .map((c) => c.ID)
+      .sort()
+  );
   assert.ok(bare.Entries.some((e) => e.Value === 'reboot'));
   assert.ok(valued.Entries.some((e) => e.Value === 'brightness/<0-100>'));
+  assert.match(bare.Entries.find((e) => e.Value === 'brightness').Note, /OSC argument: <0-100>/);
   // A WebView-only command says so, since it is refused in the other modes.
   assert.match(bare.Entries.find((e) => e.Value === 'reload').Note, /WebView mode only/);
 });
@@ -691,11 +829,11 @@ test('the Monitor routes document every declared action from the method catalogu
   const byPath = new Map(OSC.GetRoutes().map((r) => [r.Path, r]));
   assert.deepEqual(
     byPath.get('/API/Monitor/:Slug/:Method/:ActionID').Values.Entries.map((e) => e.Value),
-    ['pjlink/power.on']
+    ['pjlink/power.on', 'pjlink/input.set', 'pjlink/snapshot.load']
   );
   assert.deepEqual(
     byPath.get('/API/Monitor/:Slug/:Method/:ActionID/:Value').Values.Entries.map((e) => e.Value),
-    ['pjlink/input.set/<Input>']
+    ['pjlink/input.set/<Input>', 'pjlink/snapshot.load/<Bank>']
   );
 });
 
@@ -706,4 +844,24 @@ test('route value catalogues survive the JSON clone that ships them to the rende
   assert.ok(kiosk.Values.Entries.length > 0);
   // Routes whose values are the operator's own data carry no catalogue.
   assert.equal(cloned.find((r) => r.Path === '/API/All/WakeOnLAN').Values, undefined);
+});
+
+test('OSC takes a FreeKiosk value from the first OSC argument', async () => {
+  const { handlers, kioskCalls } = loadOSC();
+  await handlers.message(['/API/FreeKiosk/lobby-tablet/brightness', 40]);
+  await handlers.message(['/API/Group/main/FreeKiosk/volume', '25']);
+  assert.deepEqual(kioskCalls, [
+    [['kiosk-1'], 'brightness', { value: 40 }],
+    [['kiosk-1', 'kiosk-2'], 'volume', { value: 25 }],
+  ]);
+});
+
+test('OSC prefers the FreeKiosk path value over an argument, and a no-value command ignores arguments', async () => {
+  const { handlers, kioskCalls } = loadOSC();
+  await handlers.message(['/API/FreeKiosk/lobby-tablet/brightness/60', 10]);
+  await handlers.message(['/API/FreeKiosk/lobby-tablet/reboot', 1]);
+  assert.deepEqual(kioskCalls, [
+    [['kiosk-1'], 'brightness', { value: 60 }],
+    [['kiosk-1'], 'reboot', {}],
+  ]);
 });

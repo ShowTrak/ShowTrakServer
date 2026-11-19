@@ -137,9 +137,33 @@ interface RouteResult {
 // Route params are extracted from the URL path parts, so every value is a string.
 type OSCRequest = Record<string, string>;
 
-// Source metadata for an inbound OSC packet (currently just the sender IP).
+// Source metadata for an inbound OSC packet: the sender IP and the message's
+// OSC arguments. Routes dispatch on the address alone, so arguments never
+// change which route runs; the routes that take values read them from here.
+// HTTP-mirrored calls carry no Args.
 interface OSCMeta {
   IP: string | null;
+  Args?: OSCArg[];
+}
+
+// An OSC argument as node-osc decodes it, reduced to what a route can use.
+type OSCArg = string | number | boolean;
+
+// node-osc hands a message over as [address, ...args]. Numbers, strings and
+// booleans pass through; anything else (blobs, nil) is turned into text so a
+// stray type can't reach a device as an object.
+function ExtractOSCArgs(Route: unknown): OSCArg[] {
+  if (!Array.isArray(Route) || Route.length < 2) return [];
+  return Route.slice(1).map((Arg) => {
+    if (typeof Arg === 'number' || typeof Arg === 'string' || typeof Arg === 'boolean') return Arg;
+    if (Arg && typeof Arg === 'object' && 'value' in (Arg as Record<string, unknown>)) {
+      const Inner = (Arg as { value: unknown }).value;
+      if (typeof Inner === 'number' || typeof Inner === 'string' || typeof Inner === 'boolean') {
+        return Inner;
+      }
+    }
+    return Arg == null ? '' : String(Arg);
+  });
 }
 
 // Minimal shape of the UDP remote-info object node-osc passes to the handler.
@@ -340,8 +364,12 @@ async function HandleOSCMessage(Route: unknown, Info: OSCRemoteInfo | undefined)
       }
     }
 
-    // Source address of the UDP packet (used by routes that record sender IPs).
-    const Meta = { IP: Info && Info.address ? Info.address : null };
+    // Source address of the UDP packet (used by routes that record sender IPs)
+    // and the message's arguments (used by routes that take values).
+    const Meta: OSCMeta = {
+      IP: Info && Info.address ? Info.address : null,
+      Args: ExtractOSCArgs(Route),
+    };
 
     const RequestComplete = await RunWithAuditSource(Meta.IP ? `OSC (${Meta.IP})` : 'OSC', () =>
       ValidRoute.Callback(Req, Meta)
@@ -679,16 +707,65 @@ OSC.CreateRoute(
 // e.g. /API/Monitor/proj-sl/pjlink/power.on
 //      /API/Monitor/proj-sl/pjlink/input.set/31
 //
-// The trailing value form exists because node-osc arguments are not consulted by
-// this router (it dispatches purely on the address pattern), so a parameter has
-// to travel in the path. It fills the action's FIRST declared parameter, which
-// is the only one any single-value route could unambiguously address; an action
-// needing more than one is UI/SDK territory.
+// Values can travel two ways, and both keep working:
+//
+//   - As OSC arguments, in the order the action declares its parameters:
+//       /API/Monitor/qsys-main/qsys-core/snapshot.load "Show" 3 2.5
+//     This reaches every parameter, carries spaces, and keeps numbers typed.
+//   - As a trailing path segment (the original form), which fills the FIRST
+//     parameter. Any arguments then fill the parameters after it:
+//       /API/Monitor/qsys-main/qsys-core/snapshot.load/Show 3 2.5
+//
+// An empty-string argument means "use the default", so a sender with fixed
+// fields (QLab) can skip an optional value. A trailing 'list' parameter takes
+// every remaining argument, and a comma-separated string splits into items.
+// Extra arguments are ignored rather than refused, as they were before the
+// router read arguments at all.
+function isBlank(Value: unknown): boolean {
+  return Value === undefined || Value === null || Value === '';
+}
+
+function asListValue(Values: unknown[]): unknown[] {
+  return Values.flatMap((Value) =>
+    typeof Value === 'string'
+      ? Value.split(',')
+          .map((Part) => Part.trim())
+          .filter(Boolean)
+      : [Value]
+  ).filter((Value) => !isBlank(Value));
+}
+
+// Map positional values onto a parameter schema. Returns the params object, or
+// an error naming the first required parameter left without a value.
+function positionalParams(
+  Fields: MonitoringSettingField[],
+  Values: unknown[]
+): [string, null] | [null, Record<string, unknown>] {
+  const Params: Record<string, unknown> = {};
+  for (let I = 0; I < Fields.length; I++) {
+    const Field = Fields[I]!;
+    const IsLastList = Field.Type === 'list' && I === Fields.length - 1;
+    if (IsLastList) {
+      const Items = asListValue(Values.slice(I));
+      if (Items.length) Params[Field.Key] = Items;
+    } else if (Field.Type === 'list') {
+      if (!isBlank(Values[I])) Params[Field.Key] = asListValue([Values[I]]);
+    } else if (!isBlank(Values[I])) {
+      Params[Field.Key] = Values[I];
+    }
+    if (Field.Required && !(Field.Key in Params) && isBlank(Field.Default)) {
+      return [`needs a value for ${Field.Label || Field.Key} (value ${I + 1})`, null];
+    }
+  }
+  return [null, Params];
+}
+
 async function runMonitorAction(
   Slug: string,
   Method: string,
   ActionID: string,
-  Value: string | null
+  Value: string | null,
+  Args: OSCArg[] = []
 ): Promise<RouteResult> {
   const Target =
     typeof MonitoringTargetManager.GetBySlug === 'function'
@@ -705,14 +782,19 @@ async function runMonitorAction(
     return failureResult(`Unknown action "${Method}/${ActionID}"`);
   }
 
-  const Params: Record<string, unknown> = {};
-  if (Value != null) {
-    const First = Array.isArray(Action.Params) ? Action.Params[0] : null;
-    if (!First) {
-      return failureResult(`Action "${Method}/${ActionID}" takes no value`);
-    }
-    Params[First.Key] = Value;
+  const Fields = Array.isArray(Action.Params) ? Action.Params : [];
+  if (Value != null && !Fields.length) {
+    return failureResult(`Action "${Method}/${ActionID}" takes no value`);
   }
+  // A no-value action ignores arguments, as it always has.
+  const Values: unknown[] = Fields.length ? (Value != null ? [Value, ...Args] : [...Args]) : [];
+  const [ParamsErr, Params] = positionalParams(Fields, Values);
+  if (ParamsErr !== null) {
+    const Detail = `${Action.Label} ${ParamsErr}`;
+    Broadcast.emit('Notify', `OSC - ${Detail}`, 'error');
+    return failureResult(Detail);
+  }
+  const Shown = Values.filter((Entry) => !isBlank(Entry));
 
   const [Err, Summary] = await MonitoringTargetManager.RunAction(
     [Target.TargetID],
@@ -733,7 +815,7 @@ async function runMonitorAction(
     return failureResult(`${Action.Label} on "${Target.Slug || Target.TargetID}": ${Reason}`);
   }
   return successResult(
-    `${Action.Label} sent to "${Target.Slug || Target.TargetID}"${Value != null ? ` (${Value})` : ''}`
+    `${Action.Label} sent to "${Target.Slug || Target.TargetID}"${Shown.length ? ` (${Shown.join(', ')})` : ''}`
   );
 }
 
@@ -746,20 +828,43 @@ function describeValueParam(Field: MonitoringSettingField): string {
   return `<${Field.Label || Field.Key}>`;
 }
 
+// How the reference describes the values an action takes beyond the path:
+// "Values as OSC arguments: <Bank> <Snapshot> [Ramp]".
+function describeArgs(Fields: MonitoringSettingField[]): string {
+  return Fields.map((Field) => {
+    const Name = Field.Label || Field.Key;
+    const Shape = Field.Type === 'list' ? `${Name}...` : Name;
+    return Field.Required && isBlank(Field.Default) ? `<${Shape}>` : `[${Shape}]`;
+  }).join(' ');
+}
+
 // Every action every monitoring method declares, split by whether it takes a
 // value, so each Monitor route lists exactly the paths it will accept. Methods
 // register at import, so the catalogue is complete by the time this runs.
+// Value-taking actions also note their full OSC-argument form.
 function monitorActionValues(WithValue: boolean): OSCRouteValueList {
   const Methods = typeof MonitoringMethods.GetAll === 'function' ? MonitoringMethods.GetAll() : [];
   const Entries: OSCRouteValue[] = [];
   for (const Method of Methods) {
     for (const Action of Method.Actions || []) {
       const First = Array.isArray(Action.Params) ? Action.Params[0] : undefined;
-      if (WithValue !== Boolean(First)) continue;
+      // The plain route accepts every action now (values as arguments); the
+      // path-value route only those with a parameter to fill.
+      if (WithValue && !First) continue;
+      const Fields = Array.isArray(Action.Params) ? Action.Params : [];
+      const Notes = [
+        Fields.length > 1 || (Fields.length === 1 && !WithValue)
+          ? `Values as OSC arguments: ${describeArgs(Fields)}.`
+          : '',
+        Fields.length > 1 && WithValue
+          ? `With a path value, arguments fill the rest: ${describeArgs(Fields.slice(1))}.`
+          : '',
+        Action.Note || '',
+      ].filter(Boolean);
       Entries.push({
-        Value: `${Method.ID}/${Action.ID}${First ? `/${describeValueParam(First)}` : ''}`,
+        Value: `${Method.ID}/${Action.ID}${First && WithValue ? `/${describeValueParam(First)}` : ''}`,
         Label: `${Method.Name} - ${Action.Label}`,
-        ...(Action.Note ? { Note: Action.Note } : {}),
+        ...(Notes.length ? { Note: Notes.join(' ') } : {}),
       });
     }
   }
@@ -768,15 +873,22 @@ function monitorActionValues(WithValue: boolean): OSCRouteValueList {
 
 OSC.CreateRoute(
   '/API/Monitor/:Slug/:Method/:ActionID',
-  async (Req) => runMonitorAction(Req.Slug ?? '', Req.Method ?? '', Req.ActionID ?? '', null),
+  async (Req, Meta) =>
+    runMonitorAction(Req.Slug ?? '', Req.Method ?? '', Req.ActionID ?? '', null, Meta?.Args),
   'Run a check action on a Monitor by its slug, method and action ID',
   monitorActionValues(false)
 );
 
 OSC.CreateRoute(
   '/API/Monitor/:Slug/:Method/:ActionID/:Value',
-  async (Req) =>
-    runMonitorAction(Req.Slug ?? '', Req.Method ?? '', Req.ActionID ?? '', Req.Value ?? ''),
+  async (Req, Meta) =>
+    runMonitorAction(
+      Req.Slug ?? '',
+      Req.Method ?? '',
+      Req.ActionID ?? '',
+      Req.Value ?? '',
+      Meta?.Args
+    ),
   'Run a check action that takes a value (e.g. pjlink/input.set/31) on a Monitor',
   monitorActionValues(true)
 );
@@ -791,13 +903,14 @@ OSC.CreateRoute(
 //
 // e.g. /API/FreeKiosk/lobby-tablet/reboot
 //      /API/FreeKiosk/lobby-tablet/brightness/40
+//      /API/FreeKiosk/lobby-tablet/brightness 40   (value as an OSC argument)
 //      /API/Group/foyer/FreeKiosk/screen.off
 //
 // The command map in FreeKiosk/commands is the allowlist, and the value runs
 // through the same validator as the view modal's FreeKiosk:Command channel, so
 // OSC can send exactly what the UI can and nothing more; /api/js stays
-// unreachable. As with check actions, the trailing value fills the command's
-// one parameter because this router never reads OSC arguments. The Group, Tag
+// unreachable. As with check actions, the value fills the command's one
+// parameter, from the path or the first OSC argument. The Group, Tag
 // and All forms send to every FreeKiosk terminal they cover; other client types
 // are not touched.
 type OSCFreeKioskTerminal = NonNullable<Awaited<ReturnType<typeof FreeKioskManager.GetBySlug>>>;
@@ -856,10 +969,15 @@ async function getAllFreeKioskTerminals(): Promise<FreeKioskTargets> {
   return describeTerminalSet(Terminals || [], '');
 }
 
+// A command's value can come from the path (`brightness/40`, the original form)
+// or, over OSC, from the first argument (`brightness 40`). The path wins when
+// both are present. A command that takes no value ignores arguments, as it
+// always has.
 async function runFreeKioskCommand(
   Targets: Promise<FreeKioskTargets>,
   CommandID: string,
-  Value: string | null
+  PathValue: string | null,
+  Args: OSCArg[] = []
 ): Promise<RouteResult> {
   const fail = (Detail: string): RouteResult => {
     Broadcast.emit('Notify', `OSC - ${Detail}`, 'error');
@@ -873,7 +991,9 @@ async function runFreeKioskCommand(
   if (!Command) return fail(`Unknown FreeKiosk command "${CommandID}"`);
 
   const First = Array.isArray(Command.Params) ? Command.Params[0] : undefined;
-  if (Value != null && !First) return fail(`${Command.Label} takes no value`);
+  if (PathValue != null && !First) return fail(`${Command.Label} takes no value`);
+  const ArgValue = First && !isBlank(Args[0]) ? String(Args[0]) : null;
+  const Value = PathValue != null ? PathValue : ArgValue;
   if (Value == null && First) {
     return fail(`${Command.Label} needs a value, e.g. ${CommandID}/${describeValueParam(First)}`);
   }
@@ -915,13 +1035,16 @@ function freeKioskCommandValues(WithValue: boolean): OSCRouteValueList {
   const Entries: OSCRouteValue[] = [];
   for (const Command of FREEKIOSK_COMMANDS as readonly FreeKioskCommandDef[]) {
     const First = Array.isArray(Command.Params) ? Command.Params[0] : undefined;
-    if (WithValue !== Boolean(First)) continue;
+    // The plain route accepts every command (a value as an OSC argument); the
+    // path-value route only those that take one.
+    if (WithValue && !First) continue;
     const Notes = [
+      First && !WithValue ? `Value as an OSC argument: ${describeValueParam(First)}.` : '',
       Command.Modes ? `${Command.Modes.map(DisplayModeLabel).join(' / ')} mode only.` : '',
       Command.Note || '',
     ].filter(Boolean);
     Entries.push({
-      Value: `${Command.ID}${First ? `/${describeValueParam(First)}` : ''}`,
+      Value: `${Command.ID}${First && WithValue ? `/${describeValueParam(First)}` : ''}`,
       Label: Command.Label,
       ...(Notes.length ? { Note: Notes.join(' ') } : {}),
     });
@@ -931,19 +1054,25 @@ function freeKioskCommandValues(WithValue: boolean): OSCRouteValueList {
 
 OSC.CreateRoute(
   '/API/FreeKiosk/:Slug/:CommandID',
-  async (Req) =>
-    runFreeKioskCommand(getFreeKioskTerminalBySlug(Req.Slug ?? ''), Req.CommandID ?? '', null),
+  async (Req, Meta) =>
+    runFreeKioskCommand(
+      getFreeKioskTerminalBySlug(Req.Slug ?? ''),
+      Req.CommandID ?? '',
+      null,
+      Meta?.Args
+    ),
   'Send a command (e.g. reboot) to a FreeKiosk Terminal by its slug and command ID',
   freeKioskCommandValues(false)
 );
 
 OSC.CreateRoute(
   '/API/FreeKiosk/:Slug/:CommandID/:Value',
-  async (Req) =>
+  async (Req, Meta) =>
     runFreeKioskCommand(
       getFreeKioskTerminalBySlug(Req.Slug ?? ''),
       Req.CommandID ?? '',
-      Req.Value ?? ''
+      Req.Value ?? '',
+      Meta?.Args
     ),
   'Send a command that takes a value (e.g. brightness/40) to a FreeKiosk Terminal',
   freeKioskCommandValues(true)
@@ -951,19 +1080,25 @@ OSC.CreateRoute(
 
 OSC.CreateRoute(
   '/API/Group/:Slug/FreeKiosk/:CommandID',
-  async (Req) =>
-    runFreeKioskCommand(getGroupFreeKioskTerminals(Req.Slug ?? ''), Req.CommandID ?? '', null),
+  async (Req, Meta) =>
+    runFreeKioskCommand(
+      getGroupFreeKioskTerminals(Req.Slug ?? ''),
+      Req.CommandID ?? '',
+      null,
+      Meta?.Args
+    ),
   'Send a command (e.g. reboot) to every FreeKiosk Terminal in a Group by its slug',
   freeKioskCommandValues(false)
 );
 
 OSC.CreateRoute(
   '/API/Group/:Slug/FreeKiosk/:CommandID/:Value',
-  async (Req) =>
+  async (Req, Meta) =>
     runFreeKioskCommand(
       getGroupFreeKioskTerminals(Req.Slug ?? ''),
       Req.CommandID ?? '',
-      Req.Value ?? ''
+      Req.Value ?? '',
+      Meta?.Args
     ),
   'Send a command that takes a value (e.g. brightness/40) to every FreeKiosk Terminal in a Group',
   freeKioskCommandValues(true)
@@ -971,19 +1106,25 @@ OSC.CreateRoute(
 
 OSC.CreateRoute(
   '/API/Tag/:Slug/FreeKiosk/:CommandID',
-  async (Req) =>
-    runFreeKioskCommand(getTagFreeKioskTerminals(Req.Slug ?? ''), Req.CommandID ?? '', null),
+  async (Req, Meta) =>
+    runFreeKioskCommand(
+      getTagFreeKioskTerminals(Req.Slug ?? ''),
+      Req.CommandID ?? '',
+      null,
+      Meta?.Args
+    ),
   'Send a command (e.g. reboot) to every FreeKiosk Terminal carrying a Tag by its slug',
   freeKioskCommandValues(false)
 );
 
 OSC.CreateRoute(
   '/API/Tag/:Slug/FreeKiosk/:CommandID/:Value',
-  async (Req) =>
+  async (Req, Meta) =>
     runFreeKioskCommand(
       getTagFreeKioskTerminals(Req.Slug ?? ''),
       Req.CommandID ?? '',
-      Req.Value ?? ''
+      Req.Value ?? '',
+      Meta?.Args
     ),
   'Send a command that takes a value (e.g. brightness/40) to every FreeKiosk Terminal carrying a Tag',
   freeKioskCommandValues(true)
@@ -991,15 +1132,21 @@ OSC.CreateRoute(
 
 OSC.CreateRoute(
   '/API/All/FreeKiosk/:CommandID',
-  async (Req) => runFreeKioskCommand(getAllFreeKioskTerminals(), Req.CommandID ?? '', null),
+  async (Req, Meta) =>
+    runFreeKioskCommand(getAllFreeKioskTerminals(), Req.CommandID ?? '', null, Meta?.Args),
   'Send a command (e.g. reboot) to every FreeKiosk Terminal',
   freeKioskCommandValues(false)
 );
 
 OSC.CreateRoute(
   '/API/All/FreeKiosk/:CommandID/:Value',
-  async (Req) =>
-    runFreeKioskCommand(getAllFreeKioskTerminals(), Req.CommandID ?? '', Req.Value ?? ''),
+  async (Req, Meta) =>
+    runFreeKioskCommand(
+      getAllFreeKioskTerminals(),
+      Req.CommandID ?? '',
+      Req.Value ?? '',
+      Meta?.Args
+    ),
   'Send a command that takes a value (e.g. brightness/40) to every FreeKiosk Terminal',
   freeKioskCommandValues(true)
 );
