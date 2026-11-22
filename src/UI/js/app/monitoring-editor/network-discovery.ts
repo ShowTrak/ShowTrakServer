@@ -10,7 +10,7 @@
 import type { NetworkScanEvent, NetworkScanResult } from '@showtrak/protocol';
 import type { DiscoveredDevice } from '../state/types';
 import { closeModal, openModal } from '../lib/modal';
-import { buildModalHeader } from '../lib/modal-header';
+import { buildModalHeader } from '@showtrak/protocol/ui/modal-header';
 import {
   MonitoringMethodsCache,
   NetworkDiscoveryProgress,

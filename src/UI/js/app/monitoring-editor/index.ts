@@ -17,7 +17,7 @@
 // schedules a status re-run, so separating them would trade one large module for
 // two that import each other.
 import { closeModal, openModal } from '../lib/modal';
-import { buildModalHeader } from '../lib/modal-header';
+import { buildModalHeader } from '@showtrak/protocol/ui/modal-header';
 import type { MonitoringCheckDebug, MonitoringTargetView } from '@showtrak/protocol';
 import type { MonitoringEditorCheck } from '../state';
 import {

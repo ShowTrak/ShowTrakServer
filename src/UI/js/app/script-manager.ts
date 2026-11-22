@@ -5,7 +5,7 @@ import type {
   ScriptManagerEntry,
 } from '@showtrak/protocol';
 import { closeModal, openModal } from './lib/modal';
-import { buildModalHeader } from './lib/modal-header';
+import { buildModalHeader } from '@showtrak/protocol/ui/modal-header';
 import { HandleNonFatalError, Safe } from './utils';
 import { CloseAllModals } from './modals';
 import { ConfirmationDialog, Notify } from './selection-init';

@@ -2,7 +2,7 @@ import type { GroupView, TagDisplayMode, TagView } from '@showtrak/protocol';
 import { closeModal, onceHidden, openModal } from './lib/modal';
 import { RenderColourSwatches, SelectedColourIndex } from './lib/colour-swatches';
 import { EnableDragReorder } from './lib/drag-reorder';
-import { buildModalHeader } from './lib/modal-header';
+import { buildModalHeader } from '@showtrak/protocol/ui/modal-header';
 import { HandleNonFatalError, Safe } from './utils';
 import { CloseAllModals } from './modals';
 import { ConfirmationDialog, Notify } from './selection-init';

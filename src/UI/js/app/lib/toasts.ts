@@ -1,9 +1,7 @@
 // Renderer toast/notification systems, co-located.
 //
 // There are three transient-UI surfaces with genuinely different lifecycles,
-// kept as distinct entry points but unified here behind shared helpers
-// (`iconForType`, the hover-pause auto-dismiss timer) rather than forced into a
-// single component:
+// kept as distinct entry points rather than forced into a single component:
 //   1. Alert-style toasts:  top-center, stack in a host, hover-pausable
 //      auto-dismiss (`showAlertStyleToast` / `Notify`).
 //   2. Confirmation dialog: single modal toast, promise-based, keyboard-driven
@@ -12,303 +10,41 @@
 //   3. Execution toast:     persistent region holding a live execution list,
 //      outside-click to dismiss (`ShowExecutionToast` / `HideExecutionToast`).
 //
-// Extracted verbatim from the old selection-init god-module so that file can
-// become a pure re-export barrel.
+// The first two are the renderer kit's (@showtrak/protocol/ui/toasts and
+// /confirm-dialog), shared with ShowTrak Timers and configured here for the
+// Server: outline status icons, and a confirmation that stands the identify
+// banner down while it is open. The critical confirmation and the execution
+// panel are the Server's own.
+import { CreateToasts, ensureToastHost, RemoveAlertToastById } from '@showtrak/protocol/ui/toasts';
+import { CancelConfirmation, CreateConfirmationDialog } from '@showtrak/protocol/ui/confirm-dialog';
 import { setConfirmDialogActive } from '../state';
-import { HandleNonFatalError, Safe, WithFullStop } from '../utils';
-import { DismissAlert, iconForAlert } from '../alerts-tray';
+import { HandleNonFatalError, Safe } from '../utils';
 import { UpdateIdentifyStatusBanner } from '../identify';
-
-/** Options accepted by {@link showAlertStyleToast}. */
-interface AlertStyleToastOptions {
-  id?: string | null;
-  title?: unknown;
-  message?: unknown;
-  type?: string;
-  duration?: number;
-  linkAlert?: boolean;
-  iconHtml?: string | null;
-}
-
-// --- Shared helpers ---------------------------------------------------------
-
-export function iconForType(type: unknown) {
-  const t = String(type || 'info').toLowerCase();
-  if (t === 'success') return '<i class="bi bi-check-circle"></i>';
-  if (t === 'warning') return '<i class="bi bi-exclamation-triangle"></i>';
-  if (t === 'error') return '<i class="bi bi-x-circle"></i>';
-  return '<i class="bi bi-info-circle"></i>';
-}
-
-// Auto-remove `el` after `duration` ms, pausing the countdown while the pointer
-// hovers it. Shared by the alert-style toasts; no-op for duration <= 0.
-function attachHoverPauseDismiss(el: HTMLElement, duration: number) {
-  if (!duration || duration <= 0) return;
-  let remaining = duration;
-  let timerId: ReturnType<typeof setTimeout> | null = null;
-  let lastStart = Date.now();
-  const clear = () => {
-    if (timerId) {
-      clearTimeout(timerId);
-      timerId = null;
-    }
-  };
-  const remove = (context: string) => {
-    try {
-      el.remove();
-    } catch (e) {
-      HandleNonFatalError(context, e);
-    }
-  };
-  const tick = () => {
-    clear();
-    lastStart = Date.now();
-    timerId = setTimeout(() => remove('showAlertStyleToast:AutoRemove'), remaining);
-  };
-  el.addEventListener('mouseenter', () => {
-    remaining -= Date.now() - lastStart;
-    if (remaining < 0) remaining = 0;
-    clear();
-  });
-  el.addEventListener('mouseleave', () => {
-    if (remaining === 0) remove('showAlertStyleToast:MouseLeaveRemove');
-    else tick();
-  });
-  tick();
-}
 
 // --- 1. Alert-style toasts (top center) -------------------------------------
 
-export function ensureToastHost() {
-  let host = document.getElementById('ALERTS_TOAST_HOST');
-  if (!host) {
-    host = document.createElement('div');
-    host.id = 'ALERTS_TOAST_HOST';
-    document.body.appendChild(host);
-  }
-  return host;
-}
+export { ensureToastHost, RemoveAlertToastById };
 
-export function RemoveAlertToastById(id: unknown) {
-  try {
-    const host = document.getElementById('ALERTS_TOAST_HOST');
-    if (!host) return;
-    const node = host.querySelector(`.alert-toast[data-alert-id="${CSS.escape(String(id))}"]`);
-    if (node) node.remove();
-  } catch (e) {
-    HandleNonFatalError('RemoveAlertToastById', e);
-  }
-}
-
-export function showAlertStyleToast({
-  id = null,
-  title = '',
-  message = '',
-  type = 'info',
-  duration = 5000,
-  linkAlert = false,
-  iconHtml = null,
-}: AlertStyleToastOptions) {
-  const host = ensureToastHost();
-  const el = document.createElement('div');
-  el.className = 'alert-item alert-toast';
-  el.setAttribute('data-severity', String(type || 'info').toLowerCase());
-  if (id && linkAlert) el.setAttribute('data-alert-id', id);
-  const hasMessage = Boolean(message && String(message).trim().length > 0);
-  if (!hasMessage) el.classList.add('single-line');
-  el.innerHTML = `
-		<div class="alert-icon">${iconHtml ? iconHtml : linkAlert ? iconForAlert({ type }) : iconForType(type)}</div>
-		<div class="alert-content">
-			<div><strong>${Safe(title || 'Notice')}</strong></div>
-			${message ? `<div class="alert-meta">${Safe(message)}</div>` : ''}
-		</div>
-		<div class="alert-dismiss">
-			<button class="btn-dismiss" title="Dismiss" aria-label="Dismiss">✕</button>
-		</div>`;
-  host.appendChild(el);
-
-  // Dismiss interaction
-  const btn = el.querySelector('.btn-dismiss');
-  if (btn)
-    btn.addEventListener('click', () => {
-      el.remove();
-      if (linkAlert && id) {
-        // Sync with alerts tray
-        DismissAlert(id);
-      }
-    });
-
-  // Auto-remove after duration with hover pause
-  attachHoverPauseDismiss(el, duration);
-}
-
-// Every toast reads as a sentence: dynamic messages (errors handed back by the
-// server, labels joined at runtime) get the full stop literals carry already.
-export async function Notify(Message: unknown, Type = 'info', Duration = 5000) {
-  showAlertStyleToast({
-    title: WithFullStop(Message),
-    message: '',
-    type: Type,
-    duration: Duration,
-    linkAlert: false,
-  });
-}
+export const { iconForType, showAlertStyleToast, Notify } = CreateToasts({
+  IconStyle: 'outline',
+});
 
 // --- 2. Confirmation dialog -------------------------------------------------
 
-/** Options accepted by {@link ConfirmationDialog}. */
-export interface ConfirmationDialogOptions {
-  /**
-   * The confirm button's label, naming the action in Title Case ("Delete Tag",
-   * "Run Script"). Required so no dialog falls back to a vague "Confirm".
-   */
-  ConfirmLabel: string;
-}
-
-// The confirmation waiting for an answer, if any: only one at a time.
-let ActiveConfirmation: { Finish: (Answer: boolean) => void } | null = null;
-
-/**
- * Close a confirmation that is waiting, as if Cancel was chosen. Called when
- * whatever it was asked about goes away (every modal is closed for something
- * else), so a stale question can never be answered.
- */
-export function CancelConfirmation(): void {
-  ActiveConfirmation?.Finish(false);
-}
+export { CancelConfirmation };
 
 /**
  * Ask a question with Cancel and a named confirm button. Resolves true or false.
- *
- * Keys go to the dialog's own buttons, as to any button: Enter or Space on the
- * focused one (Confirm, to start with), Tab and the arrow keys to move between
- * them, Escape to cancel. A key pressed anywhere else (typing in a field behind
- * the dialog) never answers it, and neither does a key held down from before
- * it opened: the old handler on `document` confirmed on Enter or Space wherever
- * the focus was. Inside an open modal the dialog is placed in that modal, which
- * is where Bootstrap keeps the focus, and closing the modal cancels it. Opening
- * a second dialog cancels the first (which used to stay live, so one Enter
- * answered both).
+ * Keys go to the dialog's own buttons; inside an open modal it sits in that
+ * modal, and closing the modal cancels it. While it is open the identify banner
+ * stands down.
  */
-export async function ConfirmationDialog(
-  Message: unknown,
-  Options: ConfirmationDialogOptions
-): Promise<boolean> {
-  CancelConfirmation();
-  return new Promise<boolean>((resolve) => {
-    const existing = document.getElementById('SHOWTRAK_CONFIRM_TOAST');
-    if (existing) {
-      try {
-        existing.remove();
-      } catch (err) {
-        HandleNonFatalError('Toasts:NonFatal', err);
-      }
-    }
-
-    const toastHtml = `
-			<div id="SHOWTRAK_CONFIRM_TOAST" role="alertdialog" aria-modal="true" aria-labelledby="CONFIRM_TOAST_MESSAGE" class="confirm-toast no-drag">
-				<div class="confirm-toast-body">
-					<div class="confirm-toast-msg" id="CONFIRM_TOAST_MESSAGE">${Safe(Message)}</div>
-					<div class="confirm-toast-actions">
-						<button type="button" class="btn btn-sm btn-secondary" id="CONFIRM_TOAST_CANCEL">Cancel</button>
-						<button type="button" class="btn btn-sm btn-danger" id="CONFIRM_TOAST_CONFIRM">${Safe(
-              Options.ConfirmLabel
-            )}</button>
-					</div>
-				</div>
-			</div>`;
-
-    // In the open modal, if there is one: Bootstrap pulls the focus back into
-    // an open modal, so a dialog outside it could never hold the focus.
-    const HostModal = document.querySelector<HTMLElement>('.modal.show');
-    $(HostModal ?? document.body).append(toastHtml);
-    const $toast = $('#SHOWTRAK_CONFIRM_TOAST');
-    const $btnCancel = $('#CONFIRM_TOAST_CANCEL');
-    const $btnConfirm = $('#CONFIRM_TOAST_CONFIRM');
-    const Buttons = () => $toast.find('button').toArray() as HTMLElement[];
-    const Previous = document.activeElement as HTMLElement | null;
-
-    setConfirmDialogActive(true);
+export const ConfirmationDialog = CreateConfirmationDialog({
+  OnActiveChange: (Active) => {
+    setConfirmDialogActive(Active);
     UpdateIdentifyStatusBanner();
-
-    let Done = false;
-    const OnEscape = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      // An open context menu takes its own Escape.
-      const $ctx = $('#SHOWTRAK_CONTEXT_MENU');
-      if ($ctx.length && $ctx.is(':visible')) return;
-      // Before the modal behind sees it: Escape cancels the question, not the modal.
-      e.preventDefault();
-      e.stopPropagation();
-      Finish(false);
-    };
-    const Finish = (Answer: boolean) => {
-      if (Done) return;
-      Done = true;
-      ActiveConfirmation = null;
-      document.removeEventListener('keydown', OnEscape, true);
-      if (HostModal) $(HostModal).off('hide.bs.modal.confirmToast');
-      try {
-        $toast.remove();
-      } catch (err) {
-        HandleNonFatalError('Toasts:NonFatal', err);
-      }
-      setConfirmDialogActive(false);
-      UpdateIdentifyStatusBanner();
-      // Back to where the focus was, if that is still on the page.
-      if (Previous && Previous.isConnected) {
-        try {
-          Previous.focus();
-        } catch {
-          /* intentional: best-effort */
-        }
-      }
-      resolve(Answer);
-    };
-    ActiveConfirmation = { Finish };
-
-    $btnCancel.on('click', () => Finish(false));
-    $btnConfirm.on('click', () => Finish(true));
-
-    document.addEventListener('keydown', OnEscape, true);
-    if (HostModal) $(HostModal).one('hide.bs.modal.confirmToast', () => Finish(false));
-
-    $toast.on('keydown', (e) => {
-      const Native = e.originalEvent as KeyboardEvent | undefined;
-      // A key held down (from the button that opened the dialog) repeats into
-      // it: never let a repeat answer it.
-      if ((e.key === 'Enter' || e.key === ' ') && Native?.repeat) {
-        e.preventDefault();
-        return;
-      }
-      const List = Buttons();
-      const Index = List.indexOf(document.activeElement as HTMLElement);
-      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-        e.preventDefault();
-        const Step = e.key === 'ArrowLeft' ? -1 : 1;
-        const Next = Index === -1 ? List.length - 1 : (Index + Step + List.length) % List.length;
-        List[Next]?.focus();
-        return;
-      }
-      // Tab stays among the dialog's buttons while it is open.
-      if (e.key === 'Tab') {
-        e.preventDefault();
-        const Step = e.shiftKey ? -1 : 1;
-        const Next = Index === -1 ? 0 : (Index + Step + List.length) % List.length;
-        List[Next]?.focus();
-      }
-    });
-
-    // Confirm starts with the focus, so Enter (on it) confirms.
-    setTimeout(() => {
-      try {
-        if (!Done) $btnConfirm.trigger('focus');
-      } catch (err) {
-        HandleNonFatalError('Toasts:NonFatal', err);
-      }
-    }, 0);
-  });
-}
+  },
+});
 
 // --- 2b. Critical confirmation ----------------------------------------------
 // The loud sibling of ConfirmationDialog for actions that must never fire by

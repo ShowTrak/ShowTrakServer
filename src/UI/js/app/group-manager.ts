@@ -5,7 +5,7 @@
 // renderer modules (no back-reference into modals), so it carries the
 // group-manager editing state that was previously module-level in modals.
 import { closeAllModals, closeModal, openModal } from './lib/modal';
-import { buildModalHeader } from './lib/modal-header';
+import { buildModalHeader } from '@showtrak/protocol/ui/modal-header';
 import { Safe } from './utils';
 import { SCRIPT_COLOURS } from './lib/script-colours';
 import { EnableDragReorder } from './lib/drag-reorder';

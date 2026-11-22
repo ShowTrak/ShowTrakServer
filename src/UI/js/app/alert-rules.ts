@@ -1,5 +1,5 @@
 import { openModal, closeModal } from './lib/modal';
-import { buildModalHeader } from './lib/modal-header';
+import { buildModalHeader } from '@showtrak/protocol/ui/modal-header';
 import {
   AlertActionEditorIsCreating,
   AlertActionTypesCache,

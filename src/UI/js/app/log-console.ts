@@ -6,7 +6,7 @@
 // the chosen minimum level, so a closed console costs no IPC or Web UI traffic.
 import type { LogConsoleEntry, LogConsoleSnapshot } from '@showtrak/protocol';
 import { closeModal, openModal } from './lib/modal';
-import { buildModalHeader } from './lib/modal-header';
+import { buildModalHeader } from '@showtrak/protocol/ui/modal-header';
 import { EntryChars, MAX_CHARS, MAX_LINES, NewestWithinBudget } from './lib/log-console-budget';
 import { CloseAllModals } from './modals';
 import { HandleNonFatalError } from './utils';

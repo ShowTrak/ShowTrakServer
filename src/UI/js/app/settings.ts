@@ -18,7 +18,7 @@ import {
 import { GetAlertVolume, HandleNonFatalError, Safe, ShowQRModal } from './utils';
 import { Notify } from './selection-init';
 import { ConfirmationDialog } from './lib/toasts';
-import { FormatSettingValue, ResolveSettingsTab } from './lib/settings-tabs';
+import { FormatSettingValue, ResolveSettingsTab } from '@showtrak/protocol/ui/settings-tabs';
 import { GROUP_COLOUR_SATURATION_KEY, ParseGroupColourScale } from './lib/client-list-layout';
 import type { RemoteDeviceView, SettingGroupView, SettingView } from '@showtrak/protocol';
 // Wires the mode/view/alert-action buttons and fetches initial settings +

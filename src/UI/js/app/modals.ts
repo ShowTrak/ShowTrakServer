@@ -1,6 +1,6 @@
 import { closeAllModals, closeModal, openModal } from './lib/modal';
 import { CancelConfirmation } from './lib/toasts';
-import { buildModalHeader } from './lib/modal-header';
+import { buildModalHeader } from '@showtrak/protocol/ui/modal-header';
 import { Config, PendingAdoption, ScriptList, CompactMode } from './state';
 import { SetCompactMode, SetViewMode } from './mode';
 import { ParseViewMode } from './lib/list-view';

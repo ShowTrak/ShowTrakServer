@@ -68,15 +68,19 @@ export function AddAlert({
   PruneExpiredAlerts(alert.time);
   UpdateAlertsIndicator();
   if (AlertsVisible) RenderAlerts();
-  // Also show a top-center toast linked to this alert
+  // Also show a top-center toast linked to this alert: dismissing it dismisses
+  // the alert, and dismissing the alert removes it. Its icon is the alert's own,
+  // else the one the tray draws for the toast's type.
+  const ToastType = alert.severity || alert.type || 'info';
   showAlertStyleToast({
     id: alert.id,
     title: alert.title || 'Alert',
     message: alert.message || '',
-    type: alert.severity || alert.type || 'info',
+    type: ToastType,
     duration: 6000,
     linkAlert: true,
-    iconHtml: alert.iconHtml,
+    iconHtml: iconForAlert({ type: ToastType, iconHtml: alert.iconHtml }),
+    onDismiss: () => DismissAlert(alert.id),
   });
   return alert.id;
 }

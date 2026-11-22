@@ -1,6 +1,13 @@
-import { QrToSvg } from './lib/qr-svg';
+import { QrToSvg } from '@showtrak/protocol/ui/qr-svg';
+import { HandleNonFatalError } from '@showtrak/protocol/ui/errors';
 import { openModal } from './lib/modal';
 import { Settings } from './state';
+
+// The renderer's HTML escaper and error helpers are the renderer kit's, shared
+// with ShowTrak Timers, and re-exported here for the modules that import them
+// from utils.
+export { Safe } from '@showtrak/protocol/ui/html';
+export { ErrorMessage, HandleNonFatalError } from '@showtrak/protocol/ui/errors';
 
 // Master alert volume as a 0..1 multiplier, read live from the current settings
 // snapshot (ALERT_SOUND_VOLUME, a 0-100 slider). Defaults to full volume when
@@ -13,66 +20,6 @@ export function GetAlertVolume(): number {
   const Pct = Number(Setting.Value);
   if (!Number.isFinite(Pct)) return 1;
   return Math.min(1, Math.max(0, Pct / 100));
-}
-
-// Close a toast message off as a sentence. Literal messages are written with
-// their own full stop, but dynamic ones (errors handed back by the server,
-// labels joined at runtime) often are not. Messages already ending in sentence
-// punctuation are left alone, and non-strings pass through untouched.
-export function WithFullStop(Message: unknown): unknown {
-  if (typeof Message !== 'string') return Message;
-  const Trimmed = Message.trimEnd();
-  if (!Trimmed) return Message;
-  return /[.!?\u2026]$/.test(Trimmed) ? Trimmed : `${Trimmed}.`;
-}
-
-// The single HTML escaper for the renderer. Escapes all five significant
-// entities (ampersand first), so the result is safe in text content AND in
-// double- or single-quoted attribute values. Always returns a string:
-// null/undefined collapse to '' (never the literal "null"/"undefined"), and
-// arrays are escaped element-wise and comma-joined to match how an array would
-// otherwise stringify inside a template literal.
-export function Safe(Input: unknown): string {
-  if (typeof Input === 'string') {
-    return Input.replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
-  if (Array.isArray(Input)) {
-    return Input.map(Safe).join(',');
-  }
-  if (Input === null || Input === undefined) {
-    return '';
-  }
-  // Numbers, booleans, and any object/function are coerced to their string form
-  // and then escaped, so nothing can carry markup through an interpolation.
-  return Safe(String(Input));
-}
-
-// Extract a human-readable message from an unknown thrown value (catch clauses
-// are typed `unknown`). Falls back to a caller-supplied default, then String().
-export function ErrorMessage(Err: unknown, Fallback = ''): string {
-  if (Err && typeof Err === 'object' && 'message' in Err) {
-    const Message = (Err as { message?: unknown }).message;
-    if (typeof Message === 'string' && Message.length > 0) return Message;
-  }
-  if (Fallback) return Fallback;
-  return String(Err);
-}
-
-export function HandleNonFatalError(Context: unknown, Error: unknown = null) {
-  try {
-    const Label = Context ? `[NonFatal] ${Context}` : '[NonFatal]';
-    if (Error) {
-      console.warn(Label, Error);
-      return;
-    }
-    console.warn(Label);
-  } catch {
-    /* intentional: this is the last-resort error reporter; it must never throw */
-  }
 }
 
 export async function WithNonFatal<T>(

@@ -12,8 +12,8 @@ import { ClearSelection, Select } from './selection';
 import { BuildContextMenuOptions, type ContextMenuOption } from './context-menu-options';
 import { LongPressTracker } from './lib/long-press';
 import { RequiresTapConfirm, ResolveClickPointerType } from './lib/touch-input';
-import { PlaceMenu, ResolveMenuAnchor } from './lib/menu-placement';
-import { FindTypeaheadMatch, NextTypeaheadBuffer } from './lib/menu-typeahead';
+import { PlaceMenu, ResolveMenuAnchor } from '@showtrak/protocol/ui/menu-placement';
+import { FindTypeaheadMatch, NextTypeaheadBuffer } from '@showtrak/protocol/ui/menu-typeahead';
 
 // True when the UI is in the compact mobile layout (see InitMobileView in
 // mode.ts, which toggles `body.mobile-view`). Used to switch the context

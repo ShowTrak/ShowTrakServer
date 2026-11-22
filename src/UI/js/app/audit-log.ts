@@ -11,7 +11,7 @@ import {
   AuditEntryMatches,
   MergeAuditEntries,
 } from './lib/audit-log';
-import { buildModalHeader } from './lib/modal-header';
+import { buildModalHeader } from '@showtrak/protocol/ui/modal-header';
 import { closeModal, openModal } from './lib/modal';
 import { HandleNonFatalError, Safe } from './utils';
 import { MonitorHistoryModalContext } from './state';

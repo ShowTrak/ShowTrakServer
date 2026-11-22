@@ -1,5 +1,5 @@
 import { closeModal, openModal } from './lib/modal';
-import { buildModalHeader } from './lib/modal-header';
+import { buildModalHeader } from '@showtrak/protocol/ui/modal-header';
 import type { AudioAssetInspection } from '@showtrak/protocol';
 import { AudioAssetsCache, setAudioAssetsCache } from './state';
 import { ErrorMessage, GetAlertVolume, HandleNonFatalError, Safe } from './utils';
