@@ -8,6 +8,7 @@ import { closeAllModals, closeModal, openModal } from './lib/modal';
 import { buildModalHeader } from './lib/modal-header';
 import { Safe } from './utils';
 import { SCRIPT_COLOURS } from './lib/script-colours';
+import { EnableDragReorder } from './lib/drag-reorder';
 import { ConfirmationDialog, Notify, Wait } from './selection-init';
 import { DummyClients, GroupUUIDCache, MonitoringTargets, Settings, __LastClients } from './state';
 import {
@@ -620,24 +621,6 @@ export async function DeleteGroup(GroupID: number): Promise<boolean> {
   return true;
 }
 
-export function GroupManagerDragAfterElement(Container: HTMLElement, Y: number) {
-  const Items = [...Container.querySelectorAll('.GROUP_MANAGER_GROUP_ITEM:not(.dragging)')];
-  let Closest: { offset: number; element: Element | null } = {
-    offset: Number.NEGATIVE_INFINITY,
-    element: null,
-  };
-
-  for (const Child of Items) {
-    const Box = Child.getBoundingClientRect();
-    const Offset = Y - Box.top - Box.height / 2;
-    if (Offset < 0 && Offset > Closest.offset) {
-      Closest = { offset: Offset, element: Child };
-    }
-  }
-
-  return Closest.element;
-}
-
 export async function PersistGroupManagerOrder() {
   const Container = document.getElementById('GROUP_MANAGER_SORTABLE_LIST');
   if (!Container) return true;
@@ -716,20 +699,7 @@ export async function OpenGroupManager(Relaunching = false) {
   `);
 
   const SortableContainer = document.getElementById('GROUP_MANAGER_SORTABLE_LIST');
-  if (SortableContainer) {
-    SortableContainer.addEventListener('dragover', (Event) => {
-      Event.preventDefault();
-      const Dragging = SortableContainer.querySelector('.GROUP_MANAGER_GROUP_ITEM.dragging');
-      if (!Dragging) return;
-      const After = GroupManagerDragAfterElement(SortableContainer, Event.clientY);
-      if (After == null) {
-        SortableContainer.appendChild(Dragging);
-      } else {
-        SortableContainer.insertBefore(Dragging, After);
-      }
-    });
-    SortableContainer.addEventListener('drop', (Event) => Event.preventDefault());
-  }
+  if (SortableContainer) EnableDragReorder(SortableContainer, '.GROUP_MANAGER_GROUP_ITEM');
 
   $('#GROUP_MANAGER_GROUP_LIST')
     .off('dragstart.groupmanager dragend.groupmanager', '.GROUP_MANAGER_GROUP_ITEM')

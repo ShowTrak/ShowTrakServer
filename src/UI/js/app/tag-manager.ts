@@ -1,5 +1,7 @@
 import type { GroupView, TagDisplayMode, TagView } from '@showtrak/protocol';
 import { closeModal, onceHidden, openModal } from './lib/modal';
+import { RenderColourSwatches, SelectedColourIndex } from './lib/colour-swatches';
+import { EnableDragReorder } from './lib/drag-reorder';
 import { buildModalHeader } from './lib/modal-header';
 import { HandleNonFatalError, Safe } from './utils';
 import { CloseAllModals } from './modals';
@@ -7,7 +9,7 @@ import { ConfirmationDialog, Notify } from './selection-init';
 import { IsIconPickerHolding, NormalizeIconName, OpenIconPicker } from './icon-picker';
 // Tags reuse the Scripts colour palette (index-based) and its swatch/icon CSS,
 // so the palette + hex helper are imported rather than duplicated.
-import { SCRIPT_COLOURS, ScriptColourHex } from './script-manager';
+import { ScriptColourHex } from './script-manager';
 import { buildScopeModel, parseScopeSelection, scopeToSelectedValues } from './lib/scope-model';
 import { IsScopePickerHolding, bindScopeButton, renderScopeButton } from './scope-picker';
 import type { ScopePickerConfig } from './scope-picker';
@@ -234,24 +236,10 @@ export function PopulateTagManagerEditor(Tag: TagView) {
   $('#TAG_MANAGER_FIELD_SLUG').val(Tag.Slug || '');
 
   // Colour swatch picker.
-  const SwatchContainer = document.getElementById('TAG_MANAGER_COLOUR_SWATCHES') as HTMLElement;
-  SwatchContainer.innerHTML = '';
-  const CurrentColour = typeof Tag.Colour === 'number' ? Tag.Colour : 6;
-  SCRIPT_COLOURS.forEach((c, idx) => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'script-manager-swatch' + (idx === CurrentColour ? ' selected' : '');
-    btn.title = c.label;
-    btn.style.background = c.hex;
-    btn.setAttribute('data-colour-index', String(idx));
-    btn.addEventListener('click', () => {
-      SwatchContainer.querySelectorAll('.script-manager-swatch').forEach((s) =>
-        s.classList.remove('selected')
-      );
-      btn.classList.add('selected');
-    });
-    SwatchContainer.appendChild(btn);
-  });
+  RenderColourSwatches(
+    document.getElementById('TAG_MANAGER_COLOUR_SWATCHES') as HTMLElement,
+    Tag.Colour
+  );
 
   // Icon field.
   SetTagManagerEditorIcon(Tag.Icon);
@@ -291,15 +279,6 @@ export function SetTagManagerEditorIcon(Icon: unknown) {
   if (PreviewButton) PreviewButton.title = `Icon: ${Name} (click to change)`;
 }
 
-function CollectTagManagerColour(): number {
-  const SwatchContainer = document.getElementById('TAG_MANAGER_COLOUR_SWATCHES');
-  const Selected = SwatchContainer
-    ? SwatchContainer.querySelector('.script-manager-swatch.selected')
-    : null;
-  const Index = Selected ? parseInt(Selected.getAttribute('data-colour-index') || '', 10) : 6;
-  return Number.isInteger(Index) ? Index : 6;
-}
-
 export function RenderTagManagerIssues(Title: string, Issues: string[]) {
   const El = $('#TAG_MANAGER_ISSUES');
   El.removeClass('d-none info error').addClass('error');
@@ -333,7 +312,10 @@ export async function SaveTagManagerConfig() {
     return;
   }
 
-  const [ColourErr] = await window.API.SetTagColour(TagID, CollectTagManagerColour());
+  const [ColourErr] = await window.API.SetTagColour(
+    TagID,
+    SelectedColourIndex(document.getElementById('TAG_MANAGER_COLOUR_SWATCHES'))
+  );
   const [IconErr] = await window.API.SetTagIcon(
     TagID,
     NormalizeIconName(TagManagerEditingIcon) || DEFAULT_TAG_ICON
@@ -461,32 +443,5 @@ export function InitTagManager() {
 
   // Drag-and-drop reordering within the list container.
   const ListContainer = document.getElementById('TAG_MANAGER_LIST');
-  if (ListContainer) {
-    ListContainer.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      const Dragging = ListContainer.querySelector('.script-manager-item.dragging');
-      if (!Dragging) return;
-      const After = TagManagerDragAfterElement(ListContainer, e.clientY);
-      if (After == null) ListContainer.appendChild(Dragging);
-      else ListContainer.insertBefore(Dragging, After);
-    });
-    ListContainer.addEventListener('drop', (e) => e.preventDefault());
-  }
-}
-
-// Find the item the dragged element should be inserted before, based on cursor Y.
-function TagManagerDragAfterElement(Container: HTMLElement, Y: number) {
-  const Items = [...Container.querySelectorAll('.script-manager-item:not(.dragging)')];
-  let Closest: { offset: number; element: Element | null } = {
-    offset: Number.NEGATIVE_INFINITY,
-    element: null,
-  };
-  for (const Child of Items) {
-    const Box = Child.getBoundingClientRect();
-    const Offset = Y - Box.top - Box.height / 2;
-    if (Offset < 0 && Offset > Closest.offset) {
-      Closest = { offset: Offset, element: Child };
-    }
-  }
-  return Closest.element;
+  if (ListContainer) EnableDragReorder(ListContainer, '.script-manager-item');
 }

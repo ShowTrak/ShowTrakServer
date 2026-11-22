@@ -11,6 +11,8 @@ import { CloseAllModals } from './modals';
 import { ConfirmationDialog, Notify } from './selection-init';
 import { NormalizeIconName, OpenIconPicker } from './icon-picker';
 import { SCRIPT_COLOURS, ScriptColourHex } from './lib/script-colours';
+import { RenderColourSwatches, SelectedColourIndex } from './lib/colour-swatches';
+import { EnableDragReorder } from './lib/drag-reorder';
 import { buildScopeModel, parseScopeSelection, scopeToSelectedValues } from './lib/scope-model';
 import { bindScopeButton, renderScopeButton } from './scope-picker';
 import type { ScopePickerConfig } from './scope-picker';
@@ -461,23 +463,6 @@ export function RenderScriptManagerList() {
   }
 }
 
-// Find the item the dragged element should be inserted before, based on cursor Y.
-export function ScriptManagerDragAfterElement(Container: HTMLElement, Y: number) {
-  const Items = [...Container.querySelectorAll('.script-manager-item:not(.dragging)')];
-  let Closest: { offset: number; element: Element | null } = {
-    offset: Number.NEGATIVE_INFINITY,
-    element: null,
-  };
-  for (const Child of Items) {
-    const Box = Child.getBoundingClientRect();
-    const Offset = Y - Box.top - Box.height / 2;
-    if (Offset < 0 && Offset > Closest.offset) {
-      Closest = { offset: Offset, element: Child };
-    }
-  }
-  return Closest.element;
-}
-
 export async function PersistScriptManagerOrder() {
   const Container = document.getElementById('SCRIPT_MANAGER_LIST') as HTMLElement;
   const OrderedIDs = [...Container.querySelectorAll('.script-manager-item')].map(
@@ -528,24 +513,10 @@ export function PopulateScriptManagerEditor(Data: ScriptEditable) {
   $('#SCRIPT_MANAGER_FIELD_DESCRIPTION').val(Data.description || '');
 
   // Colour swatch picker.
-  const SwatchContainer = document.getElementById('SCRIPT_MANAGER_COLOUR_SWATCHES') as HTMLElement;
-  SwatchContainer.innerHTML = '';
-  const currentColour = typeof Data.colour === 'number' ? Data.colour : 6;
-  SCRIPT_COLOURS.forEach((c, idx) => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'script-manager-swatch' + (idx === currentColour ? ' selected' : '');
-    btn.title = c.label;
-    btn.style.background = c.hex;
-    btn.setAttribute('data-colour-index', String(idx));
-    btn.addEventListener('click', () => {
-      SwatchContainer.querySelectorAll('.script-manager-swatch').forEach((s) =>
-        s.classList.remove('selected')
-      );
-      btn.classList.add('selected');
-    });
-    SwatchContainer.appendChild(btn);
-  });
+  RenderColourSwatches(
+    document.getElementById('SCRIPT_MANAGER_COLOUR_SWATCHES') as HTMLElement,
+    Data.colour
+  );
 
   // Icon field.
   SetScriptManagerEditorIcon(Data.icon);
@@ -711,15 +682,9 @@ export function CollectScriptManagerFields() {
     Platforms[Key] = String($(this).find('.script-manager-platform-select').val() || '');
     Arguments[Key] = String($(this).find('.script-manager-platform-args').val() || '').trim();
   });
-  const SwatchContainer = document.getElementById(
-    'SCRIPT_MANAGER_COLOUR_SWATCHES'
-  ) as HTMLElement | null;
-  const selectedSwatch = SwatchContainer
-    ? SwatchContainer.querySelector('.script-manager-swatch.selected')
-    : null;
-  const colourIndex = selectedSwatch
-    ? parseInt(selectedSwatch.getAttribute('data-colour-index') || '', 10)
-    : 6;
+  const colourIndex = SelectedColourIndex(
+    document.getElementById('SCRIPT_MANAGER_COLOUR_SWATCHES')
+  );
   const timeoutSecondsRaw = Number($('#SCRIPT_MANAGER_FIELD_TIMEOUT_SECONDS').val());
   const timeoutSeconds =
     Number.isFinite(timeoutSecondsRaw) &&
@@ -735,7 +700,7 @@ export function CollectScriptManagerFields() {
     id: String($('#SCRIPT_MANAGER_FIELD_ID').val() || '').trim(),
     name: $('#SCRIPT_MANAGER_FIELD_NAME').val(),
     description: $('#SCRIPT_MANAGER_FIELD_DESCRIPTION').val(),
-    colour: isNaN(colourIndex) ? 6 : colourIndex,
+    colour: colourIndex,
     icon: NormalizeIconName(ScriptManagerEditingIcon) || 'terminal',
     confirmation: ReadConfirmationLevel(),
     timeoutMs: timeoutSeconds * 1000,
@@ -905,15 +870,5 @@ export function InitScriptManager() {
 
   // Drag-and-drop reordering within the list container.
   const ListContainer = document.getElementById('SCRIPT_MANAGER_LIST');
-  if (ListContainer) {
-    ListContainer.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      const Dragging = ListContainer.querySelector('.script-manager-item.dragging');
-      if (!Dragging) return;
-      const After = ScriptManagerDragAfterElement(ListContainer, e.clientY);
-      if (After == null) ListContainer.appendChild(Dragging);
-      else ListContainer.insertBefore(Dragging, After);
-    });
-    ListContainer.addEventListener('drop', (e) => e.preventDefault());
-  }
+  if (ListContainer) EnableDragReorder(ListContainer, '.script-manager-item');
 }
