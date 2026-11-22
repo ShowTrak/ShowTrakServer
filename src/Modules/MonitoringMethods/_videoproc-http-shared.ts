@@ -16,7 +16,7 @@
 import http from 'http';
 import https from 'https';
 import { URL } from 'url';
-import { CachedLookup } from './_dns-cache';
+import { CachedLookup, RequestHostname } from './_dns-cache';
 import type { ProbeAgents } from './_probe-agents';
 
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
@@ -112,7 +112,7 @@ export function RequestJson(Url: URL, Request: JsonRequest): Promise<JsonRespons
 
     const Options: https.RequestOptions = {
       method: Request.Method,
-      hostname: Url.hostname,
+      hostname: RequestHostname(Url),
       lookup: CachedLookup,
       port: Url.port || (Url.protocol === 'https:' ? 443 : 80),
       path: `${Url.pathname}${Url.search || ''}`,

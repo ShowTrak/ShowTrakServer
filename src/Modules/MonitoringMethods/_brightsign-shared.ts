@@ -29,7 +29,7 @@ import crypto from 'crypto';
 import { URL } from 'url';
 import { Esc, Pill, Rows, TextRow, Row, Note, FormatLatency } from './debug';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
-import { CachedLookup } from './_dns-cache';
+import { CachedLookup, RequestHostname } from './_dns-cache';
 
 const MAX_BODY_BYTES = 1024 * 1024;
 const MAX_REDIRECTS = 3;
@@ -303,7 +303,7 @@ function SendOnce(
 
     const ReqOpts: https.RequestOptions = {
       method: Request.Method,
-      hostname: Url.hostname,
+      hostname: RequestHostname(Url),
       lookup: CachedLookup,
       port: Url.port || (Url.protocol === 'https:' ? 443 : 80),
       path: `${Url.pathname}${Url.search || ''}`,

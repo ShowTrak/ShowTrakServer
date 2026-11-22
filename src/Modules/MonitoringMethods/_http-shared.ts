@@ -9,7 +9,7 @@ import https from 'https';
 import { URL } from 'url';
 import { Pill, Rows, TextRow, Row, FormatLatency } from './debug';
 import type { MonitoringResult, MonitoringTargetLike } from './types';
-import { CachedLookup } from './_dns-cache';
+import { CachedLookup, RequestHostname } from './_dns-cache';
 
 const MAX_BODY_BYTES = 1024 * 1024;
 const MAX_REDIRECTS = 5;
@@ -118,7 +118,7 @@ function DoRequest(Url: URL, State: HttpRequestState): Promise<MonitoringResult>
 
     const ReqOpts: https.RequestOptions = {
       method: State.Method,
-      hostname: Url.hostname,
+      hostname: RequestHostname(Url),
       lookup: CachedLookup,
       port: Url.port || (Url.protocol === 'https:' ? 443 : 80),
       path: `${Url.pathname || '/'}${Url.search || ''}`,

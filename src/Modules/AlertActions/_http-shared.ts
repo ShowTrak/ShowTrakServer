@@ -62,7 +62,9 @@ function requestJson({
 
     const Req = Transport.request(
       {
-        hostname: Parsed.hostname,
+        // Without the brackets of an IPv6 literal, which would otherwise be
+        // looked up as a name.
+        hostname: Parsed.hostname.replace(/^\[|\]$/g, ''),
         port: Parsed.port || (IsHttps ? 443 : 80),
         path: `${Parsed.pathname || '/'}${Parsed.search || ''}`,
         method: MethodUpper,

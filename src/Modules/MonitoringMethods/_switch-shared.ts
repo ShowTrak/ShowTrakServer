@@ -9,7 +9,7 @@ import http from 'http';
 import https from 'https';
 import { URL } from 'url';
 import { Card, Esc, Pill } from './debug';
-import { CachedLookup } from './_dns-cache';
+import { CachedLookup, RequestHostname } from './_dns-cache';
 import type { ProbeAgents } from './_probe-agents';
 
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
@@ -206,7 +206,7 @@ export function RequestSwitchJson(Url: URL, Request: SwitchRequest): Promise<Swi
     }
     const Options: https.RequestOptions = {
       method: Request.Method,
-      hostname: Url.hostname.replace(/^\[|\]$/g, ''),
+      hostname: RequestHostname(Url),
       lookup: CachedLookup,
       port: Url.port || (Url.protocol === 'https:' ? 443 : 80),
       path: `${Url.pathname}${Url.search || ''}`,

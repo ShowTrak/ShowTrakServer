@@ -123,6 +123,13 @@ export function CachedLookup(
   );
 }
 
+// The host to give http.request() for a URL. URL.hostname keeps the brackets
+// around an IPv6 literal ("[fd00::5]"), which Node would then try to resolve as
+// a name and fail with ENOTFOUND; Node's own http.get(url) strips them too.
+export function RequestHostname(Url: URL): string {
+  return Url.hostname.replace(/^\[|\]$/g, '');
+}
+
 // Forget every cached answer (tests; or after the network changed under us).
 export function ClearLookupCache(): void {
   Cache.clear();
