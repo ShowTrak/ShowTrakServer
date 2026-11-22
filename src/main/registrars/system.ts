@@ -6,7 +6,7 @@ import { CreateLogger } from '../../Modules/Logger';
 import { RPC } from '../rpc';
 import { validationErrorTuple } from '../ipc/create-handler';
 import { PushInitialDesktopState } from '../initial-state';
-import { markInitialStateDelivered } from '../first-paint';
+import { markInitialStateDelivered } from '@showtrak/protocol/electron-main';
 import { app } from 'electron/main';
 import { shell } from 'electron';
 import os from 'os';
@@ -89,7 +89,8 @@ function register(): void {
     try {
       await PushInitialDesktopState();
     } finally {
-      // The first one reveals the main window at startup (see first-paint.ts).
+      // The first one reveals the main window at startup (see
+      // @showtrak/protocol/electron-main's whenInitialStateDelivered).
       markInitialStateDelivered();
     }
     return;

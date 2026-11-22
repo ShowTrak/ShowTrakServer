@@ -1,86 +1,38 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { EventEmitter } = require('node:events');
 const { installModuleMocks, matchesModule } = require('./helpers/main-mocks');
 
-// Exercises src/main/app-updater.ts: what happens when a check is requested
-// while an update is already being fetched.
-//
-// Reopening the Software Update modal (or the periodic automatic check firing)
-// mid-download used to restart the updater, which errors because a download is
-// already running. A check during checking/available/downloading must instead
-// replay the latest status so the modal picks up the run already in flight.
-// Progress ticks also carry the release info, so the floating progress bar and
-// a reopened modal can name the version being downloaded.
+// src/main/app-updater.ts is @showtrak/protocol/electron-main's updater (whose
+// behaviour the protocol's specs cover) pointed at this app's releases. What is
+// the Server's own is that configuration: the wrong repository would offer
+// another app's builds as updates, or none at all.
 
-const sent = [];
-const fakeWindow = {
-  isDestroyed: () => false,
-  webContents: { send: (channel, payload) => sent.push({ channel, payload }) },
-};
-
+let Options = null;
+const Created = { Register() {} };
 const restore = installModuleMocks([
-  { match: matchesModule('electron/main'), value: { app: { isPackaged: false } } },
-  { match: (r) => r === 'electron', value: { autoUpdater: new EventEmitter() } },
   {
-    match: (r) => r === 'electron-updater',
-    value: { autoUpdater: Object.assign(new EventEmitter(), { autoDownload: false }) },
+    match: (r) => r === '@showtrak/protocol/electron-main',
+    value: {
+      CreateAppUpdater: (Given) => {
+        Options = Given;
+        return Created;
+      },
+    },
   },
   {
-    match: matchesModule('/Logger'),
-    value: { CreateLogger: () => ({ log() {}, warn() {}, error() {} }) },
+    match: matchesModule('/Modules/Logger'),
+    value: { CreateLogger: (Alias) => ({ Alias }) },
   },
 ]);
 test.after(() => restore());
 
 const { Manager } = require('../dist/main/app-updater');
 
-const handlers = {};
-Manager.Register(
-  { handle: (channel, fn) => (handlers[channel] = fn) },
-  { getMainWindow: () => fakeWindow }
-);
-
-const statuses = () => sent.map((s) => s.payload);
-
-test('progress ticks carry the info of the update being downloaded', () => {
-  sent.length = 0;
-  Manager.sendAppUpdateStatus({ state: 'checking' });
-  Manager.sendAppUpdateStatus({ state: 'available', info: { version: '3.30.0' } });
-  Manager.sendAppUpdateStatus({ state: 'downloading', percent: 42 });
-  assert.deepEqual(statuses()[2], {
-    state: 'downloading',
-    percent: 42,
-    info: { version: '3.30.0' },
-  });
-});
-
-test('a check while downloading replays the progress instead of restarting', async () => {
-  sent.length = 0;
-  await handlers['AppUpdate:Check']();
-  assert.deepEqual(statuses(), [
-    { state: 'downloading', percent: 42, info: { version: '3.30.0' } },
-  ]);
-});
-
-test('a new check clears the previous run’s info', () => {
-  Manager.sendAppUpdateStatus({ state: 'downloaded', info: { version: '3.30.0' } });
-  sent.length = 0;
-  Manager.sendAppUpdateStatus({ state: 'checking' });
-  Manager.sendAppUpdateStatus({ state: 'downloading', percent: 5 });
-  assert.deepEqual(statuses()[1], { state: 'downloading', percent: 5 });
-});
-
-test('once the download has finished, a check re-sends it rather than checking again', async (t) => {
-  t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
-  Manager.sendAppUpdateStatus({ state: 'downloaded', info: { version: '3.30.0' } });
-  sent.length = 0;
-  await handlers['AppUpdate:Check']();
-  // A fresh check would answer "up to date" on Windows (Squirrel already lists
-  // the downloaded version) and hide the Install button.
-  assert.deepEqual(statuses(), [{ state: 'downloaded', info: { version: '3.30.0' } }]);
-  t.mock.timers.tick(5000);
-  assert.equal(statuses().length, 1);
-  // Installing it clears the way for the next check.
-  Manager.sendAppUpdateStatus({ state: 'installed' });
+test("the updater checks ShowTrak Server's own GitHub releases", () => {
+  assert.equal(Manager, Created, 'Manager is the kit updater itself');
+  assert.equal(Options.Owner, 'ShowTrak');
+  assert.equal(Options.Repo, 'ShowTrakServer');
+  assert.equal(Options.UserAgent, 'ShowTrakServer');
+  assert.equal(Options.TempConfigName, 'showtrak-app-update.yml');
+  assert.equal(Options.Logger.Alias, 'AppUpdater');
 });

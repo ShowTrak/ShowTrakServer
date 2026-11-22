@@ -243,8 +243,8 @@ test('Loaded re-pushes the authoritative state after a renderer reload', async (
   // empty until the next incremental push.
   assert.equal(await GetHandler('Loaded')(null), undefined);
   assert.equal(initialStatePushes.length, 1);
-  // The startup reveal waits on this (see src/main/first-paint.ts).
-  const { whenInitialStateDelivered } = require('../dist/main/first-paint');
+  // The startup reveal waits on this (see main.ts).
+  const { whenInitialStateDelivered } = require('@showtrak/protocol/electron-main');
   const Started = Date.now();
   await whenInitialStateDelivered(5000);
   assert.ok(Date.now() - Started < 1000, 'the first Loaded marks the initial state delivered');

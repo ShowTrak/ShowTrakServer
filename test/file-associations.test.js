@@ -3,125 +3,33 @@
 // in Finder or Explorer swaps out the show every client is running against, so
 // it must find the right file, never lose unsaved changes, and ask before it
 // replaces a running show.
+//
+// Finding the file, holding the request and the Windows registry entries are
+// @showtrak/protocol/electron-main's CreateShowFileAssociations, covered by the
+// protocol's specs; the Server's part is its configuration and the prompt.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
 
 const FA = require('../dist/main/file-associations');
 const { ConfirmShowFileReplace } = require('../dist/main/show-file-replace-prompt');
 
-test.beforeEach(() => FA.ResetShowFileRequestsForTests());
+// --- Configuration ------------------------------------------------------------
 
-// --- Command line -------------------------------------------------------------
-
-test('finds an existing show file on the command line, in any letter case', (t) => {
-  const Dir = fs.mkdtempSync(path.join(os.tmpdir(), 'st-assoc-'));
-  t.after(() => fs.rmSync(Dir, { recursive: true, force: true }));
-  const File = path.join(Dir, 'Main Stage.ShowTrak');
-  fs.writeFileSync(File, '');
-  assert.equal(FA.ShowFileFromArgv(['--squirrel-firstrun', File]), File);
-  assert.equal(
-    FA.ShowFileFromArgv(['Main Stage.ShowTrak'], Dir),
-    File,
-    'relative to the cwd given'
-  );
-});
-
-test('ignores switches, other files and show files that do not exist', (t) => {
-  const Dir = fs.mkdtempSync(path.join(os.tmpdir(), 'st-assoc-'));
-  t.after(() => fs.rmSync(Dir, { recursive: true, force: true }));
-  fs.writeFileSync(path.join(Dir, 'notes.txt'), '');
-  assert.equal(
-    FA.ShowFileFromArgv(['.', '--allow-file-access-from-files', 'notes.txt', 'gone.showtrak'], Dir),
-    null
-  );
-  assert.equal(FA.IsShowFilePath('--x.showtrak'), false);
-});
-
-// --- Requests -----------------------------------------------------------------
-
-test('a request before the renderer starts is part of the launch, and is not announced', () => {
-  let Announced = 0;
-  FA.OnShowFileRequest(() => Announced++);
-  FA.RequestShowFileOpen('/a.showtrak');
-  assert.equal(Announced, 0);
-  assert.deepEqual(FA.TakeShowFileRequest(), { FilePath: '/a.showtrak', Source: 'Launch' });
-  assert.equal(FA.TakeShowFileRequest(), null, 'taken once');
-});
-
-test('once the renderer has started, a request is announced and asks first', () => {
-  let Announced = 0;
-  FA.OnShowFileRequest(() => Announced++);
-  FA.TakeShowFileRequest();
-  FA.RequestShowFileOpen('/a.showtrak');
-  FA.RequestShowFileOpen('/b.showtrak');
-  assert.equal(Announced, 2);
-  assert.deepEqual(FA.TakeShowFileRequest(), { FilePath: '/b.showtrak', Source: 'Running' });
-});
-
-// --- Windows registry ---------------------------------------------------------
-
-test('Squirrel install and update register the association against the stub exe', () => {
-  const ExecPath =
-    'C:\\Users\\op\\AppData\\Local\\showtrak_server\\app-3.33.0\\showtrak-server.exe';
-  for (const Event of ['--squirrel-install', '--squirrel-updated']) {
-    const Calls = [];
-    const Action = FA.HandleSquirrelFileAssociations(['exe', Event, '3.33.0'], {
-      Platform: 'win32',
-      ExecPath: ExecPath.replace(/\\/g, '/'),
-      Run: (Args) => (Calls.push(Args), { status: 0 }),
-    });
-    assert.equal(Action, 'register');
-    const Command = Calls.find((A) => A[1].endsWith('\\shell\\open\\command'));
-    assert.ok(Command, 'writes the open command');
-    assert.match(Command[4], /showtrak_server[\\/]showtrak-server\.exe" "%1"$/);
-    assert.doesNotMatch(Command[4], /app-3\.33\.0/, 'not the versioned folder Squirrel deletes');
-    assert.ok(
-      Calls.some(
-        (A) => A[1] === 'HKCU\\Software\\Classes\\.showtrak' && A.includes('ShowTrak.ShowFile')
-      )
-    );
-  }
-});
-
-test('Squirrel uninstall removes the association, and .showtrak only while it is still ours', () => {
-  const Run = (Default) => {
-    const Calls = [];
-    FA.HandleSquirrelFileAssociations(['exe', '--squirrel-uninstall'], {
-      Platform: 'win32',
-      ExecPath: '/root/app-1.0.0/showtrak-server.exe',
-      Run: (Args) => {
-        Calls.push(Args);
-        return Args[0] === 'query'
-          ? { status: 0, stdout: `(Default) REG_SZ ${Default}` }
-          : { status: 0 };
-      },
-    });
-    return Calls;
-  };
-  const DeletesExtension = (Calls) =>
-    Calls.some(
-      (A) => A[0] === 'delete' && A[1] === 'HKCU\\Software\\Classes\\.showtrak' && A.includes('/ve')
-    );
-  assert.ok(
-    Run('ShowTrak.ShowFile').some((A) => A[0] === 'delete' && A[1].endsWith('\\ShowTrak.ShowFile'))
-  );
-  assert.equal(DeletesExtension(Run('ShowTrak.ShowFile')), true);
-  assert.equal(DeletesExtension(Run('SomeOtherApp.File')), false);
-});
-
-test('nothing happens outside Windows or without a Squirrel event', () => {
-  const Run = () => assert.fail('must not touch the registry');
-  assert.equal(
-    FA.HandleSquirrelFileAssociations(['exe', '--squirrel-install'], { Platform: 'darwin', Run }),
-    null
-  );
-  assert.equal(
-    FA.HandleSquirrelFileAssociations(['exe', 'show.showtrak'], { Platform: 'win32', Run }),
-    null
-  );
+test('associates .showtrak files with ShowTrak Server, as forge.config.ts declares them', () => {
+  assert.equal(FA.SHOW_FILE_EXTENSION, 'showtrak');
+  assert.equal(FA.WINDOWS_PROG_ID, 'ShowTrak.ShowFile');
+  assert.equal(FA.IsShowFilePath('/shows/Main Stage.ShowTrak'), true);
+  assert.equal(FA.IsShowFilePath('/shows/timers.showtraktimers'), false);
+  const Register = FA.WindowsAssociationCommands('register', 'C:\\ShowTrak\\showtrak-server.exe');
+  assert.deepEqual(Register[0], [
+    'add',
+    'HKCU\\Software\\Classes\\.showtrak',
+    '/ve',
+    '/d',
+    'ShowTrak.ShowFile',
+    '/f',
+  ]);
+  assert.ok(Register.some((Args) => Args.includes('ShowTrak Show File')));
 });
 
 // --- Replacing the open show --------------------------------------------------

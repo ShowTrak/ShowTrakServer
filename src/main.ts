@@ -25,11 +25,11 @@ import { Manager as AppDataManager } from './Modules/AppData';
 AppDataManager.Initialize();
 import { CreateLogger } from './Modules/Logger';
 const Logger = CreateLogger('Main');
-// Install the process-wide network fault guards before any socket-binding module
-// loads, so a mid-boot interface drop (mDNS/OSC/etc.) is caught rather than
-// crashing the process. See ./main/process-guards.
-import { installProcessGuards } from './main/process-guards';
-installProcessGuards();
+// Install the process-wide fault guards before any socket-binding module loads,
+// so a mid-boot interface drop (mDNS/OSC/etc.) is caught rather than crashing the
+// process. See @showtrak/protocol/runtime's InstallProcessGuards.
+import { InstallProcessGuards } from '@showtrak/protocol/runtime';
+InstallProcessGuards(CreateLogger('ProcessGuard'));
 // Gate multiple instances. If another instance is already running, quit early.
 // The arguments go across as additionalData too: Chromium adds its own switches
 // to the argv that 'second-instance' reports, and can reorder it.
@@ -87,7 +87,7 @@ import {
   PRELOADER_MIN_DISPLAY_MS,
   PRELOADER_SHOW_DELAY_MS,
 } from './Modules/Config/constants';
-import { whenInitialStateDelivered } from './main/first-paint';
+import { whenInitialStateDelivered } from '@showtrak/protocol/electron-main';
 
 // --- Back-end manager boot ---------------------------------------------------
 // Load order is preserved from the original main.ts. `require('./Modules/Server')`
@@ -128,10 +128,13 @@ import path from 'path';
 import { RPC } from './main/rpc';
 import { RegisterRendererSink, PushToRenderers } from './main/renderer-bus';
 import { getMainWindow, setMainWindow, hasMainWindow } from './main/app-window';
-import { StartDevReload } from './main/dev-reload';
+import {
+  StartDevReload,
+  applyWindowSecurityGuards,
+  applyWindowZoomShortcuts,
+} from '@showtrak/protocol/electron-main';
+import { DIST_ROOT } from './Modules/Config/dist-root';
 import { configureApplicationMenu } from './main/app-menu';
-import { applyWindowSecurityGuards } from './main/window-guards';
-import { applyWindowZoomShortcuts } from './main/window-zoom';
 import { scheduleAutosave } from './main/autosave';
 import {
   setAccidentalShutdownProtection,
@@ -347,7 +350,13 @@ app.whenReady().then(async () => {
     ...WINDOW_CHROME_OPTIONS,
   });
   setMainWindow(MainWindow);
-  StartDevReload();
+  // Development only (npm start): reload the window when the built renderer
+  // changes, keeping the main process and everything connected to it.
+  StartDevReload({
+    Root: path.join(DIST_ROOT, 'UI'),
+    GetWindow: getMainWindow,
+    Logger: CreateLogger('DevReload'),
+  });
 
   MainWindow.loadFile(path.join(__dirname, 'UI', 'index.html')).then(async () => {
     Logger.log('MainWindow finished loading UI');

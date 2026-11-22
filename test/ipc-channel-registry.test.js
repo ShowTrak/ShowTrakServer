@@ -33,9 +33,15 @@ function extractCallChannels(source, callPattern) {
   return names;
 }
 
-// Main process source: main.js plus any registrar modules under src/main.
+// Main process source: main.js plus any registrar modules under src/main, and
+// the shared self-updater (@showtrak/protocol/electron-main), which registers
+// the AppUpdate:* channels on the RPC object it is handed.
 function readMainProcessSource() {
-  const files = [path.join(SRC_DIR, 'main.js'), ...collectJsFiles(path.join(SRC_DIR, 'main'))];
+  const files = [
+    path.join(SRC_DIR, 'main.js'),
+    ...collectJsFiles(path.join(SRC_DIR, 'main')),
+    path.join(__dirname, '..', 'shared', 'dist', 'electron-main', 'app-updater.js'),
+  ];
   return files.map((file) => fs.readFileSync(file, 'utf8')).join('\n');
 }
 
