@@ -6,17 +6,40 @@
 import { isDeepStrictEqual } from 'util';
 import path from 'path';
 
+import type {
+  AssertTrue,
+  ChannelListCheck,
+  ScriptConfig,
+  ScriptConfirmationLevel,
+  ScriptConsoleFilter,
+  ScriptConsoleFilterMode,
+  ScriptPlatform,
+} from '@showtrak/protocol';
+
 import { SCRIPT_EXECUTION_DEFAULT_TIMEOUT_MS } from '../Config/constants';
 
+// The normalised Script.json, its console filter and its confirmation level are
+// the protocol's ScriptConfig, ScriptConsoleFilter and ScriptConfirmationLevel:
+// the catalog ships them to clients, the renderer and the SDK as they are.
+// Each list below names exactly the protocol's values (checked at compile time).
+
 // The platforms a script can target. Order is meaningful for display.
-const PLATFORM_KEYS = ['Windows', 'macOS', 'Linux'];
+const PLATFORM_KEYS = ['Windows', 'macOS', 'Linux'] as const;
+type _PlatformKeysMatch = AssertTrue<ChannelListCheck<ScriptPlatform, typeof PLATFORM_KEYS>>;
 
 // Console filter match modes. The filter is applied CLIENT-SIDE while a script
 // runs: only console lines that match are surfaced as the live status tail.
 // "none" disables filtering (every line is surfaced; the historical default).
 // Order is meaningful for display in the Script Manager UI.
-const CONSOLE_FILTER_MODES = ['none', 'startsWith', 'includes', 'regex'];
-const DEFAULT_CONSOLE_FILTER_MODE = 'none';
+const CONSOLE_FILTER_MODES = ['none', 'startsWith', 'includes', 'regex'] as const;
+type _ConsoleFilterModesMatch = AssertTrue<
+  ChannelListCheck<ScriptConsoleFilterMode, typeof CONSOLE_FILTER_MODES>
+>;
+const DEFAULT_CONSOLE_FILTER_MODE: ScriptConsoleFilterMode = 'none';
+
+function IsConsoleFilterMode(value: string): value is ScriptConsoleFilterMode {
+  return (CONSOLE_FILTER_MODES as readonly string[]).includes(value);
+}
 
 // How hard a script asks before it runs. Script.json stores this as the
 // historical `Confirmation` boolean plus an optional `ConfirmationStyle`, which
@@ -24,10 +47,12 @@ const DEFAULT_CONSOLE_FILTER_MODE = 'none';
 // byte-identical (no checksum churn, no mass redeploy), and older clients and
 // SDK consumers that only read `Confirmation` still see a confirm-worthy script.
 const CONFIRMATION_LEVELS = ['None', 'Standard', 'Critical'] as const;
-type ConfirmationLevel = (typeof CONFIRMATION_LEVELS)[number];
+type _ConfirmationLevelsMatch = AssertTrue<
+  ChannelListCheck<ScriptConfirmationLevel, typeof CONFIRMATION_LEVELS>
+>;
 const CRITICAL_CONFIRMATION_STYLE = 'Critical';
 
-function IsConfirmationLevel(value: unknown): value is ConfirmationLevel {
+function IsConfirmationLevel(value: unknown): value is ScriptConfirmationLevel {
   return typeof value === 'string' && (CONFIRMATION_LEVELS as readonly string[]).includes(value);
 }
 
@@ -35,7 +60,7 @@ function IsConfirmationLevel(value: unknown): value is ConfirmationLevel {
 function ResolveConfirmationLevel(Config: {
   Confirmation?: unknown;
   ConfirmationStyle?: unknown;
-}): ConfirmationLevel {
+}): ScriptConfirmationLevel {
   if (Config.Confirmation !== true) return 'None';
   return Config.ConfirmationStyle === CRITICAL_CONFIRMATION_STYLE ? 'Critical' : 'Standard';
 }
@@ -91,26 +116,24 @@ function NormalizeArgumentString(value: unknown): string {
 // When Strip is true the matched text is removed from the surfaced line (only
 // the remainder is shown as the live status tail). Parsing/matching/stripping
 // happens on the ShowTrakClient; this only validates shape.
-interface ConsoleFilterConfig {
-  Mode: string;
-  Pattern: string;
-  Strip: boolean;
-}
-
+//
 // Normalize the optional ConsoleFilter object. Coerces Mode to a known mode
-// (defaulting to "includes") and Pattern to a trimmed string. For regex mode a
+// (defaulting to "none") and Pattern to a trimmed string. For regex mode a
 // pattern that fails to compile is kept as-authored but reported as a warning
 // so the author can fix it; the client disables an uncompilable filter.
-function NormalizeConsoleFilter(value: unknown): { filter: ConsoleFilterConfig; errors: string[] } {
+function NormalizeConsoleFilter(value: unknown): { filter: ScriptConsoleFilter; errors: string[] } {
   const errors: string[] = [];
   const raw = IsPlainObject(value) ? value : {};
   if (value !== undefined && !IsPlainObject(value)) {
     errors.push('"ConsoleFilter" was not an object; reset to an empty filter.');
   }
 
-  let Mode = typeof raw.Mode === 'string' ? raw.Mode.trim() : '';
-  if (!CONSOLE_FILTER_MODES.includes(Mode)) {
-    if (Mode)
+  const RawMode = typeof raw.Mode === 'string' ? raw.Mode.trim() : '';
+  let Mode: ScriptConsoleFilterMode;
+  if (IsConsoleFilterMode(RawMode)) {
+    Mode = RawMode;
+  } else {
+    if (RawMode)
       errors.push(
         `ConsoleFilter "Mode" was invalid; defaulted to "${DEFAULT_CONSOLE_FILTER_MODE}".`
       );
@@ -174,30 +197,14 @@ function ResolveLegacyPathTargets(legacyPath: string): string[] {
   return ['Windows', 'macOS', 'Linux'];
 }
 
-// The managed keys every normalized Script.json carries. Unknown author keys
-// are preserved alongside these (hence the index signature).
-interface NormalizedScriptConfig {
-  Name: string;
-  Description: string;
-  Colour: number;
-  Icon: string;
-  Weight: number;
-  Confirmation: boolean;
-  /** Present only when "Critical"; see CONFIRMATION_LEVELS. */
-  ConfirmationStyle?: 'Critical';
-  Enabled: boolean;
-  Timeout: number;
-  Platforms: Record<string, string>;
-  Arguments: Record<string, string>;
-  ConsoleFilter: ConsoleFilterConfig;
-  [key: string]: unknown;
-}
-
-// Produce a fully-normalized config object for a script folder.
+// Produce a fully-normalized config object for a script folder: the managed
+// keys every normalized Script.json carries (ScriptConfig; ConfirmationStyle is
+// present only when "Critical", see CONFIRMATION_LEVELS), with any unknown keys
+// the author added preserved alongside them.
 function NormalizeScriptConfig(
   RawData: unknown,
   ID: string
-): { config: NormalizedScriptConfig; changed: boolean; errors: string[] } {
+): { config: ScriptConfig; changed: boolean; errors: string[] } {
   const errors: string[] = [];
   const data: Record<string, unknown> = IsPlainObject(RawData) ? RawData : {};
   if (!IsPlainObject(RawData)) {
@@ -415,7 +422,7 @@ function NormalizeScriptConfig(
   if ('LabelStyle' in config) delete config.LabelStyle;
 
   const changed = !isDeepStrictEqual(data, config);
-  return { config: config as NormalizedScriptConfig, changed, errors };
+  return { config: config as ScriptConfig, changed, errors };
 }
 
 export {
@@ -431,4 +438,3 @@ export {
   NormalizeConsoleFilter,
   NormalizeIconName,
 };
-export type { NormalizedScriptConfig, ConsoleFilterConfig, ConfirmationLevel };

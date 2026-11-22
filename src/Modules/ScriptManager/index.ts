@@ -27,32 +27,26 @@ import {
   NormalizeScriptConfig,
   ResolveConfirmationLevel,
 } from './schema';
-import type { NormalizedScriptConfig, ConsoleFilterConfig, ConfirmationLevel } from './schema';
-import type { ScriptFileEntry, Result } from '@showtrak/protocol';
+import type {
+  Result,
+  ScriptCatalogEntry,
+  ScriptCatalogInvalidScript,
+  ScriptCatalogScript,
+  ScriptConfig,
+  ScriptConfirmationLevel,
+  ScriptConsoleFilter,
+  ScriptConsoleFilterMode,
+  ScriptEditable,
+  ScriptFileEntry,
+  ScriptPlatformMap,
+} from '@showtrak/protocol';
 
 const Logger = CreateLogger('ScriptManager');
 
-// A per-platform launch/argument map ({ Windows, macOS, Linux }).
-type PlatformMap = Record<string, string>;
-
-// A ScriptFileEntry (from the protocol) is one entry in a script folder's file listing.
-
-// The editable projection of a script surfaced to the Script Manager UI.
-interface ScriptEditable {
-  id: string;
-  name: string;
-  description: string;
-  colour: number;
-  icon: string;
-  confirmation: ConfirmationLevel;
-  timeoutMs: number;
-  enabled: boolean;
-  platforms: PlatformMap;
-  arguments: PlatformMap;
-  consoleFilter: ConsoleFilterConfig;
-  files: string[];
-  valid: boolean;
-}
+// The catalog (Script and InvalidScript below, union ScriptCatalogEntry), each
+// folder's file listing (ScriptFileEntry), its per-platform launch and argument
+// maps (ScriptPlatformMap: { Windows, macOS, Linux }) and the editable
+// projection the Script Manager UI reads (ScriptEditable) are the protocol's.
 
 // Structured field edits accepted by SaveFields (from the renderer). Every
 // field is validated/normalized at runtime, so inputs are permissive.
@@ -101,8 +95,6 @@ interface ScriptTemplateResult {
   errors?: string[];
 }
 
-type ScriptCatalogEntry = Script | InvalidScript;
-
 interface ScriptManagerType {
   GetScripts(Force?: boolean): Promise<ScriptCatalogEntry[]>;
   ReloadScripts(): Promise<ScriptCatalogEntry[]>;
@@ -123,7 +115,11 @@ let ScriptDirectoryWatcherPath: string | null = null;
 let ScriptDirectoryReloadTimer: ReturnType<typeof setTimeout> | null = null;
 let DeploymentFingerprint = '';
 
-class Script {
+// Instances go on the wire as they are (GetScripts, SetScriptList), so each
+// class implements its protocol entry. Declaring a field here makes it an own
+// property of every instance, which the catalog's readers test with `in`: only
+// add one the protocol entry declares.
+class Script implements ScriptCatalogScript {
   ID: string;
   Name: string;
   Description: string;
@@ -131,21 +127,21 @@ class Script {
   Icon: string;
   Weight: number;
   Confirmation: boolean;
-  ConfirmationLevel: ConfirmationLevel;
+  ConfirmationLevel: ScriptConfirmationLevel;
   Timeout: number;
-  Platforms: PlatformMap;
-  Arguments: PlatformMap;
-  ConsoleFilter: ConsoleFilterConfig;
+  Platforms: ScriptPlatformMap;
+  Arguments: ScriptPlatformMap;
+  ConsoleFilter: ScriptConsoleFilter;
   CompatiblePlatforms: string[];
   Files: ScriptFileEntry[];
   isEnabled: boolean;
-  isValid: boolean;
+  isValid: true;
   ValidationErrors: string[];
-  Config: NormalizedScriptConfig;
+  Config: ScriptConfig;
 
   constructor(
     ID: string,
-    Config: NormalizedScriptConfig,
+    Config: ScriptConfig,
     AllFilesInFolder: ScriptFileEntry[],
     CompatiblePlatforms: string[],
     ValidationErrors: string[]
@@ -190,7 +186,7 @@ class Script {
 
 // Represents a script whose Script.json failed to parse. It is surfaced to the
 // Script Manager UI so the author can fix it, but is never runnable.
-class InvalidScript {
+class InvalidScript implements ScriptCatalogInvalidScript {
   ID: string;
   Name: string;
   Description: string;
@@ -198,17 +194,17 @@ class InvalidScript {
   Icon: string;
   Weight: number;
   Confirmation: boolean;
-  ConfirmationLevel: ConfirmationLevel;
-  Platforms: PlatformMap;
-  Arguments: PlatformMap;
+  ConfirmationLevel: ScriptConfirmationLevel;
+  Platforms: ScriptPlatformMap;
+  Arguments: ScriptPlatformMap;
   CompatiblePlatforms: string[];
   Files: ScriptFileEntry[];
   isEnabled: boolean;
-  isValid: boolean;
+  isValid: false;
   ParseError: string;
   RawText: string;
   ValidationErrors: string[];
-  Config: NormalizedScriptConfig | null;
+  Config: null;
 
   constructor(ID: string, ParseError: string, RawText: unknown) {
     this.ID = ID;
@@ -254,9 +250,11 @@ interface FingerprintScriptEntry {
   Confirmation: boolean;
   Timeout: number;
   Enabled: boolean;
-  Platforms: PlatformMap;
-  Arguments: PlatformMap;
-  ConsoleFilter: ConsoleFilterConfig;
+  Platforms: ScriptPlatformMap;
+  Arguments: ScriptPlatformMap;
+  // Mode is any string here, not just a known one: this is hash input, built
+  // field by field below, and it must hash exactly as it always has.
+  ConsoleFilter: { Mode: string; Pattern: string; Strip: boolean };
   isValid: boolean;
   ParseError: string;
   Files: FingerprintFileEntry[];
@@ -485,7 +483,10 @@ async function ChecksumWalkedFile(File: WalkedFile): Promise<string | null> {
 }
 
 // Determine which platforms reference an existing file inside the script folder.
-function ResolveCompatiblePlatforms(ScriptFolderPath: string, Platforms: PlatformMap): string[] {
+function ResolveCompatiblePlatforms(
+  ScriptFolderPath: string,
+  Platforms: ScriptPlatformMap
+): string[] {
   const Compatible: string[] = [];
   for (const key of PLATFORM_KEYS) {
     const rel = Platforms[key];
@@ -754,7 +755,10 @@ Manager.GetEditable = async (ID: string): Promise<Result<ScriptEditable>> => {
     consoleFilter:
       'ConsoleFilter' in Script && Script.ConsoleFilter && typeof Script.ConsoleFilter === 'object'
         ? {
-            Mode: String(Script.ConsoleFilter.Mode || DEFAULT_CONSOLE_FILTER_MODE),
+            // Already one of the modes: NormalizeScriptConfig settled it.
+            Mode: String(
+              Script.ConsoleFilter.Mode || DEFAULT_CONSOLE_FILTER_MODE
+            ) as ScriptConsoleFilterMode,
             Pattern: String(Script.ConsoleFilter.Pattern || ''),
             Strip: Script.ConsoleFilter.Strip === true,
           }
@@ -807,7 +811,7 @@ Manager.SaveFields = async (
   const Arguments = (
     Fields.arguments && typeof Fields.arguments === 'object' ? Fields.arguments : {}
   ) as Record<string, unknown>;
-  const Confirmation: ConfirmationLevel = IsConfirmationLevel(Fields.confirmation)
+  const Confirmation: ScriptConfirmationLevel = IsConfirmationLevel(Fields.confirmation)
     ? Fields.confirmation
     : Fields.confirm
       ? 'Standard'

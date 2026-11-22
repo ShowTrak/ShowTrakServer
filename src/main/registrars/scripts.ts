@@ -18,6 +18,7 @@ import {
 import { shell } from 'electron';
 import path from 'path';
 import fs from 'fs';
+import type { ScriptManagerEntry } from '@showtrak/protocol';
 import { execFile } from 'child_process';
 import { Manager as ServerManager } from '../../Modules/Server';
 import { Manager as ScriptManager } from '../../Modules/ScriptManager';
@@ -285,7 +286,7 @@ function register(): void {
   // Script Manager: return the catalog (including invalid scripts) for editing.
   RPC.handle('Scripts:GetManagerList', async () => {
     const Scripts = (await ScriptManager.GetScripts()) || [];
-    return Scripts.map((s) => ({
+    return Scripts.map((s): ScriptManagerEntry => ({
       id: s.ID,
       name: s.Name,
       description: s.Description || '',

@@ -44,6 +44,12 @@ declare module 'socket.io' {
 
 // The default-namespace socket, bound to the shared client wire contract.
 type ClientSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
+// What the server acknowledges a client's request with, as the contract declares
+// it: the payload of the event's callback (GetScripts' catalog, and so on).
+type AckPayloadOf<Event extends keyof ClientToServerEvents> =
+  Parameters<ClientToServerEvents[Event]> extends [(payload: infer Payload) => void]
+    ? Payload
+    : never;
 // The Socket.IO server bound to the same contract.
 type ClientNamespaceServer = Server<ClientToServerEvents, ServerToClientEvents>;
 
@@ -98,7 +104,8 @@ function makeGuardedOn(
   // makes the validator's array literal infer as a tuple), so a handler cannot
   // annotate its payload as a shape the validator never produced.
   return function GuardedOn<Args extends unknown[] | []>(
-    event: string,
+    // A client event the contract declares ('disconnect' is Socket.IO's own).
+    event: keyof ClientToServerEvents | 'disconnect',
     validate: ((...args: unknown[]) => Args) | null,
     handler: (...args: Args) => unknown,
     options: { serial?: boolean } = {}
@@ -276,9 +283,11 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
 
     GuardedOn(
       'GetScripts',
-      (Callback) => [SocketValidation.Ack(Callback, 'GetScripts')],
+      (Callback) => [SocketValidation.Ack<AckPayloadOf<'GetScripts'>>(Callback, 'GetScripts')],
       async (Callback) => {
         Logger.log(`Client ${socket.UUID} requested scripts.`);
+        // The current catalog (ScriptCatalogEntry), which every client reads as
+        // the wire generation it is (ScriptCatalogWireEntry).
         const Scripts = await ScriptManager.GetScripts();
         Callback(Scripts);
       }
@@ -289,7 +298,9 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
     // Integrated / unadopted clients get a null config.
     GuardedOn(
       'GetLaunchConfig',
-      (Callback) => [SocketValidation.Ack(Callback, 'GetLaunchConfig')],
+      (Callback) => [
+        SocketValidation.Ack<AckPayloadOf<'GetLaunchConfig'>>(Callback, 'GetLaunchConfig'),
+      ],
       async (Callback) => {
         // Global toggle for the on-screen abort countdown, applied to every
         // client's launch config so the operator controls it from one place.
@@ -315,7 +326,7 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
     // an empty set rather than the show's variables.
     GuardedOn(
       'GetVariables',
-      (Callback) => [SocketValidation.Ack(Callback, 'GetVariables')],
+      (Callback) => [SocketValidation.Ack<AckPayloadOf<'GetVariables'>>(Callback, 'GetVariables')],
       async (Callback) => {
         const [Err, Client] = await ClientManager.Get(socket.UUID);
         if (Err || !Client || Client.Integrated === true) {
@@ -719,6 +730,8 @@ function SetupClientNamespace(io: ClientNamespaceServer) {
       await IdentifyManager.HandleClientStopped(socket.UUID);
     });
 
+    // The third argument (ScriptExecutionResult: true or null, ExecuteScript only)
+    // is not read: the error alone says how the task ended, null meaning success.
     GuardedOn(
       'ScriptExecutionResponse',
       (RequestID, Error) => [
