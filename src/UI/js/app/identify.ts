@@ -6,29 +6,12 @@ import { AllClients, IsIntegratedClientEntity, PendingAdoption } from './state';
 import { HandleNonFatalError } from './utils';
 import { RenderFullClientAndMonitorList } from './client-list';
 import { Notify } from './lib/toasts';
+import { ParseVersionTuple, IsVersionAtLeast } from '../../../common/client-version';
 
 export const MINIMUM_IDENTIFY_VERSION = [3, 7, 0];
 export const MINIMUM_DISPLAY_MONITORING_VERSION = [3, 8, 0];
 
-export function ParseSemverTuple(value: unknown) {
-  const Match = String(value || '')
-    .trim()
-    .match(/(?:^|[^0-9])(\d+)\.(\d+)\.(\d+)(?:[^0-9]|$)/);
-  if (!Match) return null;
-  return [Number(Match[1]), Number(Match[2]), Number(Match[3])];
-}
-
-export function IsVersionAtLeast(value: unknown, minimumTuple: number[]) {
-  const Parsed = ParseSemverTuple(value);
-  if (!Parsed) return false;
-  for (let i = 0; i < minimumTuple.length; i++) {
-    const Current = Parsed[i] || 0;
-    const Minimum = minimumTuple[i] || 0;
-    if (Current > Minimum) return true;
-    if (Current < Minimum) return false;
-  }
-  return true;
-}
+export { ParseVersionTuple as ParseSemverTuple, IsVersionAtLeast };
 
 export function GetIdentifyTargetByUUID(UUID: string) {
   const AdoptedTarget = Array.isArray(AllClients)

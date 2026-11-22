@@ -25,6 +25,7 @@ import type {
 } from '@showtrak/protocol';
 import { AsRecord } from './normalizers';
 import type { CriticalKind } from './critical-kind';
+import { IsVersionAtLeast } from '../../common/client-version';
 
 /** DegradedWarnings entries, one per kind of fault (several kinds share one). */
 export const AUDIO_WARNINGS: Record<AudioIssueKind, string> = {
@@ -555,20 +556,9 @@ export function AudioPlatformLabel(Platform: string | null | undefined): string 
 
 /**
  * Whether a reported client version is at least `Minimum`. An unparseable version
- * is treated as too old: a client that cannot say what it is gets no feature that
- * depends on it, which is the safe reading for "send this machine a command".
+ * is treated as too old (see src/common/client-version).
  */
-export function IsClientVersionAtLeast(Version: unknown, Minimum: readonly number[]): boolean {
-  const Match = /(?:^|[^0-9])(\d+)\.(\d+)\.(\d+)(?:[^0-9]|$)/.exec(String(Version ?? '').trim());
-  if (!Match) return false;
-  const Parsed = [Number(Match[1]), Number(Match[2]), Number(Match[3])];
-  for (let Index = 0; Index < Minimum.length; Index += 1) {
-    const Current = Parsed[Index] || 0;
-    const Required = Minimum[Index] || 0;
-    if (Current !== Required) return Current > Required;
-  }
-  return true;
-}
+export const IsClientVersionAtLeast = IsVersionAtLeast;
 
 /** Audio endpoints monitored by endpoint id (see ./critical-kind). */
 export const AUDIO_KIND: CriticalKind<CriticalAudioDevice> = {

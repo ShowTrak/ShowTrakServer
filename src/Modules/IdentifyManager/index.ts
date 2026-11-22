@@ -12,6 +12,7 @@ import { RecordAction } from '../AuditLog/edits';
 import { Entity, Line } from '../AuditLog/message';
 import { ClientDisplayName } from '../AuditLog/status';
 import { AuditStep } from '../Shared/audit-names';
+import { IsVersionAtLeast } from '../../common/client-version';
 
 const Logger = CreateLogger('IdentifyManager');
 
@@ -54,26 +55,6 @@ function IsIntegratedClient(Client: IdentifyClientInfo | null | undefined): bool
       .trim()
       .toLowerCase() === 'integrated'
   );
-}
-
-function ParseSemverTuple(value: unknown): number[] | null {
-  const match = String(value || '')
-    .trim()
-    .match(/(?:^|[^0-9])(\d+)\.(\d+)\.(\d+)(?:[^0-9]|$)/);
-  if (!match) return null;
-  return [Number(match[1]), Number(match[2]), Number(match[3])];
-}
-
-function IsVersionAtLeast(value: unknown, minimumTuple: number[]): boolean {
-  const parsed = ParseSemverTuple(value);
-  if (!parsed) return false;
-  for (let i = 0; i < minimumTuple.length; i++) {
-    const current = parsed[i] || 0;
-    const minimum = minimumTuple[i] || 0;
-    if (current > minimum) return true;
-    if (current < minimum) return false;
-  }
-  return true;
 }
 
 // Clear the identify flag on whichever manager owns the UUID. Does not emit to

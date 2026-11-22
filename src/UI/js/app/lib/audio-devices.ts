@@ -13,6 +13,7 @@ import type {
   AudioTransport,
   ClientView,
 } from '@showtrak/protocol';
+import { IsVersionAtLeast } from '../../../../common/client-version';
 
 /**
  * The first ShowTrak Client release with audio monitoring. Older clients have no
@@ -23,17 +24,7 @@ export const MINIMUM_AUDIO_MONITORING_VERSION = [3, 21, 0] as const;
 export const MINIMUM_AUDIO_VERSION_LABEL = MINIMUM_AUDIO_MONITORING_VERSION.join('.');
 
 /** Whether `Version` (e.g. "3.21.0", "v3.22.1-beta") is at least `Minimum`. */
-export function IsVersionAtLeast(Version: unknown, Minimum: readonly number[]): boolean {
-  const Match = /(?:^|[^0-9])(\d+)\.(\d+)\.(\d+)(?:[^0-9]|$)/.exec(String(Version ?? '').trim());
-  if (!Match) return false;
-  const Parsed = [Number(Match[1]), Number(Match[2]), Number(Match[3])];
-  for (let Index = 0; Index < Minimum.length; Index += 1) {
-    const Current = Parsed[Index] || 0;
-    const Required = Minimum[Index] || 0;
-    if (Current !== Required) return Current > Required;
-  }
-  return true;
-}
+export { IsVersionAtLeast };
 
 /**
  * Which overall message the section shows:
