@@ -4,9 +4,9 @@
 // host OS, plus small path/version normalizers. Extracted from main.js so they
 // can be unit-tested in isolation. Behavior is identical to the original inline
 // implementations.
-const path = require('path');
-const fs = require('fs');
-const { execFile } = require('child_process');
+import path from 'path';
+import fs from 'fs';
+import { execFile } from 'child_process';
 
 import { CreateLogger } from '../Modules/Logger';
 

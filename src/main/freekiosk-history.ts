@@ -16,6 +16,7 @@
 import { MONITORING_HISTORY_MAX_AGE_MS } from './monitoring-history';
 import { FREEKIOSK_METRICS, RoundTo } from '../Modules/FreeKiosk/metrics';
 import { ParseAlarmSettings } from '../Modules/FreeKiosk/alarms';
+import { IsArray, IsObject } from '../Modules/Utils/guards';
 
 /** One point of one metric's series. */
 export interface FreeKioskMetricSample {
@@ -210,11 +211,12 @@ export function recordFreeKioskHistorySamples(
 
 /** Record for every terminal in a full list push, and forget deleted ones. */
 export function syncFreeKioskHistoryStore(List: unknown): void {
-  const Terminals: TerminalLike[] = Array.isArray(List) ? List : [];
+  const Terminals = IsArray(List) ? List : [];
   const Valid = new Set<string>();
 
   for (const Terminal of Terminals) {
-    const UUID = NormalizeUUID(Terminal && Terminal.UUID);
+    if (!IsObject(Terminal)) continue;
+    const UUID = NormalizeUUID(Terminal.UUID);
     if (!UUID) continue;
     Valid.add(UUID);
     recordFreeKioskHistorySamples(Terminal);

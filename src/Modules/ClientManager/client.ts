@@ -221,7 +221,9 @@ function SameStrings(A: readonly string[], B: readonly string[]): boolean {
 // temperature collectors on a keepalive) whether or not anything changed, so
 // an identical report is the common case and is recognised by this alone.
 function ReportSignature(Report: unknown): string {
-  return JSON.stringify(Report, (Key, Value) => (Key === 'SampledAt' ? undefined : Value));
+  return JSON.stringify(Report, (Key: string, Value: unknown) =>
+    Key === 'SampledAt' ? undefined : Value
+  );
 }
 
 // --- Local domain shapes ---------------------------------------------------
@@ -1866,7 +1868,7 @@ class Client {
     this.ScriptsFingerprint = NextValue;
     BroadcastManager.emit('ClientUpdated', this);
   }
-  SetIntegratedActions(Actions: unknown) {
+  SetIntegratedActions(Actions: IntegratedAction[]) {
     this.Integrated = true;
     this.IntegratedActions = Array.isArray(Actions) ? Actions : [];
     BroadcastManager.emit('ClientUpdated', this);

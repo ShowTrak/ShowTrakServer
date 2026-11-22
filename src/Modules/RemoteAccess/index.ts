@@ -24,6 +24,7 @@
 import { Manager as SettingsManager } from '../SettingsManager';
 import { Manager as ModeManager } from '../ModeManager';
 import type { SubscribeChannel } from '../IPCRegistry/channels';
+import { IsArray } from '../Utils/guards';
 
 /**
  * Settings prefix identifying a remote surface. Every permission this module
@@ -308,8 +309,9 @@ export function ToRemoteResult(Channel: string, Result: unknown): unknown {
 
 /** Reduce a settings list to the rows a remote surface may see. */
 export function ToPublicSettings<T>(Settings: readonly T[] | null | undefined): T[] {
-  if (!Array.isArray(Settings)) return [];
-  return Settings.filter((Setting) => {
+  if (!IsArray(Settings)) return [];
+  const List: readonly T[] = Settings;
+  return List.filter((Setting) => {
     const Key = Setting && (Setting as { Key?: unknown }).Key;
     return typeof Key === 'string' && PUBLIC_SETTING_KEYS.has(Key);
   });

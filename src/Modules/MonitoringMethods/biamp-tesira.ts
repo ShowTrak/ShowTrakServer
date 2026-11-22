@@ -429,7 +429,7 @@ class TtpReader {
 
   // Object members, up to Close ('}' or end of text for a reply body).
   Members(Close: string, Depth: number): { [Key: string]: TtpValue } {
-    const Obj: { [Key: string]: TtpValue } = Object.create(null);
+    const Obj = Object.create(null) as { [Key: string]: TtpValue };
     let LastKey: string | null = null;
     for (;;) {
       this.SkipSpace();

@@ -55,7 +55,7 @@ export function ExtractTitanValue(Body: unknown): string | null {
   const Raw = String(Body == null ? '' : Body).trim();
   if (!Raw) return null;
   try {
-    const Parsed = JSON.parse(Raw);
+    const Parsed: unknown = JSON.parse(Raw);
     if (typeof Parsed === 'string') return Parsed.trim() || null;
     if (typeof Parsed === 'number' || typeof Parsed === 'boolean') return String(Parsed);
     if (Parsed && typeof Parsed === 'object') {

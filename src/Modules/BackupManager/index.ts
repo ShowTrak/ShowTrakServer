@@ -7,6 +7,7 @@ import { Manager as AppDataManager } from '../AppData';
 import { Manager as Broadcast } from '../Broadcast';
 import { Config } from '../Config';
 import { CompareVersions } from '../Utils';
+import { IsObject } from '../Utils/guards';
 import { CreateShowFileInfoRepository } from '../DB/repositories/show-file-info';
 
 const Logger = CreateLogger('BackupManager');
@@ -38,8 +39,10 @@ function LoadPersistedFilePath(): string | null {
   try {
     const StatePath = AppDataManager.GetStateFilePath();
     if (!fs.existsSync(StatePath)) return null;
-    const State = JSON.parse(fs.readFileSync(StatePath, 'utf8'));
-    return State && typeof State.CurrentFilePath === 'string' ? State.CurrentFilePath : null;
+    const State: unknown = JSON.parse(fs.readFileSync(StatePath, 'utf8'));
+    return IsObject(State) && typeof State.CurrentFilePath === 'string'
+      ? State.CurrentFilePath
+      : null;
   } catch (err) {
     Logger.error('Failed to read persisted show file path:', err);
     return null;

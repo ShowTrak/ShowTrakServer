@@ -1,6 +1,7 @@
 // Pure normalization helpers and interval bounds shared across the
 // MonitoringTargetManager modules.
 import { DEFAULT_MONITORING_INTERVAL_MS, MAX_MONITORING_INTERVAL_MS } from '../Config/constants';
+import { IsObject } from '../Utils/guards';
 
 const MIN_INTERVAL_MS = 3000;
 const MAX_INTERVAL_MS = MAX_MONITORING_INTERVAL_MS;
@@ -42,8 +43,8 @@ function ParseSettings(Raw: unknown): Record<string, unknown> {
   if (!Raw) return {};
   if (typeof Raw === 'object') return Raw as Record<string, unknown>;
   try {
-    const Parsed = JSON.parse(Raw as string);
-    return Parsed && typeof Parsed === 'object' ? Parsed : {};
+    const Parsed: unknown = JSON.parse(Raw as string);
+    return IsObject(Parsed) ? Parsed : {};
   } catch {
     return {};
   }

@@ -8,14 +8,18 @@ import { Manager as AppDataManager } from '../AppData';
 
 const Logger = CreateLogger('DB');
 
+import {
+  Database as SqliteDatabase,
+  OPEN_READONLY,
+  verbose as EnableSqliteVerboseMode,
+} from 'sqlite3';
 // Verbose mode adds long stack traces to every query at a measurable cost;
 // opt in via env when debugging instead of paying for it in production.
-const sqlite3 =
-  process.env.SHOWTRAK_SQLITE_VERBOSE === '1' ? require('sqlite3').verbose() : require('sqlite3');
+if (process.env.SHOWTRAK_SQLITE_VERBOSE === '1') EnableSqliteVerboseMode();
 // Note: On macOS/ARM64, ensure prebuilt sqlite3 is available or rebuild during packaging.
 
-// Minimal shape of the callback-style sqlite3 connection we use. sqlite3 ships
-// no bundled types; this covers exactly the surface this module touches.
+// Minimal shape of the callback-style sqlite3 connection we use: exactly the
+// surface this module touches.
 interface SqliteConnection {
   get(sql: string, params: unknown, cb: (err: Error | null, row: unknown) => void): void;
   all(sql: string, params: unknown, cb: (err: Error | null, rows: unknown[]) => void): void;
@@ -385,7 +389,7 @@ function OpenConnection(): Promise<void> {
   schemaInitializationPromise = null;
   hasUnsavedChanges = false;
   readyPromise = new Promise((resolve, reject) => {
-    DB = new sqlite3.Database(dbPath, async (err: Error | null) => {
+    DB = new SqliteDatabase(dbPath, async (err: Error | null) => {
       if (err) {
         Logger.error('Failed to connect to database:', err);
         return reject(err);
@@ -717,7 +721,7 @@ Manager.SnapshotTo = async (TargetPath: string): Promise<DBResult<string>> => {
 // a fallback, all of the core tables are present.
 function ValidateDatabaseFile(SourcePath: string): Promise<DBResult<boolean>> {
   return new Promise((resolve) => {
-    const Probe = new sqlite3.Database(SourcePath, sqlite3.OPEN_READONLY, (err: Error | null) => {
+    const Probe = new SqliteDatabase(SourcePath, OPEN_READONLY, (err: Error | null) => {
       if (err) {
         return resolve([new Error('Selected file is not a valid ShowTrak file'), null]);
       }
@@ -795,7 +799,7 @@ Manager.ReadFileInfo = async (SourcePath: string): Promise<DBResult<ShowFileInfo
   const [ValidationErr] = await ValidateDatabaseFile(SourcePath);
   if (ValidationErr) return [ValidationErr, null];
   return new Promise((resolve) => {
-    const Probe = new sqlite3.Database(SourcePath, sqlite3.OPEN_READONLY, (err: Error | null) => {
+    const Probe = new SqliteDatabase(SourcePath, OPEN_READONLY, (err: Error | null) => {
       if (err) return resolve([new Error('Selected file is not a valid ShowTrak file'), null]);
       Probe.all(
         'SELECT Key, Value FROM ShowFileInfo',

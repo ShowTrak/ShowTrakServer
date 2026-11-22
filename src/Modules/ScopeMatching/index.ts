@@ -20,6 +20,7 @@
 // says nothing about what an absent scope means, because the callers disagree:
 // a missing script whitelist means "everyone", a missing tag scope means
 // "nobody". That decision stays with each caller.
+import { IsArray } from '../Utils/guards';
 
 /** Permissive scope shape: accepts stored JSON, wire views and editor drafts. */
 export interface ScopeShape {
@@ -61,7 +62,7 @@ export function NormalizeScopeTags(Raw: unknown): number[] {
 /** Index a tag list by TagID for repeated lookups during a walk. */
 export function IndexTagsByID(Tags: readonly ScopeTag[] | null | undefined): Map<number, ScopeTag> {
   const Index = new Map<number, ScopeTag>();
-  for (const Tag of Array.isArray(Tags) ? Tags : []) {
+  for (const Tag of IsArray(Tags) ? Tags : []) {
     if (!Tag || !Number.isFinite(Number(Tag.TagID))) continue;
     Index.set(Number(Tag.TagID), Tag);
   }

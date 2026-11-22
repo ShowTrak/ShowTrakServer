@@ -38,7 +38,7 @@ import { CurrentAuditSource } from './source';
 
 const Logger = CreateLogger('AuditLog');
 
-const sqlite3 = require('sqlite3');
+import { Database as SqliteDatabase } from 'sqlite3';
 
 const DATABASE_FILE_NAME = 'AuditLog.sqlite';
 const DEFAULT_PAGE_SIZE = 200;
@@ -138,7 +138,7 @@ function Open(): Promise<SqliteConnection | null> {
     } catch (Err) {
       Logger.error('Failed to create the audit log directory:', Err);
     }
-    const Db: SqliteConnection = new sqlite3.Database(FilePath, (OpenErr: Error | null) => {
+    const Db: SqliteConnection = new SqliteDatabase(FilePath, (OpenErr: Error | null) => {
       if (OpenErr) {
         Logger.error('Failed to open the audit log database:', OpenErr);
         return resolve(null);

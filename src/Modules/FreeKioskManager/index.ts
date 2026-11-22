@@ -86,7 +86,7 @@ function GenerateUUID(): string {
   if (typeof globalThis.crypto?.randomUUID === 'function') {
     return globalThis.crypto.randomUUID();
   }
-  return require('crypto').randomUUID();
+  return (require('crypto') as typeof import('crypto')).randomUUID();
 }
 
 export interface FreeKioskCommandOutcome {

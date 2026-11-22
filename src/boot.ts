@@ -13,12 +13,15 @@
 // own setting wins.
 process.env.UV_THREADPOOL_SIZE ||= '16';
 
-const { app } = require('electron/main');
+import { app } from 'electron/main';
 // Cache V8's compiled code for the bundle (keyed by file content, so an update
 // invalidates it). Best-effort: startup never depends on it.
 try {
-  require('node:module').enableCompileCache?.(
-    require('node:path').join(app.getPath('userData'), 'compile-cache')
+  (require('node:module') as typeof import('node:module')).enableCompileCache?.(
+    (require('node:path') as typeof import('node:path')).join(
+      app.getPath('userData'),
+      'compile-cache'
+    )
   );
 } catch {
   /* intentional: an unavailable cache only costs the speed-up */

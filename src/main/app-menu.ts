@@ -4,7 +4,8 @@
 // actions (via `sendAppMenuAction`) or set the show/edit mode directly. On every
 // other platform the application menu is cleared. The menu template is a pure
 // function of its injected dependencies so it carries no module state.
-const { Menu } = require('electron/main');
+import { Menu } from 'electron/main';
+import type { MenuItemConstructorOptions } from 'electron';
 
 interface AppMenuDeps {
   // Forward a menu item's action ID to the renderer (AppMenuAction channel).
@@ -13,9 +14,9 @@ interface AppMenuDeps {
   setMode(mode: string): void;
 }
 
-function buildMacAppMenuTemplate(deps: AppMenuDeps) {
+function buildMacAppMenuTemplate(deps: AppMenuDeps): MenuItemConstructorOptions[] {
   const { sendAppMenuAction, setMode } = deps;
-  const fileSubmenu = [
+  const fileSubmenu: MenuItemConstructorOptions[] = [
     {
       label: 'New Show',
       accelerator: 'CmdOrCtrl+N',

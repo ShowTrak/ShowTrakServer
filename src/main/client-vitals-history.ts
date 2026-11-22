@@ -13,6 +13,7 @@
 // current threshold would say about the past.
 import type { FreeKioskMetricSample } from '@showtrak/protocol';
 import { PercentReading } from '../Modules/ClientManager/health';
+import { IsArray, IsObject } from '../Modules/Utils/guards';
 
 /** One averaged point every this often. Sixty-minute charts get six per minute. */
 export const VITALS_POINT_INTERVAL_MS = 10 * 1000;
@@ -59,7 +60,7 @@ function NormalizeUUID(Value: unknown): string | null {
 }
 
 function AlarmActive(Alarms: unknown, Key: string): boolean {
-  return Array.isArray(Alarms) && Alarms.some((Alarm) => Alarm && Alarm.Key === Key);
+  return IsArray(Alarms) && Alarms.some((Alarm) => IsObject(Alarm) && Alarm.Key === Key);
 }
 
 function Trim(Samples: FreeKioskMetricSample[], Now: number): void {

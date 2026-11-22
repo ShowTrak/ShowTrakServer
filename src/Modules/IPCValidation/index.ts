@@ -217,16 +217,30 @@ export interface IPCValidationManager {
 
 const Manager = {} as IPCValidationManager;
 
-require('./client-validators')(Manager);
-require('./script-validators')(Manager);
-require('./monitoring-validators')(Manager);
-require('./dummy-validators')(Manager);
-require('./freekiosk-validators')(Manager);
-require('./alert-validators')(Manager);
-require('./tag-validators')(Manager);
-require('./variable-validators')(Manager);
-require('./audio-validators')(Manager);
-require('./fog-validators')(Manager);
-require('./system-validators')(Manager);
+// Each domain module adds its validators to Manager. They only import this
+// module's types, so there is no import cycle at runtime.
+import registerClientValidators from './client-validators';
+import registerScriptValidators from './script-validators';
+import registerMonitoringValidators from './monitoring-validators';
+import registerDummyValidators from './dummy-validators';
+import registerFreeKioskValidators from './freekiosk-validators';
+import registerAlertValidators from './alert-validators';
+import registerTagValidators from './tag-validators';
+import registerVariableValidators from './variable-validators';
+import registerAudioValidators from './audio-validators';
+import registerFogValidators from './fog-validators';
+import registerSystemValidators from './system-validators';
+
+registerClientValidators(Manager);
+registerScriptValidators(Manager);
+registerMonitoringValidators(Manager);
+registerDummyValidators(Manager);
+registerFreeKioskValidators(Manager);
+registerAlertValidators(Manager);
+registerTagValidators(Manager);
+registerVariableValidators(Manager);
+registerAudioValidators(Manager);
+registerFogValidators(Manager);
+registerSystemValidators(Manager);
 
 export { Manager };

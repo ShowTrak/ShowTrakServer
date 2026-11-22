@@ -7,6 +7,7 @@ import { CreateMonitoringChecksRepository } from '../DB/repositories/monitoring-
 import { Manager as BroadcastManager } from '../Broadcast';
 import { Manager as MonitoringMethods } from '../MonitoringMethods';
 import { Ok, Fail } from '../Utils';
+import { IsArray } from '../Utils/guards';
 import * as SlugService from '../Slug';
 import { createGroupOrdering } from '../Shared/group-ordering';
 import type { Result } from '../../types/result';
@@ -171,7 +172,9 @@ async function MigrateLegacyTargetToCheck(
   if (Method === 'https') {
     Method = 'http';
     try {
-      const Settings = JSON.parse(SettingsJson);
+      // The check's own Settings column; a value that is not an object throws
+      // here and takes the catch below, as it always did.
+      const Settings = JSON.parse(SettingsJson) as Record<string, unknown>;
       Settings.Protocol = 'https';
       SettingsJson = JSON.stringify(Settings);
     } catch {
@@ -182,7 +185,7 @@ async function MigrateLegacyTargetToCheck(
   // Migrate old 'http' method to explicitly set Protocol='http'
   else if (Method === 'http') {
     try {
-      const Settings = JSON.parse(SettingsJson);
+      const Settings = JSON.parse(SettingsJson) as Record<string, unknown>;
       if (!Settings.Protocol) Settings.Protocol = 'http';
       SettingsJson = JSON.stringify(Settings);
     } catch {
@@ -841,7 +844,8 @@ const Manager = {
 
   async Create(Payload: MonitoringTargetCreatePayload): Promise<Result<MonitoringTargetView>> {
     const Now = Date.now();
-    const Checks: MonitoringCheckPayload[] = Array.isArray(Payload.Checks) ? Payload.Checks : [];
+    // Validated by IPCValidation (MonitoringTargetCreatePayload), which builds every check.
+    const Checks = (IsArray(Payload.Checks) ? Payload.Checks : []) as MonitoringCheckPayload[];
     for (const C of Checks) {
       if (!MonitoringMethods.Has(C.Method)) return Fail(`Unknown monitoring method: ${C.Method}`);
     }
@@ -945,9 +949,8 @@ const Manager = {
 
     let NextChecks: MonitoringCheckPayload[] | null = null;
     if (Object.prototype.hasOwnProperty.call(Payload, 'Checks')) {
-      const Incoming: MonitoringCheckPayload[] = Array.isArray(Payload.Checks)
-        ? Payload.Checks
-        : [];
+      // Validated by IPCValidation (MonitoringTargetUpdatePayload), as on create.
+      const Incoming = (IsArray(Payload.Checks) ? Payload.Checks : []) as MonitoringCheckPayload[];
       for (const C of Incoming) {
         if (!MonitoringMethods.Has(C.Method)) return Fail(`Unknown monitoring method: ${C.Method}`);
       }

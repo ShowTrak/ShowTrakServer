@@ -7,6 +7,7 @@ import { CreateLogger } from '../Logger';
 import { Manager as AppData } from '../AppData';
 import { Manager as UUID } from '../UUID';
 import { Ok, Fail } from '../Utils';
+import { IsArray } from '../Utils/guards';
 import type { Result } from '../../types/result';
 import { RecordEdit, RecordUpdate, type EditInput } from '../AuditLog/edits';
 import { Line, Value } from '../AuditLog/message';
@@ -222,8 +223,11 @@ function loadManifest(): void {
   }
   try {
     const Raw = fs.readFileSync(ManifestPath, 'utf8');
-    const Parsed = JSON.parse(Raw);
-    Assets = Array.isArray(Parsed) ? Parsed.filter((A: AudioAsset) => A && A.ID) : [];
+    const Parsed: unknown = JSON.parse(Raw);
+    // This module's own manifest (see persistManifest); entries without an ID are dropped.
+    Assets = IsArray(Parsed)
+      ? (Parsed as Array<AudioAsset | null>).filter((A): A is AudioAsset => !!(A && A.ID))
+      : [];
   } catch (Err) {
     Logger.error('Failed to read audio manifest, starting empty', Err);
     Assets = [];

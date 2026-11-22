@@ -148,7 +148,8 @@ function readManifest(): UpdateManifest | null {
   if (!fs.existsSync(ManifestPath)) return null;
   try {
     const raw = fs.readFileSync(ManifestPath, 'utf8');
-    const parsed = JSON.parse(raw);
+    // This module's own manifest (see writeManifest).
+    const parsed = JSON.parse(raw) as UpdateManifest | null;
     if (!parsed || !Array.isArray(parsed.assets)) return null;
     return parsed;
   } catch (err) {

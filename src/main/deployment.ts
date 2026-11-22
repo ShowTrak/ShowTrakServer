@@ -9,6 +9,7 @@
 
 import { CreateLogger } from '../Modules/Logger';
 import { SCRIPT_DEPLOY_DEBOUNCE_MS } from '../Modules/Config/constants';
+import { IsArray } from '../Modules/Utils/guards';
 import { Manager as ScriptManager } from '../Modules/ScriptManager';
 import { Manager as ClientManager } from '../Modules/ClientManager';
 import { Manager as ServerManager } from '../Modules/Server';
@@ -41,8 +42,12 @@ const ActiveScriptDeployment = {
 };
 
 function normalizeDeploymentTargets(TargetUUIDs: unknown): string[] {
-  if (!Array.isArray(TargetUUIDs)) return [];
-  return [...new Set(TargetUUIDs.filter((UUID) => typeof UUID === 'string' && UUID.trim()))];
+  if (!IsArray(TargetUUIDs)) return [];
+  return [
+    ...new Set(
+      TargetUUIDs.filter((UUID): UUID is string => typeof UUID === 'string' && !!UUID.trim())
+    ),
+  ];
 }
 
 function IsIntegratedClient(Client: DeploymentClientInfo | null | undefined): boolean {

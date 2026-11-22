@@ -13,6 +13,7 @@ import { Manager as AppDataManager } from '../AppData';
 import { ChecksumFile } from '@showtrak/protocol/runtime';
 import { Manager as BroadcastManager } from '../Broadcast';
 import { Ok, Fail } from '../Utils';
+import { IsArray } from '../Utils/guards';
 import { SCRIPT_EXECUTION_DEFAULT_TIMEOUT_MS } from '../Config/constants';
 import type { Result } from '../../types/result';
 import { RecordEdit, RecordUpdate } from '../AuditLog/edits';
@@ -706,7 +707,7 @@ function ScriptOrder(): string {
 }
 
 // A folder ID must be a safe single path segment.
-function IsSafeFolderID(ID: unknown): boolean {
+function IsSafeFolderID(ID: unknown): ID is string {
   return (
     typeof ID === 'string' &&
     ID.length > 0 &&
@@ -877,7 +878,7 @@ Manager.SaveFields = async (
 
 // Persist a new ordering by reassigning Weight in folder order.
 Manager.SetOrder = async (OrderedIDs: unknown): Promise<Result<true>> => {
-  if (!Array.isArray(OrderedIDs)) return Fail('Invalid order');
+  if (!IsArray(OrderedIDs)) return Fail('Invalid order');
   const Before = await AuditBefore(async () => {
     if (Scripts.length === 0) await Manager.GetScripts();
     return ScriptOrder();
@@ -889,7 +890,7 @@ Manager.SetOrder = async (OrderedIDs: unknown): Promise<Result<true>> => {
     const scriptJsonPath = path.join(ScriptsDirectory, ID, 'Script.json');
     if (!fs.existsSync(scriptJsonPath)) continue;
     try {
-      const Parsed = JSON.parse(fs.readFileSync(scriptJsonPath, 'utf-8'));
+      const Parsed: unknown = JSON.parse(fs.readFileSync(scriptJsonPath, 'utf-8'));
       const { config } = NormalizeScriptConfig(Parsed, ID);
       config.Weight = Weight;
       fs.writeFileSync(scriptJsonPath, JSON.stringify(config, null, 2) + '\n', 'utf-8');
@@ -1055,9 +1056,11 @@ Manager.CreateFromTemplate = async (
   const ConfigFile = Template.files.find((f) => f && f.path === 'Script.json');
   if (ConfigFile) {
     try {
+      // Asserted rather than narrowed so a template whose Script.json is not an
+      // object fails on the Weight assignment below, as it always has.
       TemplateConfig = JSON.parse(
         Buffer.from(String(ConfigFile.content || ''), 'base64').toString('utf-8')
-      );
+      ) as Record<string, unknown>;
     } catch {
       TemplateConfig = {};
     }

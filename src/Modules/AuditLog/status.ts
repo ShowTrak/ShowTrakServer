@@ -15,6 +15,7 @@ import { Device, Entity, Line, Value } from './message';
 import type { SummaryPart } from './message';
 import { DescribeUSBLocation } from '../ClientManager/usb';
 import { SYSTEM_CHECK_WARNINGS } from '../ClientManager/system-checks';
+import { IsArray, IsObject } from '../Utils/guards';
 
 // ---- Shared ------------------------------------------------------------------
 
@@ -52,11 +53,13 @@ function Unique(Values: string[]): string[] {
 }
 
 function IssueMessages(Issues: unknown): string[] {
-  if (!Array.isArray(Issues)) return [];
+  if (!IsArray(Issues)) return [];
   // Presence is the item's own Connected state, logged as a connect or a
   // disconnect, so a "missing" issue would only say it a second time.
   return Unique(
-    Issues.filter((Issue) => Issue && Issue.Kind !== 'missing').map((Issue) => Text(Issue.Message))
+    Issues.filter(
+      (Issue) => !!Issue && (IsObject(Issue) ? Issue.Kind : undefined) !== 'missing'
+    ).map((Issue) => Text(IsObject(Issue) ? Issue.Message : undefined))
   );
 }
 

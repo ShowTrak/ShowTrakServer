@@ -41,6 +41,7 @@ import crypto from 'crypto';
 import type { Server } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents } from '@showtrak/protocol';
 import { CreateLogger } from '../Logger';
+import { IsArray } from '../Utils/guards';
 import { Manager as BroadcastManager } from '../Broadcast';
 import { Manager as RemoteDeviceManager } from '../RemoteDeviceManager';
 import { Manager as SettingsManager } from '../SettingsManager';
@@ -797,7 +798,7 @@ function SetupSdkNamespace(io: SdkIOServer) {
           if (!Decision.allowed) return ack && ack({ error: Decision.reason || 'forbidden' });
           const Handler = GetHandler(channel);
           if (typeof Handler !== 'function') return ack && ack({ error: 'unknown_channel' });
-          const Args = Array.isArray(args) ? args : [];
+          const Args = IsArray(args) ? args : [];
           const Result = await RunWithAuditSource(socket.AuditSource || 'ShowTrak Remote', () =>
             Handler(null, ...Args)
           );

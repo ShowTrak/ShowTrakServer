@@ -21,7 +21,7 @@ import { IsTransientNetworkError, DescribeError } from '@showtrak/protocol/runti
 
 const Logger = CreateLogger('OSC');
 
-const { Server } = require('node-osc');
+import { Server } from 'node-osc';
 
 // Minimal shape of the node-osc Server we use, so the mutable handle stays typed.
 // `_sock` is node-osc's internal dgram socket: the library never attaches an

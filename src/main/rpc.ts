@@ -6,7 +6,7 @@
 // by a single implementation. Previously this lived inline in main.ts; extracting
 // it lets the per-domain registrar modules register handlers directly.
 
-const { ipcMain } = require('electron/main');
+import { ipcMain } from 'electron/main';
 import { RegisterHandler } from './handler-registry';
 import type { InvokeChannel } from '../Modules/IPCRegistry/channels';
 import type { IpcHandler } from './handler-registry';

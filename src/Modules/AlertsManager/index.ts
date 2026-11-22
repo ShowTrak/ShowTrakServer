@@ -13,7 +13,8 @@ import {
   HISTORY_RETENTION_SWEEP_INTERVAL_MS,
 } from '../Config/constants';
 import type { Result } from '../../types/result';
-import type { AlertTriggerType, TagView } from '@showtrak/protocol';
+import type { AlertTriggerType, MonitoringCheckView, TagView } from '@showtrak/protocol';
+import { IsArray, IsObject } from '../Utils/guards';
 import type { AlertRuleWriteRow } from '../DB/repositories/alert-rules';
 
 import { TRIGGERS, TRIGGER_CATALOG } from './triggers';
@@ -60,6 +61,17 @@ interface AlertTargetLike {
   LastChecked?: number | null;
   Checks?: unknown;
   [key: string]: unknown;
+}
+
+// What the script-failure alert reads from an execution update. The entries are
+// ScriptExecutionManager's own (each holds the live Client and the dispatched
+// script); the handler still skips any hole in the list.
+interface AlertScriptExecutionLike {
+  RequestID?: string | number | null;
+  Status?: string;
+  Client?: AlertEntityLike | null;
+  Script?: { Name?: string | null; ID?: string | null } | null;
+  Error?: string | null;
 }
 
 // Validated create/update payloads (IPCValidation guarantees Title/TriggerType
@@ -293,10 +305,11 @@ async function executeRule(Rule: AlertRule, Context: AlertContext) {
         Error: Result.value && Result.value.Error ? Result.value.Error : null,
       };
     }
+    const Reason: unknown = Result.reason;
     return {
       Type: ActionType,
       Success: false,
-      Error: Result.reason && Result.reason.message ? Result.reason.message : String(Result.reason),
+      Error: IsObject(Reason) && Reason.message ? String(Reason.message) : String(Reason),
     };
   });
 
@@ -1034,7 +1047,10 @@ Manager.HandleMonitoringTargetUpdated = async (Target: AlertTargetLike) => {
 
   // Per-check alerts (opt-in via check:<CheckID> scope).
   const TargetName = Target.Nickname || Target.Address || `Target ${Target.TargetID}`;
-  const Checks = Array.isArray(Target.Checks) ? Target.Checks : [];
+  // MonitoringTargetManager's own check views (Target.ToJSON()); holes are skipped.
+  const Checks = (IsArray(Target.Checks) ? Target.Checks : []) as ReadonlyArray<
+    MonitoringCheckView | null | undefined
+  >;
   for (const Check of Checks) {
     if (!Check || Check.CheckID == null) continue;
     if (Check.LastChecked == null) continue;
@@ -1111,8 +1127,9 @@ Manager.HandleMonitoringTargetUpdated = async (Target: AlertTargetLike) => {
 // re-announced every past failure: actions, sounds and history all over again.
 const AlertedScriptFailures = new Set<string>();
 
-Manager.HandleScriptExecutionUpdated = async (Executions: unknown) => {
-  if (!Array.isArray(Executions)) return;
+Manager.HandleScriptExecutionUpdated = async (Updated: unknown) => {
+  if (!IsArray(Updated)) return;
+  const Executions = Updated as ReadonlyArray<AlertScriptExecutionLike | null | undefined>;
   // Forget requests that have left the list, which keeps the set bounded by it.
   const Present = new Set<string>();
   for (const Exe of Executions) {
@@ -1130,7 +1147,7 @@ Manager.HandleScriptExecutionUpdated = async (Executions: unknown) => {
       if (AlertedScriptFailures.has(ID)) continue;
       AlertedScriptFailures.add(ID);
     }
-    const Client = Exe.Client || {};
+    const Client: AlertEntityLike = Exe.Client || {};
     await evaluateAgainstRules({
       TriggerType: TRIGGERS.SCRIPT_EXECUTION_FAILED,
       EntityType: 'client',

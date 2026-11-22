@@ -3,16 +3,26 @@ import type { AlertAction, AlertActionInput, AlertActionResult, AlertContext } f
 
 const Logger = CreateLogger('AlertActions');
 
+import * as ShowTrakAlert from './showtrak-alert';
+import * as PlaySound from './play-sound';
+import * as PlayCustomAudio from './play-custom-audio';
+import * as OscTrigger from './osc-trigger';
+import * as HttpApi from './http-api';
+import * as DiscordWebhook from './discord-webhook';
+import * as SlackWebhook from './slack-webhook';
+import * as TeamsWebhook from './teams-webhook';
+import * as TelegramBot from './telegram-bot';
+
 const ActionModules: AlertAction[] = [
-  require('./showtrak-alert'),
-  require('./play-sound'),
-  require('./play-custom-audio'),
-  require('./osc-trigger'),
-  require('./http-api'),
-  require('./discord-webhook'),
-  require('./slack-webhook'),
-  require('./teams-webhook'),
-  require('./telegram-bot'),
+  ShowTrakAlert,
+  PlaySound,
+  PlayCustomAudio,
+  OscTrigger,
+  HttpApi,
+  DiscordWebhook,
+  SlackWebhook,
+  TeamsWebhook,
+  TelegramBot,
 ];
 
 const Actions = new Map<string, AlertAction>();

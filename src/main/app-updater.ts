@@ -6,16 +6,17 @@
 // Status is pushed to the renderer via the 'AppUpdate:Status' channel using the
 // injected window provider. Behavior is identical to the original inline impl;
 // it has simply been grouped here.
-const { app } = require('electron/main');
-const { autoUpdater: SquirrelUpdater, net } = require('electron');
-const path = require('path');
-const fs = require('fs');
-const os = require('os');
-const { spawnSync } = require('child_process');
+import { app } from 'electron/main';
+import { autoUpdater as SquirrelUpdater, net } from 'electron';
+import path from 'path';
+import fs from 'fs';
+import os from 'os';
+import { spawnSync } from 'child_process';
 
 import type { BrowserWindow } from 'electron';
 import type { AppUpdater } from 'electron-updater';
 import { CreateLogger } from '../Modules/Logger';
+import { IsObject } from '../Modules/Utils/guards';
 import {
   NormalizeUpdateChannel,
   ResolveChannelRelease,
@@ -116,7 +117,7 @@ async function resolveChannelFeed(): Promise<{ Tag: string; FeedURL: string } | 
             Accept: 'application/vnd.github+json',
             'User-Agent': 'ShowTrakServer',
           })
-        ),
+        ) as unknown,
     });
     if (Release) Logger.log(`Beta channel: checking against ${Release.Tag}`);
     else Logger.warn('Beta channel: no installable release found; using the stable feed');
@@ -421,7 +422,8 @@ function endSquirrelTracking() {
 // electron-updater do); Node's fetch does not, so behind a venue's proxy the
 // beta-channel lookup and release notes would fail while the update itself works.
 async function fetchText(url: string, headers: Record<string, string> = {}) {
-  const Fetch: typeof fetch = net && typeof net.fetch === 'function' ? net.fetch : fetch;
+  const Fetch: (input: string, init: RequestInit) => Promise<Response> =
+    net && typeof net.fetch === 'function' ? net.fetch : fetch;
   const res = await Fetch(url, { headers, signal: AbortSignal.timeout(SQUIRREL_META_TIMEOUT_MS) });
   if (!res.ok) throw new Error(`GET ${url} failed with status ${res.status}`);
   return res.text();
@@ -444,13 +446,13 @@ async function trackSquirrelDownload(session: number) {
 
   let releaseNotes: string | undefined;
   try {
-    const release = JSON.parse(
+    const release: unknown = JSON.parse(
       await fetchText(`${GITHUB_RELEASE_BY_TAG_API}${activeSquirrelTag || `v${version}`}`, {
         Accept: 'application/vnd.github+json',
         'User-Agent': 'ShowTrakServer',
       })
     );
-    if (release && typeof release.body === 'string') releaseNotes = release.body;
+    if (IsObject(release) && typeof release.body === 'string') releaseNotes = release.body;
   } catch (e) {
     Logger.warn(`Failed to fetch release notes for v${version}:`, e);
   }
@@ -558,7 +560,12 @@ async function handleCheck() {
       try {
         SquirrelUpdater.setFeedURL({ url: activeSquirrelFeed });
       } catch {
-        SquirrelUpdater.setFeedURL(activeSquirrelFeed);
+        // The older form, a plain URL, which Electron still accepts at runtime
+        // but no longer declares (its types only describe the options object),
+        // hence the cast.
+        (SquirrelUpdater as unknown as { setFeedURL(url: string): void }).setFeedURL(
+          activeSquirrelFeed
+        );
       }
       SquirrelUpdater.checkForUpdates();
     } catch (e) {
@@ -570,7 +577,10 @@ async function handleCheck() {
   // Packaged (non-Squirrel): ensure electron-updater is initialized
   if (!autoUpdater) {
     try {
-      const { autoUpdater: updater }: { autoUpdater: AppUpdater } = require('electron-updater');
+      // Required here, on first use: it is large, and most launches never need it
+      // (it stays out of the main bundle; see scripts/build-main.js).
+      const { autoUpdater: updater } =
+        require('electron-updater') as typeof import('electron-updater');
       autoUpdater = updater;
       Logger.log('Initialized electron-updater in handleCheck()');
       autoUpdater.autoDownload = true;

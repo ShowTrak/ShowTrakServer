@@ -6,8 +6,8 @@
 // with its version and byte size, and Squirrel streams the package straight
 // into `<root>/packages/<file>` while downloading, so the partial file's size
 // against the manifest size gives a real percentage.
-const path = require('path');
-const fs = require('fs');
+import path from 'path';
+import fs from 'fs';
 import { CompareVersions as compareVersions } from '../Modules/Utils';
 
 export interface SquirrelPackage {

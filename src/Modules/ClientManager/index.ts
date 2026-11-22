@@ -18,6 +18,7 @@ import type {
   ValidatedUSBDevice,
 } from '../SocketValidation';
 import { CreateLogger } from '../Logger';
+import { IsArray } from '../Utils/guards';
 import { Manager as DB } from '../DB';
 import { CreateClientsRepository } from '../DB/repositories/clients';
 import {
@@ -227,11 +228,11 @@ export interface ClientManagerType {
   GetClientsInGroup(GroupID: unknown): Promise<Client[]>;
   MoveGroupToNoGroup(GroupID: unknown): Promise<Result<number>>;
   ReconcileOrphanedGroups(ValidGroupIDs: unknown): Promise<Result<number>>;
-  SetGroupOrder(GroupID: unknown, orderedUUIDs: unknown): Promise<Result<boolean>>;
+  SetGroupOrder(GroupID: unknown, orderedUUIDs: readonly string[]): Promise<Result<boolean>>;
   SetGroupOrderWithWeights(
     GroupID: unknown,
-    orderedUUIDs: unknown,
-    weights: unknown
+    orderedUUIDs: readonly string[],
+    weights: readonly number[]
   ): Promise<Result<boolean>>;
 }
 
@@ -2128,8 +2129,8 @@ async function InOneCommit(Apply: () => Promise<void>): Promise<void> {
 
 // Persist a specific order of clients in a group and optionally move clients into that group
 // orderedUUIDs: string[] in the desired order. Any client not in orderedUUIDs will retain existing weight.
-Manager.SetGroupOrder = async (GroupID: unknown, orderedUUIDs: unknown) => {
-  if (!Array.isArray(orderedUUIDs)) return Fail('Invalid orderedUUIDs');
+Manager.SetGroupOrder = async (GroupID: unknown, orderedUUIDs: readonly string[]) => {
+  if (!IsArray(orderedUUIDs)) return Fail('Invalid orderedUUIDs');
   // normalize GroupID null
   const TargetGroupID = (GroupID === undefined ? null : GroupID) as number | string | null;
   const Moved: Client[] = [];
@@ -2158,16 +2159,17 @@ Manager.SetGroupOrder = async (GroupID: unknown, orderedUUIDs: unknown) => {
 // is shared across multiple entity types (e.g. clients + monitoring targets).
 Manager.SetGroupOrderWithWeights = async (
   GroupID: unknown,
-  orderedUUIDs: unknown,
-  weights: unknown
+  orderedUUIDs: readonly string[],
+  weights: readonly number[]
 ) => {
-  if (!Array.isArray(orderedUUIDs) || !Array.isArray(weights)) return Fail('Invalid input');
+  if (!IsArray(orderedUUIDs) || !IsArray(weights)) return Fail('Invalid input');
   if (orderedUUIDs.length !== weights.length) return Fail('Length mismatch');
   const TargetGroupID = (GroupID === undefined ? null : GroupID) as number | string | null;
   const Moved: Client[] = [];
   await InOneCommit(async () => {
     for (let i = 0; i < orderedUUIDs.length; i++) {
-      const uuid = orderedUUIDs[i];
+      // i < length, so in bounds.
+      const uuid = orderedUUIDs[i]!;
       const w = Number(weights[i]) || 0;
       const [err, client] = await Manager.Get(uuid);
       if (err || !client) continue;

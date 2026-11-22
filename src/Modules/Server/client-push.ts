@@ -77,7 +77,7 @@ export function FlushClientPushes(): void {
   if (Queued.size === 0) return;
   const Clients = Array.from(Queued.values());
   Queued.clear();
-  const Projected: Array<ClientView | undefined> = new Array(Clients.length);
+  const Projected = new Array<ClientView | undefined>(Clients.length);
   const Batch: ClientPushBatch = {
     Clients,
     PublicOf(Index: number): ClientView {

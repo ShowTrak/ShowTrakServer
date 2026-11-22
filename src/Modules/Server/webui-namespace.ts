@@ -24,6 +24,7 @@ import crypto from 'crypto';
 import type { Server } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents, ClientView } from '@showtrak/protocol';
 import { CreateLogger } from '../Logger';
+import { IsArray } from '../Utils/guards';
 import { Config } from '../Config';
 import { Manager as BroadcastManager } from '../Broadcast';
 import { Manager as ClientManager } from '../ClientManager';
@@ -642,7 +643,7 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
         if (!Decision.allowed) return cb && cb({ error: Decision.reason || 'forbidden' });
         const Handler = GetHandler(channel);
         if (typeof Handler !== 'function') return cb && cb({ error: 'unknown_channel' });
-        const Args = Array.isArray(args) ? args : [];
+        const Args = IsArray(args) ? args : [];
         const Address = (socket.handshake && socket.handshake.address) || '';
         const Result = await RunWithAuditSource(Address ? `Web UI (${Address})` : 'Web UI', () =>
           Handler(null, ...Args)

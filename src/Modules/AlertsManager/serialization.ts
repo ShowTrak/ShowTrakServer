@@ -1,6 +1,7 @@
 // Pure (de)serialization helpers for translating AlertRule database rows
 // to/from the in-memory rule shape used by the AlertsManager.
 import type { AlertRuleView, AlertRuleScope, AlertRuleActionView } from '@showtrak/protocol';
+import { IsArray } from '../Utils/guards';
 
 // The persisted/derived row shape consumed by normalizeRuleRow. Rows come either
 // from the AlertRules table (JSON columns as strings) or from freshly-built
@@ -22,7 +23,7 @@ function parseJson<T>(Value: unknown, Fallback: T): T {
   if (Value == null) return Fallback;
   if (typeof Value === 'object') return Value as T;
   try {
-    const Parsed = JSON.parse(Value as string);
+    const Parsed: unknown = JSON.parse(Value as string);
     return (Parsed == null ? Fallback : Parsed) as T;
   } catch {
     return Fallback;
@@ -53,8 +54,8 @@ function parseTriggerTypes(Value: unknown): string[] {
     if (!Text) return [];
     if (Text.startsWith('[')) {
       try {
-        const Parsed = JSON.parse(Text);
-        if (Array.isArray(Parsed)) return coerceTriggerTypeList(Parsed);
+        const Parsed: unknown = JSON.parse(Text);
+        if (IsArray(Parsed)) return coerceTriggerTypeList(Parsed);
       } catch {
         // Fall through and treat the raw text as a single legacy trigger.
       }

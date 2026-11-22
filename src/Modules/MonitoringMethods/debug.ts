@@ -128,7 +128,7 @@ function TruncatedBodyBlock(Text: string): string {
 export function JsonCodeBlock(JsonString: unknown): string {
   if (!JsonString) return Note('No JSON response');
   try {
-    const Parsed = JSON.parse(String(JsonString));
+    const Parsed: unknown = JSON.parse(String(JsonString));
     const Beautified = JSON.stringify(Parsed, null, 2);
     return (
       '<pre class="bg-ghost rounded p-2 text-light font-monospace" ' +
@@ -154,7 +154,7 @@ export function JsonCodeBlockWithPath(JsonString: unknown, JsonPath: unknown): s
   if (!JsonString || !JsonPath) return JsonCodeBlock(JsonString);
 
   try {
-    const Parsed = JSON.parse(String(JsonString));
+    const Parsed: unknown = JSON.parse(String(JsonString));
     const Beautified = JSON.stringify(Parsed, null, 2);
     const Escaped = Esc(Beautified);
 
@@ -163,7 +163,9 @@ export function JsonCodeBlockWithPath(JsonString: unknown, JsonPath: unknown): s
     let Cur = Parsed;
     for (const Part of Parts) {
       if (Cur == null) break;
-      Cur = Cur[Part];
+      // Any value but null and undefined can be indexed, primitives included (a
+      // string's length, say), so this reads exactly what Cur[Part] always did.
+      Cur = (Cur as Record<string, unknown>)[Part];
     }
 
     // If we found a value, try to find and highlight it in the beautified JSON

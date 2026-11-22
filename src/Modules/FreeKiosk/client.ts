@@ -248,7 +248,7 @@ function ParseEnvelope(Body: Buffer): FreeKioskEnvelope | null {
   const Text = Body.toString('utf8').trim();
   if (!Text) return null;
   try {
-    const Parsed = JSON.parse(Text);
+    const Parsed: unknown = JSON.parse(Text);
     return Parsed && typeof Parsed === 'object' ? (Parsed as FreeKioskEnvelope) : null;
   } catch {
     return null;

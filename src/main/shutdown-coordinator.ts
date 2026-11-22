@@ -8,12 +8,17 @@
 // main.ts stays the composition root; it registers the events and delegates
 // their bodies to these methods. Behavior is identical to the original inline
 // handlers; only the ownership of the flags moved.
-import type { BrowserWindow as ElectronBrowserWindow } from 'electron';
+import type {
+  BaseWindow,
+  BrowserWindow as ElectronBrowserWindow,
+  MessageBoxOptions,
+  MessageBoxReturnValue,
+} from 'electron';
 import { CreateLogger, flushLogWrites } from '../Modules/Logger';
 import { DB_PENDING_OPERATION_TIMEOUT_MS } from '../Modules/Config/constants';
 import { stopAutosave } from './autosave';
-const { app } = require('electron/main');
-const { dialog } = require('electron');
+import { app } from 'electron/main';
+import { dialog as ElectronDialog } from 'electron';
 import { getMainWindow, hasMainWindow, sendShowFileUpdated } from './app-window';
 import { PushToRenderers } from './renderer-bus';
 import { Manager as ModeManager } from '../Modules/ModeManager';
@@ -28,6 +33,18 @@ import { Manager as DBManager } from '../Modules/DB';
 import { Manager as AuditLog } from '../Modules/AuditLog';
 
 const Logger = CreateLogger('Main');
+
+// Electron's dialog, typed for how these prompts call it: with the main window
+// as the parent, or null once that window is gone. Electron takes null for "no
+// parent" (it always has), though its types declare only the overload without
+// a window for that case.
+const dialog: {
+  showMessageBox(
+    window: BaseWindow | null,
+    options: MessageBoxOptions
+  ): Promise<MessageBoxReturnValue>;
+  showErrorBox(title: string, content: string): void;
+} = ElectronDialog;
 
 // Minimal shape for the Electron lifecycle events whose only use here is
 // cancelling the default action.

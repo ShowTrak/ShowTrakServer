@@ -21,14 +21,15 @@ import {
 } from '@showtrak/protocol/runtime';
 import { Manager as AppDataManager } from '../AppData';
 
-const pc = require('picocolors');
+import pc from 'picocolors';
 
 const fsp = fs.promises;
 
 let IsInInstallation = false;
 try {
-  // In install/update phase for Electron apps, avoid file I/O noise.
-  IsInInstallation = require('electron-squirrel-startup');
+  // In install/update phase for Electron apps, avoid file I/O noise. The package
+  // exports one boolean (whether this is a Squirrel install run) and no types.
+  IsInInstallation = require('electron-squirrel-startup') as boolean;
 } catch {
   IsInInstallation = false;
 }
@@ -324,7 +325,7 @@ class Logger {
   }
   databaseError(...args: unknown[]): void {
     args.forEach((arg) =>
-      writeLine(this.Alias, 'Database', arg instanceof Error ? arg : pc.red(arg), 'error')
+      writeLine(this.Alias, 'Database', arg instanceof Error ? arg : pc.red(String(arg)), 'error')
     );
   }
   child(suffix: string): Logger {

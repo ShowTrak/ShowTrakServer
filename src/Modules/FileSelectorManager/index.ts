@@ -25,7 +25,7 @@ function DirectoryStorePath(): string {
 
 function LoadLastDirectories(): Partial<Record<DialogCategory, string>> {
   try {
-    const Parsed = JSON.parse(fs.readFileSync(DirectoryStorePath(), 'utf8'));
+    const Parsed: unknown = JSON.parse(fs.readFileSync(DirectoryStorePath(), 'utf8'));
     return Parsed && typeof Parsed === 'object' ? (Parsed as Record<DialogCategory, string>) : {};
   } catch {
     // Missing/corrupt store just means "no remembered directory yet".

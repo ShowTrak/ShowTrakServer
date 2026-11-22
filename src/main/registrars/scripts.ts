@@ -15,10 +15,10 @@ import {
   parseArgumentString,
   runLocalScriptFile,
 } from '../local-scripts';
-const { shell } = require('electron');
-const path = require('path');
-const fs = require('fs');
-const { execFile } = require('child_process');
+import { shell } from 'electron';
+import path from 'path';
+import fs from 'fs';
+import { execFile } from 'child_process';
 import { Manager as ServerManager } from '../../Modules/Server';
 import { Manager as ScriptManager } from '../../Modules/ScriptManager';
 import { Manager as ScriptExecutionManager } from '../../Modules/ScriptExecutionManager';

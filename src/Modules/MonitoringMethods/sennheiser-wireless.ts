@@ -40,6 +40,7 @@ import dgram from 'dgram';
 import dns from 'dns';
 import { Card, FormatLatency, Note, Pill, Row, Rows, TextRow } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
+import { IsArray } from '../Utils/guards';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
 const ID = 'sennheiser-wireless';
@@ -493,7 +494,7 @@ function InterpretState(State: Json): SennheiserDevice {
     const Rx = State[`rx${N}`];
     if (!IsPlainObject(Rx) || !Object.keys(Rx).length) continue;
     if (Profile === 'Digital 6000') {
-      const Mm = Array.isArray(State.mm) ? State.mm[N - 1] : undefined;
+      const Mm = IsArray(State.mm) ? State.mm[N - 1] : undefined;
       Channels.push(InterpretDigital6000(N, Rx, Mm));
     } else {
       const Mate = Path(State, 'mates', `tx${N}`);

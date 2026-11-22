@@ -44,7 +44,7 @@ import { CreateWebUiAssetHandler } from './static-assets';
 
 const Logger = CreateLogger('WebServer');
 
-const HTTP = require('http');
+import HTTP from 'http';
 import type { IncomingMessage, ServerResponse } from 'http';
 import { Server as WebServer } from 'socket.io';
 
@@ -232,7 +232,7 @@ const ClientsListHandler = async (req: Request, res: Response) => {
 // of the main process's load time, and Socket.IO traffic (every ShowTrak Client
 // and SDK connection) is answered by engine.io before it reaches this handler.
 function CreateHttpApp() {
-  const express = require('express');
+  const express = require('express') as typeof import('express');
   const app = express();
 
   UpdateManager.RegisterRoutes(app);
@@ -256,7 +256,7 @@ function CreateHttpApp() {
       if (sourceIP) detailParts.push(sourceIP);
 
       Logger.log(`API ${req.method} ${req.originalUrl} -> ${statusCode}`);
-      require('../Broadcast').Manager.emit('DebugTrafficEntry', {
+      (require('../Broadcast') as typeof import('../Broadcast')).Manager.emit('DebugTrafficEntry', {
         protocol: 'http',
         timestamp: Date.now(),
         valid: statusCode > 0 && statusCode < 400,

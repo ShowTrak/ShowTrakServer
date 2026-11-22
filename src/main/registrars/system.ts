@@ -7,11 +7,11 @@ import { RPC } from '../rpc';
 import { validationErrorTuple } from '../ipc/create-handler';
 import { PushInitialDesktopState } from '../initial-state';
 import { markInitialStateDelivered } from '../first-paint';
-const { app } = require('electron/main');
-const { shell } = require('electron');
-const os = require('os');
-const path = require('path');
-const fs = require('fs');
+import { app } from 'electron/main';
+import { shell } from 'electron';
+import os from 'os';
+import path from 'path';
+import fs from 'fs';
 import { Config } from '../../Modules/Config';
 import { Manager as ModeManager } from '../../Modules/ModeManager';
 import { Manager as SettingsManager } from '../../Modules/SettingsManager';
@@ -131,12 +131,12 @@ function register(): void {
   // Open an arbitrary external URL supplied by the renderer (e.g. a monitoring
   // method's documentation link). Restricted to http/https so a crafted value
   // can never launch a file:// path or a custom protocol handler.
-  RPC.handle('OpenExternalUrl', async (_event: unknown, URL: unknown) => {
-    const Raw = String(URL || '').trim();
+  RPC.handle('OpenExternalUrl', async (_event: unknown, Url: unknown) => {
+    const Raw = String(Url || '').trim();
     if (!Raw) return;
     let Parsed;
     try {
-      Parsed = new (require('url').URL)(Raw);
+      Parsed = new URL(Raw);
     } catch {
       Logger.warn(`Refusing to open malformed external URL: ${Raw}`);
       return;
@@ -177,7 +177,10 @@ function register(): void {
       }
 
       const PackageJsonRaw = fs.readFileSync(PackageJsonPath, 'utf8');
-      const PackageJson = JSON.parse(PackageJsonRaw);
+      // The app's own package.json, shipped with it.
+      const PackageJson = JSON.parse(PackageJsonRaw) as {
+        dependencies?: Record<string, string>;
+      };
 
       const DefaultRuntimeDependencies = new Set(['electron-squirrel-startup']);
 

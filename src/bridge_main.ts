@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+import { contextBridge, ipcRenderer } from 'electron';
 import type {
   ClientView,
   ExecutionOutputView,
@@ -290,7 +290,8 @@ function invoke<T = unknown>(channel: InvokeChannel, ...args: unknown[]): Promis
   if (!INVOKE_CHANNELS.has(channel)) {
     throw new Error(`Blocked invoke channel: ${channel}`);
   }
-  return ipcRenderer.invoke(channel, ...args);
+  // The main process answers with the type the shared contract declares.
+  return ipcRenderer.invoke(channel, ...args) as Promise<T>;
 }
 
 function subscribe<Args extends unknown[], Payload extends unknown[] = Args>(

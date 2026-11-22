@@ -9,6 +9,7 @@ import path from 'path';
 import fs from 'fs';
 import { Manager as AppDataManager } from '../AppData';
 import { WriteAndSyncFileSync } from '../Utils';
+import { IsArray, IsObject } from '../Utils/guards';
 import type { DBResult } from '../DB';
 import type { SettingRow } from '../DB/rows';
 
@@ -22,8 +23,8 @@ export function CreateInstallSettingsStore(GetFilePath: () => string = DefaultFi
   // SettingsManager from initialising. The next write replaces it.
   function ReadAll(): Record<string, unknown> {
     try {
-      const Parsed = JSON.parse(fs.readFileSync(GetFilePath(), 'utf8'));
-      return Parsed && typeof Parsed === 'object' && !Array.isArray(Parsed) ? Parsed : {};
+      const Parsed: unknown = JSON.parse(fs.readFileSync(GetFilePath(), 'utf8'));
+      return IsObject(Parsed) && !IsArray(Parsed) ? Parsed : {};
     } catch {
       return {};
     }

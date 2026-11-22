@@ -4,6 +4,7 @@
 // are pruned. The backing Maps are encapsulated here; callers interact only
 // through exported helpers.
 import { HISTORY_RETENTION_MS } from '../Modules/Config/constants';
+import { IsArray, IsObject } from '../Modules/Utils/guards';
 
 const MONITORING_HISTORY_MAX_AGE_MS = HISTORY_RETENTION_MS;
 // Readings closer together than this collapse into one: a burst of updates for
@@ -92,23 +93,18 @@ interface NamedHistoryEntry extends HistorySeries {
   Stamp: number;
 }
 
-// Loose client telemetry shape read by the critical-entity extractors.
-interface RunningApplicationsLike {
-  Status?: unknown;
-  Items?: unknown;
-  Foreground?: unknown;
-  Capabilities?: unknown;
-}
+// Loose client telemetry shape read by the critical-entity extractors. Every
+// field is narrowed where it is read.
 interface ClientHardwareTelemetryLike {
   UUID?: unknown;
   Online?: unknown;
   Degraded?: unknown;
-  RunningApplications?: RunningApplicationsLike | null;
+  RunningApplications?: unknown;
   USBDeviceList?: unknown;
   DisplayList?: unknown;
-  AudioDevices?: { Endpoints?: unknown } | null;
-  NetworkStatus?: { Interfaces?: unknown } | null;
-  StorageStatus?: { Volumes?: unknown } | null;
+  AudioDevices?: unknown;
+  NetworkStatus?: unknown;
+  StorageStatus?: unknown;
   SystemChecks?: unknown;
   ResourceAlarms?: unknown;
   PowerStatus?: unknown;
@@ -317,14 +313,14 @@ function recordEntityHistorySample(
 
 function syncEntityHistoryStore<T>(
   entityType: string,
-  list: unknown,
+  list: readonly T[] | null | undefined,
   keyResolver: (item: T) => unknown,
   sampleResolver: (item: T) => HistorySampleInput
 ): void {
   const store = getHistoryStore(entityType);
   if (!store || typeof keyResolver !== 'function' || typeof sampleResolver !== 'function') return;
 
-  const safeList: T[] = Array.isArray(list) ? list : [];
+  const safeList: readonly T[] = IsArray(list) ? list : [];
   const validKeys = new Set<EntityHistoryKey>();
 
   for (const item of safeList) {
@@ -385,9 +381,9 @@ function getStatusHistoryOverviewSamples(sinceTs: number): {
 
 function recordMonitoringHistorySample(target: MonitoringTargetLike | null | undefined): void {
   if (!target || !target.TargetID) return;
-  const checks = Array.isArray(target.Checks) ? target.Checks : [];
+  const checks = IsArray(target.Checks) ? target.Checks : [];
   for (const check of checks) {
-    if (!check || check.CheckID == null) continue;
+    if (!IsObject(check) || check.CheckID == null) continue;
     // A check still inside its failure threshold on first contact has no
     // verdict; charting that gap as offline would draw an outage that never was.
     if (check.LastChecked == null) continue;
@@ -403,9 +399,10 @@ function syncMonitoringHistoryStore(list: unknown): void {
   // Flatten every target's checks into a single per-check sample list so the
   // shared sync helper can prune history for checks that no longer exist.
   const checks: MonitoringCheckLike[] = [];
-  for (const target of Array.isArray(list) ? list : []) {
-    for (const check of Array.isArray(target && target.Checks) ? target.Checks : []) {
-      if (check && check.CheckID != null) checks.push(check);
+  for (const target of IsArray(list) ? list : []) {
+    const targetChecks = IsObject(target) ? target.Checks : undefined;
+    for (const check of IsArray(targetChecks) ? targetChecks : []) {
+      if (IsObject(check) && check.CheckID != null) checks.push(check);
     }
   }
   syncEntityHistoryStore(
@@ -436,11 +433,11 @@ function recordDummyHistorySample(dummy: StatusEntityLike | null | undefined): v
 function syncDummyHistoryStore(list: unknown): void {
   syncEntityHistoryStore(
     ENTITY_DUMMY_CLIENT,
-    list,
-    (dummy: StatusEntityLike) => dummy && dummy.UUID,
-    (dummy: StatusEntityLike) => ({
-      online: !!(dummy && dummy.Online),
-      degraded: !!(dummy && dummy.Degraded),
+    IsArray(list) ? list : null,
+    (dummy) => (IsObject(dummy) ? dummy.UUID : null),
+    (dummy) => ({
+      online: IsObject(dummy) && !!dummy.Online,
+      degraded: IsObject(dummy) && !!dummy.Degraded,
       latencyMs: null,
     })
   );
@@ -466,11 +463,11 @@ function recordClientHistorySample(client: StatusEntityLike | null | undefined):
 function syncClientHistoryStore(list: unknown): void {
   syncEntityHistoryStore(
     ENTITY_CLIENT,
-    list,
-    (client: StatusEntityLike) => client && client.UUID,
-    (client: StatusEntityLike) => ({
-      online: !!(client && client.Online),
-      degraded: !!(client && client.Degraded),
+    IsArray(list) ? list : null,
+    (client) => (IsObject(client) ? client.UUID : null),
+    (client) => ({
+      online: IsObject(client) && !!client.Online,
+      degraded: IsObject(client) && !!client.Degraded,
       latencyMs: null,
     })
   );
@@ -567,10 +564,11 @@ function createNamedHistoryStore<KeyField extends string>(
   }
 
   function sync(list: unknown): void {
-    const safeList = Array.isArray(list) ? list : [];
+    const safeList = IsArray(list) ? list : [];
     const validUUIDs = new Set<string>();
     for (const client of safeList) {
-      const uuid = normalizeDummyUUID(client && client.UUID);
+      if (!IsObject(client)) continue;
+      const uuid = normalizeDummyUUID(client.UUID);
       if (!uuid) continue;
       validUUIDs.add(uuid);
       record(client);
@@ -621,20 +619,15 @@ function extractCriticalApplicationStates(
   client: ClientHardwareTelemetryLike | null | undefined
 ): NamedEntityState[] | null {
   if (!client || !client.Online) return null;
-  const running =
-    client.RunningApplications && typeof client.RunningApplications === 'object'
-      ? client.RunningApplications
-      : null;
+  const running = IsObject(client.RunningApplications) ? client.RunningApplications : null;
   if (!running) return null;
-  const status = (running.Status && typeof running.Status === 'object' ? running.Status : {}) as {
-    State?: unknown;
-  };
+  const status: { State?: unknown } = IsObject(running.Status) ? running.Status : {};
   const state = String(status.State || 'unknown').toLowerCase();
   if (state !== 'ok') return null;
-  const items = Array.isArray(running.Items) ? running.Items : [];
-  const capabilities = (
-    running.Capabilities && typeof running.Capabilities === 'object' ? running.Capabilities : {}
-  ) as { Foreground?: unknown };
+  const items = IsArray(running.Items) ? running.Items : [];
+  const capabilities: { Foreground?: unknown } = IsObject(running.Capabilities)
+    ? running.Capabilities
+    : {};
   // Only a named owner is evidence that the application lost focus (see
   // Client._isOutOfForeground).
   const focusKnown =
@@ -643,7 +636,7 @@ function extractCriticalApplicationStates(
     !!running.Foreground;
   const states: NamedEntityState[] = [];
   for (const item of items) {
-    if (!item || !item.IsCritical) continue;
+    if (!IsObject(item) || !item.IsCritical) continue;
     const name = typeof item.Name === 'string' && item.Name.trim() ? item.Name.trim() : null;
     const key = typeof item.Key === 'string' && item.Key.trim() ? item.Key.trim() : name;
     if (!key) continue;
@@ -686,18 +679,20 @@ function extractCriticalUSBStates(
   client: ClientHardwareTelemetryLike | null | undefined
 ): NamedEntityState[] | null {
   if (!client || !client.Online) return null;
-  const devices = Array.isArray(client.USBDeviceList) ? client.USBDeviceList : [];
+  const devices = IsArray(client.USBDeviceList) ? client.USBDeviceList : [];
   const states: NamedEntityState[] = [];
   const byNameKey = new Map<string, NamedEntityState>();
   for (const device of devices) {
-    if (!device || !device.IsCritical) continue;
+    if (!IsObject(device) || !device.IsCritical) continue;
     const manufacturer =
       typeof device.ManufacturerName === 'string' ? device.ManufacturerName.trim() : '';
     const product = typeof device.ProductName === 'string' ? device.ProductName.trim() : '';
     const name = [manufacturer, product].filter(Boolean).join(' ') || 'USB Device';
-    const issues: Array<{ Kind?: unknown }> = Array.isArray(device.Issues) ? device.Issues : [];
-    const missingIssue = issues.some((issue) => issue && issue.Kind === 'missing');
-    const otherIssue = issues.some((issue) => issue && issue.Kind !== 'missing');
+    const issues = IsArray(device.Issues) ? device.Issues : [];
+    // Any issue that is there at all and is not a missing one counts as another.
+    const issueKind = (issue: unknown) => (IsObject(issue) ? issue.Kind : undefined);
+    const missingIssue = issues.some((issue) => !!issue && issueKind(issue) === 'missing');
+    const otherIssue = issues.some((issue) => !!issue && issueKind(issue) !== 'missing');
     const isConnected = device.IsConnected !== false;
     const serial =
       device.SerialNumber != null && String(device.SerialNumber).trim()
@@ -719,8 +714,7 @@ function extractCriticalUSBStates(
     if (!nameKey) continue;
     // Short of its quantity, unless its presence is not required.
     const presenceRequired =
-      !device.Critical ||
-      (device.Critical as { RequirePresent?: unknown }).RequirePresent !== false;
+      !device.Critical || !IsObject(device.Critical) || device.Critical.RequirePresent !== false;
     const short = missingIssue || !!device.Missing || (!!device.Shortfall && presenceRequired);
     if (!isConnected && !short) continue;
     const existing = byNameKey.get(nameKey);
@@ -759,14 +753,11 @@ function extractCriticalDisplayStates(
   client: ClientHardwareTelemetryLike | null | undefined
 ): NamedEntityState[] | null {
   if (!client || !client.Online) return null;
-  const displays = Array.isArray(client.DisplayList) ? client.DisplayList : [];
+  const displays = IsArray(client.DisplayList) ? client.DisplayList : [];
   const states: NamedEntityState[] = [];
   for (const display of displays) {
-    if (!display || !display.IsCritical) continue;
-    const critical =
-      display.Critical && typeof display.Critical === 'object'
-        ? (display.Critical as { DisplayID?: unknown })
-        : null;
+    if (!IsObject(display) || !display.IsCritical) continue;
+    const critical = IsObject(display.Critical) ? display.Critical : null;
     const rawID = critical && critical.DisplayID != null ? critical.DisplayID : display.DisplayID;
     const id = rawID != null && String(rawID).trim() ? String(rawID).trim() : null;
     if (!id) continue;
@@ -774,7 +765,7 @@ function extractCriticalDisplayStates(
       typeof display.Label === 'string' && display.Label.trim() ? display.Label.trim() : null;
     const isConnected = display.IsConnected !== false && !display.Missing;
     if (!isConnected && !display.Missing) continue;
-    const issues = Array.isArray(display.Issues) ? display.Issues : [];
+    const issues = IsArray(display.Issues) ? display.Issues : [];
     states.push({
       key: id,
       name: label || 'Display',
@@ -802,12 +793,11 @@ function extractCriticalAudioStates(
   client: ClientHardwareTelemetryLike | null | undefined
 ): NamedEntityState[] | null {
   if (!client || !client.Online) return null;
-  const endpoints = Array.isArray(client.AudioDevices?.Endpoints)
-    ? (client.AudioDevices.Endpoints as Array<Record<string, unknown> | null>)
-    : [];
+  const listed = IsObject(client.AudioDevices) ? client.AudioDevices.Endpoints : undefined;
+  const endpoints = IsArray(listed) ? listed : [];
   const states: NamedEntityState[] = [];
   for (const endpoint of endpoints) {
-    if (!endpoint || !endpoint.IsCritical) continue;
+    if (!IsObject(endpoint) || !endpoint.IsCritical) continue;
     const id = typeof endpoint.EndpointID === 'string' ? endpoint.EndpointID.trim() : '';
     if (!id) continue;
     const isConnected = endpoint.IsConnected !== false;
@@ -816,7 +806,7 @@ function extractCriticalAudioStates(
       typeof endpoint.Name === 'string' && endpoint.Name.trim()
         ? endpoint.Name.trim()
         : 'Audio Device';
-    const issues = Array.isArray(endpoint.Issues) ? endpoint.Issues : [];
+    const issues = IsArray(endpoint.Issues) ? endpoint.Issues : [];
     states.push({
       key: id,
       name,
@@ -842,17 +832,16 @@ function extractCriticalNetworkStates(
   client: ClientHardwareTelemetryLike | null | undefined
 ): NamedEntityState[] | null {
   if (!client || !client.Online) return null;
-  const interfaces = Array.isArray(client.NetworkStatus?.Interfaces)
-    ? (client.NetworkStatus.Interfaces as Array<Record<string, unknown> | null>)
-    : [];
+  const listed = IsObject(client.NetworkStatus) ? client.NetworkStatus.Interfaces : undefined;
+  const interfaces = IsArray(listed) ? listed : [];
   const states: NamedEntityState[] = [];
   for (const iface of interfaces) {
-    if (!iface || !iface.IsCritical) continue;
+    if (!IsObject(iface) || !iface.IsCritical) continue;
     const name = typeof iface.Name === 'string' ? iface.Name.trim() : '';
     if (!name) continue;
     const isConnected = iface.IsConnected !== false;
     if (!isConnected && !iface.Missing) continue;
-    const issues = Array.isArray(iface.Issues) ? iface.Issues : [];
+    const issues = IsArray(iface.Issues) ? iface.Issues : [];
     states.push({
       key: name,
       name,
@@ -877,17 +866,16 @@ function extractCriticalStorageStates(
   client: ClientHardwareTelemetryLike | null | undefined
 ): NamedEntityState[] | null {
   if (!client || !client.Online) return null;
-  const volumes = Array.isArray(client.StorageStatus?.Volumes)
-    ? (client.StorageStatus.Volumes as Array<Record<string, unknown> | null>)
-    : [];
+  const listed = IsObject(client.StorageStatus) ? client.StorageStatus.Volumes : undefined;
+  const volumes = IsArray(listed) ? listed : [];
   const states: NamedEntityState[] = [];
   for (const volume of volumes) {
-    if (!volume || !volume.IsCritical) continue;
+    if (!IsObject(volume) || !volume.IsCritical) continue;
     const mountPoint = typeof volume.MountPoint === 'string' ? volume.MountPoint.trim() : '';
     if (!mountPoint) continue;
     const isConnected = volume.IsConnected !== false;
     if (!isConnected && !volume.Missing) continue;
-    const issues = Array.isArray(volume.Issues) ? volume.Issues : [];
+    const issues = IsArray(volume.Issues) ? volume.Issues : [];
     const name = typeof volume.Name === 'string' && volume.Name.trim() ? volume.Name.trim() : '';
     states.push({
       key: mountPoint,
@@ -939,12 +927,10 @@ function extractSystemCheckStates(
   client: ClientHardwareTelemetryLike | null | undefined
 ): NamedEntityState[] | null {
   if (!client || !client.Online) return null;
-  const checks = (
-    client.SystemChecks && typeof client.SystemChecks === 'object' ? client.SystemChecks : {}
-  ) as Record<string, unknown>;
+  const checks: Record<string, unknown> = IsObject(client.SystemChecks) ? client.SystemChecks : {};
   const failing = new Set<string>();
-  for (const alarm of Array.isArray(client.ResourceAlarms) ? client.ResourceAlarms : []) {
-    const check = alarm && ALARM_CHECK[String((alarm as { Key?: unknown }).Key)];
+  for (const alarm of IsArray(client.ResourceAlarms) ? client.ResourceAlarms : []) {
+    const check = IsObject(alarm) ? ALARM_CHECK[String(alarm.Key)] : undefined;
     if (check) failing.add(check);
   }
   const states: NamedEntityState[] = [];

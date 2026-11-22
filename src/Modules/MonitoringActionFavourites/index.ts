@@ -57,7 +57,7 @@ function ParseParams(Raw: unknown): Record<string, unknown> {
   if (!Raw) return {};
   if (typeof Raw === 'object') return Raw as Record<string, unknown>;
   try {
-    const Parsed = JSON.parse(String(Raw));
+    const Parsed: unknown = JSON.parse(String(Raw));
     return Parsed && typeof Parsed === 'object' ? (Parsed as Record<string, unknown>) : {};
   } catch {
     return {};

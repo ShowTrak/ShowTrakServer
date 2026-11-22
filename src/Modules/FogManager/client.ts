@@ -29,6 +29,7 @@ import http from 'http';
 import https from 'https';
 import { FOG_REQUEST_TIMEOUT_MS } from '../Config/fog';
 import { NormalizeMacAddress } from '../MacAddress';
+import { IsArray } from '../Utils/guards';
 
 export interface FogConfig {
   Protocol: 'http' | 'https';
@@ -197,7 +198,7 @@ export function ToText(Value: unknown): string {
 // from FOG's route.class.php, since the docs mention neither. Anything that is
 // not a valid MAC is dropped rather than failing the whole host.
 export function ReadHostMacAddresses(Host: { primac?: unknown; macs?: unknown }): string[] {
-  const Raw = [Host.primac, ...(Array.isArray(Host.macs) ? Host.macs : [])];
+  const Raw = [Host.primac, ...(IsArray(Host.macs) ? Host.macs : [])];
   const Seen = new Set<string>();
   for (const Value of Raw) {
     const Mac = NormalizeMacAddress(Value);

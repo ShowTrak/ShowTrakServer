@@ -7,7 +7,7 @@ import type {
 } from './types';
 import { OSC_PORT } from '../Config/constants';
 
-const { Client, Message } = require('node-osc');
+import { Client, Message } from 'node-osc';
 
 // Minimal surface of the node-osc client used below (node-osc ships no types).
 interface OscClient {
@@ -34,7 +34,7 @@ function interpolate(Input: unknown, Context: AlertContext): string {
     groupId: Context && Context.GroupID != null ? String(Context.GroupID) : '',
   };
 
-  return Source.replace(/\{\{([a-zA-Z0-9_]+)\}\}/g, (_m, key) =>
+  return Source.replace(/\{\{([a-zA-Z0-9_]+)\}\}/g, (_m, key: string) =>
     Object.prototype.hasOwnProperty.call(Tokens, key) ? (Tokens[key] ?? '') : ''
   );
 }

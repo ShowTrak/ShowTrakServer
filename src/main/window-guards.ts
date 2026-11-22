@@ -4,7 +4,7 @@
 // in the OS browser (never in-app), and in-app navigation away from the loaded
 // UI is blocked. Both guards fail closed (deny) on error.
 import type { BrowserWindow as ElectronBrowserWindow } from 'electron';
-const { shell } = require('electron');
+import { shell } from 'electron';
 
 function applyWindowSecurityGuards(windowInstance: ElectronBrowserWindow): void {
   if (!windowInstance || windowInstance.isDestroyed()) return;

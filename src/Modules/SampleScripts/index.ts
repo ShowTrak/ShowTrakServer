@@ -6,6 +6,7 @@ import fs from 'fs';
 import { CreateLogger } from '../Logger';
 import { Manager as AppDataManager } from '../AppData';
 import { Manager as BroadcastManager } from '../Broadcast';
+import { IsArray } from '../Utils/guards';
 
 const Logger = CreateLogger('SampleScripts');
 
@@ -103,7 +104,11 @@ function LoadCacheFromDisk(): boolean {
   try {
     const FilePath = GetCacheFilePath();
     if (!fs.existsSync(FilePath)) return false;
-    const Parsed = JSON.parse(fs.readFileSync(FilePath, 'utf-8'));
+    // This module's own cache file (WriteCacheToDisk).
+    const Parsed = JSON.parse(fs.readFileSync(FilePath, 'utf-8')) as {
+      sha?: unknown;
+      samples?: Sample[];
+    } | null;
     if (!Parsed || !Array.isArray(Parsed.samples)) return false;
     Samples = Parsed.samples;
     CachedSha = typeof Parsed.sha === 'string' ? Parsed.sha : null;
@@ -146,7 +151,7 @@ async function FetchLatestSha(): Promise<string | null> {
 async function FetchRepoTree(): Promise<unknown[]> {
   const Url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/git/trees/${REPO_BRANCH}?recursive=1`;
   const Data = await FetchJson(Url);
-  if (!IsRecord(Data) || !Array.isArray(Data.tree)) return [];
+  if (!IsRecord(Data) || !IsArray(Data.tree)) return [];
   return Data.tree;
 }
 
@@ -200,7 +205,10 @@ async function BuildSamplesFromTree(Tree: unknown[]): Promise<Sample[]> {
       });
       if (File.relativePath === 'Script.json') {
         try {
-          Config = JSON.parse(FileBuffer.toString('utf-8'));
+          const Parsed: unknown = JSON.parse(FileBuffer.toString('utf-8'));
+          // Anything but an object reads as one without fields, as it always did
+          // (its defaults below); null, false, 0 and "" skip the sample.
+          Config = IsRecord(Parsed) ? Parsed : Parsed ? {} : null;
         } catch (Err) {
           Logger.error(`Sample ${Folder} has invalid Script.json, skipping:`, Err);
         }

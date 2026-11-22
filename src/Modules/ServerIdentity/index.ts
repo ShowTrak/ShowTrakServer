@@ -3,6 +3,7 @@ import fs from 'fs';
 
 import { Manager as AppDataManager } from '../AppData';
 import { Manager as UUIDManager } from '../UUID';
+import { IsObject } from '../Utils/guards';
 
 interface ServerIdentityRecord {
   Token: string;
@@ -16,8 +17,8 @@ let cachedIdentity: ServerIdentityRecord | null = null;
 function loadIdentityFromDisk(): ServerIdentityRecord | null {
   try {
     if (!fs.existsSync(IdentityFilePath)) return null;
-    const parsed = JSON.parse(fs.readFileSync(IdentityFilePath, 'utf8'));
-    if (!parsed || typeof parsed.Token !== 'string' || !parsed.Token.trim()) {
+    const parsed: unknown = JSON.parse(fs.readFileSync(IdentityFilePath, 'utf8'));
+    if (!IsObject(parsed) || typeof parsed.Token !== 'string' || !parsed.Token.trim()) {
       return null;
     }
     return {

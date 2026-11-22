@@ -9,13 +9,16 @@
 // The bulk of the previous 2,600-line file (the ~90 IPC handlers, the ~23
 // broadcast subscribers, and the deployment orchestration) now lives under
 // src/main/ (registrars/, broadcast-bridge.ts, deployment.ts, initial-state.ts).
-import type { BrowserWindow as ElectronBrowserWindow } from 'electron';
+import type {
+  BrowserWindow as ElectronBrowserWindow,
+  BrowserWindowConstructorOptions,
+} from 'electron';
 // Process set-up that has to come before any module loads (the libuv thread
 // pool size, V8's compile cache) is done by the entry point, ./boot.ts, which
 // then loads this file as part of the main-process bundle; Squirrel's install
 // runs stop in ./entry.ts before this file loads.
-const { app, BrowserWindow, dialog } = require('electron/main');
-const { powerMonitor, autoUpdater: nativeAutoUpdater } = require('electron');
+import { app, BrowserWindow, dialog } from 'electron/main';
+import { powerMonitor, autoUpdater as nativeAutoUpdater } from 'electron';
 import { OnShowFileRequest, RequestShowFileOpen, ShowFileFromArgv } from './main/file-associations';
 
 import { Manager as AppDataManager } from './Modules/AppData';
@@ -119,7 +122,7 @@ import { Manager as SettingsManager } from './Modules/SettingsManager';
 import { Manager as ModeManager } from './Modules/ModeManager';
 import { RunWithAuditSource } from './Modules/AuditLog/source';
 import { Wait } from './Modules/Utils';
-const path = require('path');
+import path from 'path';
 
 // --- Main-process infrastructure (no manager dependencies) -------------------
 import { RPC } from './main/rpc';
@@ -179,7 +182,10 @@ const MAC_TRAFFIC_LIGHT_TOP_PADDING_PX = Math.max(
   Math.round((WINDOW_DRAGBAR_HEIGHT_PX - MAC_TRAFFIC_LIGHT_DIAMETER_PX) / 2)
 );
 
-const WINDOW_CHROME_OPTIONS =
+const WINDOW_CHROME_OPTIONS: Pick<
+  BrowserWindowConstructorOptions,
+  'frame' | 'titleBarStyle' | 'trafficLightPosition'
+> =
   process.platform === 'darwin'
     ? {
         frame: true,
@@ -410,7 +416,7 @@ app.whenReady().then(async () => {
     // Write the compile cache now that startup has loaded everything it needs:
     // Node only writes it at a clean exit otherwise, which a hard stop skips.
     try {
-      require('node:module').flushCompileCache?.();
+      (require('node:module') as typeof import('node:module')).flushCompileCache?.();
     } catch {
       /* intentional: best-effort, like enabling it */
     }
@@ -502,7 +508,12 @@ app.on('before-quit', handleBeforeQuit);
 // The server and display are kept awake by ./main/live-settings
 // (initLiveSettings, wired above).
 
-powerMonitor.on('shutdown', handlePowerMonitorShutdown);
+// Electron hands 'shutdown' listeners an event whose preventDefault() holds off
+// the system shutdown (as its own docs for the event say), but declares the
+// listener without arguments; hence the assertion.
+powerMonitor.on('shutdown', (...Args: unknown[]) =>
+  handlePowerMonitorShutdown(Args[0] as Parameters<typeof handlePowerMonitorShutdown>[0])
+);
 
 // macOS's updater emits this; Windows' (Squirrel) does not, so the updater
 // also calls the hook itself just before a Squirrel install quits.

@@ -17,7 +17,7 @@ import { RecordEdit } from '../../Modules/AuditLog/edits';
 import { Line, Value } from '../../Modules/AuditLog/message';
 import { AuditStep } from '../../Modules/Shared/audit-names';
 
-const { dialog } = require('electron');
+import { dialog } from 'electron';
 
 const Logger = CreateLogger('Main');
 
