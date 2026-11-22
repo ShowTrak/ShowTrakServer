@@ -12,7 +12,7 @@ import { RecordAction } from '../AuditLog/edits';
 import { Entity, Line } from '../AuditLog/message';
 import { ClientDisplayName } from '../AuditLog/status';
 import { AuditStep } from '../Shared/audit-names';
-import { IsVersionAtLeast } from '../../common/client-version';
+import { IsVersionAtLeast, MINIMUM_IDENTIFY_VERSION } from '../../common/client-version';
 
 const Logger = CreateLogger('IdentifyManager');
 
@@ -45,7 +45,6 @@ let io: IdentifyIOServer | null = null;
 
 // UUIDs currently in identify mode.
 const IdentifyingUUIDs = new Set<string>();
-const MINIMUM_IDENTIFY_VERSION = [3, 7, 0];
 
 function IsIntegratedClient(Client: IdentifyClientInfo | null | undefined): boolean {
   if (!Client) return false;

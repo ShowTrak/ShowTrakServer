@@ -13,14 +13,16 @@ import type {
   AudioTransport,
   ClientView,
 } from '@showtrak/protocol';
-import { IsVersionAtLeast } from '../../../../common/client-version';
+import {
+  IsVersionAtLeast,
+  MINIMUM_AUDIO_MONITORING_VERSION,
+} from '../../../../common/client-version';
 
 /**
  * The first ShowTrak Client release with audio monitoring. Older clients have no
- * audio monitor at all, so their section reads as unsupported. Mirrors
- * MINIMUM_AUDIO_MONITORING_VERSION in Modules/Config/constants.ts.
+ * audio monitor at all, so their section reads as unsupported.
  */
-export const MINIMUM_AUDIO_MONITORING_VERSION = [3, 21, 0] as const;
+export { MINIMUM_AUDIO_MONITORING_VERSION };
 export const MINIMUM_AUDIO_VERSION_LABEL = MINIMUM_AUDIO_MONITORING_VERSION.join('.');
 
 /** Whether `Version` (e.g. "3.21.0", "v3.22.1-beta") is at least `Minimum`. */

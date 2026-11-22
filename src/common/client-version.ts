@@ -3,6 +3,27 @@
 // before it offers the control. Compiled into both programs: no Node and no DOM
 // here.
 
+// The first Client release with each feature both processes gate on. Each MUST
+// match the Client version that ships the feature.
+
+/** Identify (flash the client's screen on request). */
+export const MINIMUM_IDENTIFY_VERSION: readonly [number, number, number] = [3, 7, 0];
+
+/**
+ * Reports audio endpoints and accepts remote level changes. Anything older has
+ * no audio monitor at all: its Audio section reads as unsupported and level
+ * changes are refused before anything is sent, rather than waiting out a
+ * timeout.
+ */
+export const MINIMUM_AUDIO_MONITORING_VERSION: readonly [number, number, number] = [3, 21, 0];
+
+/**
+ * Reports battery/mains, sleep and resume, temperatures, hung applications and
+ * the foreground application. Older clients read as "update the client" for
+ * these rather than as unsupported hardware.
+ */
+export const MINIMUM_SYSTEM_HEALTH_VERSION: readonly [number, number, number] = [3, 22, 0];
+
 /**
  * The first major.minor.patch in a reported version ("3.21.0", "v3.22.1-beta",
  * "ShowTrak 3.7.0"), or null when there is none.

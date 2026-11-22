@@ -6,12 +6,15 @@ import { AllClients, IsIntegratedClientEntity, PendingAdoption } from './state';
 import { HandleNonFatalError } from './utils';
 import { RenderFullClientAndMonitorList } from './client-list';
 import { Notify } from './lib/toasts';
-import { ParseVersionTuple, IsVersionAtLeast } from '../../../common/client-version';
+import {
+  ParseVersionTuple,
+  IsVersionAtLeast,
+  MINIMUM_IDENTIFY_VERSION,
+} from '../../../common/client-version';
 
-export const MINIMUM_IDENTIFY_VERSION = [3, 7, 0];
 export const MINIMUM_DISPLAY_MONITORING_VERSION = [3, 8, 0];
 
-export { ParseVersionTuple as ParseSemverTuple, IsVersionAtLeast };
+export { ParseVersionTuple as ParseSemverTuple, IsVersionAtLeast, MINIMUM_IDENTIFY_VERSION };
 
 export function GetIdentifyTargetByUUID(UUID: string) {
   const AdoptedTarget = Array.isArray(AllClients)

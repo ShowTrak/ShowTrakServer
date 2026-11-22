@@ -18,13 +18,13 @@ import type {
   ThermalState,
 } from '@showtrak/protocol';
 import { AudioPlatformLabel, IsVersionAtLeast } from './audio-devices';
+import { MINIMUM_SYSTEM_HEALTH_VERSION } from '../../../../common/client-version';
 
 /**
  * The first ShowTrak Client release that reports battery/mains, sleep and
  * resume, temperatures, hung applications and the foreground application.
- * MUST match MINIMUM_SYSTEM_HEALTH_VERSION in Modules/Config/constants.ts.
  */
-export const MINIMUM_SYSTEM_HEALTH_VERSION = [3, 22, 0] as const;
+export { MINIMUM_SYSTEM_HEALTH_VERSION };
 export const MINIMUM_SYSTEM_HEALTH_VERSION_LABEL = MINIMUM_SYSTEM_HEALTH_VERSION.join('.');
 
 // --- Uptime ---------------------------------------------------------------------
