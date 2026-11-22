@@ -1,9 +1,10 @@
 // Shared HTTP/JSON transport for the video processor checks (Brompton Tessera,
-// Barco Event Master, Analog Way LivePremier). All three expose a small
-// HTTP API that answers JSON, and each probe makes one to a handful of
-// requests, so the transport, the whole-probe deadline and the address
-// parsing live here, while each method owns its own endpoints and verdicts.
-// The operator actions use the same transport with their own short deadline.
+// Barco Event Master, Analog Way LivePremier) and the other methods whose
+// device answers JSON over HTTP, the managed switches (./_switch-shared)
+// among them. Each probe makes one to a handful of requests, so the transport,
+// the whole-probe deadline and the address parsing live here, while each
+// method owns its own endpoints and verdicts. The operator actions use the
+// same transport with their own short deadline.
 //
 // Nothing here logs. A request URL can carry a credential (LivePremier's
 // documented login puts the password in the query string), so error strings
@@ -32,6 +33,9 @@ export interface JsonRequest {
   IgnoreTlsErrors?: boolean;
   // Reuse one connection for the rest of the probe (see _probe-agents).
   Agents?: ProbeAgents;
+  // The Error of a request that ran out of time; "Request timed out after
+  // <budget>ms" when absent.
+  TimeoutError?: (BudgetMs: number) => string;
 }
 
 export type JsonResponse =
@@ -42,6 +46,7 @@ export type JsonResponse =
       // Parsed body, or undefined when the body is empty or not JSON.
       Json: unknown;
       Headers: http.IncomingHttpHeaders;
+      LatencyMs: number;
     }
   | { Ok: false; Error: string; TimedOut?: boolean };
 
@@ -83,7 +88,8 @@ export function WithPath(Base: URL, Path: string): URL {
 // the raw status and parsed JSON so the caller decides what each status means.
 export function RequestJson(Url: URL, Request: JsonRequest): Promise<JsonResponse> {
   return new Promise<JsonResponse>((resolve) => {
-    const BudgetMs = Request.DeadlineAt - Date.now();
+    const Started = Date.now();
+    const BudgetMs = Request.DeadlineAt - Started;
     if (BudgetMs <= 0) {
       resolve({ Ok: false, Error: 'Probe timed out', TimedOut: true });
       return;
@@ -124,7 +130,10 @@ export function RequestJson(Url: URL, Request: JsonRequest): Promise<JsonRespons
 
     let Req: http.ClientRequest;
     const KillTimer = setTimeout(() => {
-      Finish({ Ok: false, Error: `Request timed out after ${BudgetMs}ms`, TimedOut: true });
+      const Error = Request.TimeoutError
+        ? Request.TimeoutError(BudgetMs)
+        : `Request timed out after ${BudgetMs}ms`;
+      Finish({ Ok: false, Error, TimedOut: true });
       try {
         Req.destroy();
       } catch {
@@ -160,7 +169,14 @@ export function RequestJson(Url: URL, Request: JsonRequest): Promise<JsonRespons
         } catch {
           Json = undefined;
         }
-        Finish({ Ok: true, Status: Res.statusCode || 0, Body, Json, Headers: Res.headers });
+        Finish({
+          Ok: true,
+          Status: Res.statusCode || 0,
+          Body,
+          Json,
+          Headers: Res.headers,
+          LatencyMs: Date.now() - Started,
+        });
       });
       Res.on('error', (Err: Error) => {
         Finish({ Ok: false, Error: Err && Err.message ? Err.message : String(Err) });

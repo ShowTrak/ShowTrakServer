@@ -1,18 +1,25 @@
 // Shared pieces for the managed-switch checks (Luminex GigaCore, Netgear AV
 // Line): the "Monitored ports" list parser, a JSON-over-HTTP(S) request with a
-// hard deadline (GET, POST and PUT, since GigaCore writes are PUTs), and the
-// small debug-panel helpers both methods render port rows with.
+// hard deadline (GET, POST and PUT, since GigaCore writes are PUTs; the
+// transport is ./_videoproc-http-shared's), and the small debug-panel helpers
+// both methods render port rows with.
 //
 // Nothing here logs. Error strings are built from the socket error only, never
 // from the URL or headers, so a credential can never end up in a message.
-import http from 'http';
-import https from 'https';
 import { URL } from 'url';
 import { Card, Esc, Pill } from './debug';
-import { CachedLookup, RequestHostname } from './_dns-cache';
-import type { ProbeAgents } from './_probe-agents';
+import {
+  RequestJson,
+  WithPath,
+  IsObject,
+  StrOrNull,
+  NumOrNull,
+  type JsonRequest,
+  type JsonResponse,
+} from './_videoproc-http-shared';
 
-const MAX_BODY_BYTES = 4 * 1024 * 1024;
+export { WithPath, IsObject, StrOrNull, NumOrNull };
+
 // A port list cannot name more ports than this, so a typo such as 1-99999
 // is reported instead of expanding into a huge list.
 export const MAX_MONITORED_PORTS = 512;
@@ -99,28 +106,10 @@ export function ParseActionPort(Value: unknown): number | null {
 
 // --- HTTP ---------------------------------------------------------------------------
 
-export interface SwitchRequest {
-  Method: 'GET' | 'POST' | 'PUT';
-  // Serialised as the JSON request body when present (false and 0 included).
-  Json?: unknown;
-  Headers?: Record<string, string>;
-  // Absolute epoch-ms deadline for this request.
-  DeadlineAt: number;
-  IgnoreTlsErrors?: boolean;
-  // Reuse one connection for the rest of the probe (see _probe-agents).
-  Agents?: ProbeAgents;
-}
-
-export type SwitchResponse =
-  | {
-      Ok: true;
-      Status: number;
-      Body: string;
-      // Parsed body, or undefined when the body is empty or not JSON.
-      Json: unknown;
-      LatencyMs: number;
-    }
-  | { Ok: false; Error: string; TimedOut?: boolean };
+// The JSON-over-HTTP(S) transport is the one the video processors use; a switch
+// request differs only in how a timeout reads.
+export type SwitchRequest = Omit<JsonRequest, 'TimeoutError'>;
+export type SwitchResponse = JsonResponse;
 
 // Base URL for a switch. Accepts a bare host/IP or a pasted URL (whose scheme
 // wins); any path or query on the address is discarded since the API paths are
@@ -155,111 +144,12 @@ export function AddressHasScheme(Address: unknown): boolean {
   return /^https?:\/\//i.test(String(Address == null ? '' : Address).trim());
 }
 
-export function WithPath(Base: URL, Path: string): URL {
-  const Url = new URL(Base.toString());
-  const Query = Path.indexOf('?');
-  Url.pathname = Query >= 0 ? Path.slice(0, Query) : Path;
-  Url.search = Query >= 0 ? Path.slice(Query) : '';
-  return Url;
-}
-
 // One request against its deadline. Resolves (never rejects) with the status
 // and parsed JSON so the caller decides what each status means.
 export function RequestSwitchJson(Url: URL, Request: SwitchRequest): Promise<SwitchResponse> {
-  return new Promise<SwitchResponse>((resolve) => {
-    const Started = Date.now();
-    const BudgetMs = Request.DeadlineAt - Started;
-    if (BudgetMs <= 0) {
-      resolve({ Ok: false, Error: 'Probe timed out', TimedOut: true });
-      return;
-    }
-    const Lib = Url.protocol === 'https:' ? https : http;
-    let Settled = false;
-    let Req: http.ClientRequest | null = null;
-    const Finish = (Value: SwitchResponse) => {
-      if (Settled) return;
-      Settled = true;
-      clearTimeout(KillTimer);
-      resolve(Value);
-    };
-    const KillTimer = setTimeout(() => {
-      Finish({ Ok: false, Error: `No reply within ${BudgetMs}ms`, TimedOut: true });
-      try {
-        Req?.destroy();
-      } catch {
-        // ignore
-      }
-    }, BudgetMs);
-
-    const Headers: Record<string, string> = {
-      Host: Url.host,
-      'User-Agent': 'ShowTrak-Monitoring/1.0',
-      Accept: 'application/json',
-      Connection: Request.Agents ? 'keep-alive' : 'close',
-      ...(Request.Headers || {}),
-    };
-    const Payload =
-      Request.Json === undefined ? null : Buffer.from(JSON.stringify(Request.Json), 'utf8');
-    if (Payload) {
-      Headers['Content-Type'] = 'application/json';
-      Headers['Content-Length'] = String(Payload.length);
-    }
-    const Options: https.RequestOptions = {
-      method: Request.Method,
-      hostname: RequestHostname(Url),
-      lookup: CachedLookup,
-      port: Url.port || (Url.protocol === 'https:' ? 443 : 80),
-      path: `${Url.pathname}${Url.search || ''}`,
-      headers: Headers,
-    };
-    if (Url.protocol === 'https:') Options.rejectUnauthorized = !Request.IgnoreTlsErrors;
-    const Agent = Request.Agents ? Request.Agents.For(Url) : undefined;
-    if (Agent) Options.agent = Agent;
-
-    try {
-      Req = Lib.request(Options);
-    } catch (Err) {
-      Finish({ Ok: false, Error: Err instanceof Error ? Err.message : String(Err) });
-      return;
-    }
-    Req.on('error', (Err: Error) => {
-      Finish({ Ok: false, Error: Err && Err.message ? Err.message : String(Err) });
-    });
-    Req.on('response', (Res: http.IncomingMessage) => {
-      let Bytes = 0;
-      const Chunks: Buffer[] = [];
-      Res.on('data', (Chunk: Buffer) => {
-        Bytes += Chunk.length;
-        // Stop accumulating past the cap; a truncated body simply fails to parse.
-        if (Bytes > MAX_BODY_BYTES) return;
-        Chunks.push(Chunk);
-      });
-      Res.on('end', () => {
-        const Body = Buffer.concat(Chunks).toString('utf8');
-        let Json: unknown;
-        try {
-          Json = Body.trim() ? JSON.parse(Body) : undefined;
-        } catch {
-          Json = undefined;
-        }
-        Finish({
-          Ok: true,
-          Status: Res.statusCode || 0,
-          Body,
-          Json,
-          LatencyMs: Date.now() - Started,
-        });
-      });
-      Res.on('error', (Err: Error) => {
-        Finish({ Ok: false, Error: Err && Err.message ? Err.message : String(Err) });
-      });
-    });
-    try {
-      if (Payload) Req.write(Payload);
-      Req.end();
-    } catch (Err) {
-      Finish({ Ok: false, Error: Err instanceof Error ? Err.message : String(Err) });
-    }
+  return RequestJson(Url, {
+    ...Request,
+    TimeoutError: (BudgetMs) => `No reply within ${BudgetMs}ms`,
   });
 }
 
@@ -267,29 +157,7 @@ export function Sleep(Ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, Math.max(0, Ms)));
 }
 
-// --- Small value readers ------------------------------------------------------------
-
-export function IsObject(Value: unknown): Value is Record<string, unknown> {
-  return !!Value && typeof Value === 'object' && !Array.isArray(Value);
-}
-
-export function StrOrNull(Value: unknown): string | null {
-  if (Value == null || typeof Value === 'object') return null;
-  const S = String(Value).trim();
-  return S ? S : null;
-}
-
-// A number from a number or a numeric string ("45", "12.5 W"); null otherwise.
-export function NumOrNull(Value: unknown): number | null {
-  if (typeof Value === 'number') return Number.isFinite(Value) ? Value : null;
-  if (typeof Value === 'string') {
-    const Match = Value.trim().match(/^-?\d+(?:\.\d+)?/);
-    if (!Match) return null;
-    const N = Number(Match[0]);
-    return Number.isFinite(N) ? N : null;
-  }
-  return null;
-}
+// --- Small value readers (the rest are re-exported above) ---------------------------
 
 export function TimeoutOf(Cfg: Record<string, unknown>, Default: number): number {
   const N = Number(Cfg.Timeout);
