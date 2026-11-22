@@ -6,7 +6,7 @@
 // is exactly what the methods declare. Parameters are then normalized against
 // the ACTION's own schema, which means a parameter meant for one action cannot
 // ride along with another.
-import { fail, isPlainObject, normalizeNonEmptyString } from './primitives';
+import { fail, isPlainObject, normalizeNonEmptyString, normalizeNumericID } from './primitives';
 import { Manager as MonitoringMethods } from '../MonitoringMethods';
 import type { IPCValidationManager } from './index';
 
@@ -36,18 +36,8 @@ function normalizeMonitoringSettings(value: unknown): Record<string, unknown> {
 }
 
 export = function registerMonitoringValidators(Manager: IPCValidationManager): void {
-  Manager.MonitoringTargetID = (value: unknown, fieldName = 'TargetID') => {
-    if (typeof value === 'number') {
-      if (!Number.isInteger(value) || value <= 0) fail(`${fieldName} must be a positive integer`);
-      return value;
-    }
-    if (typeof value === 'string') {
-      const normalized = value.trim();
-      if (!/^\d+$/.test(normalized)) fail(`${fieldName} must be numeric`);
-      return parseInt(normalized, 10);
-    }
-    fail(`${fieldName} is invalid`);
-  };
+  Manager.MonitoringTargetID = (value: unknown, fieldName = 'TargetID') =>
+    normalizeNumericID(value, fieldName);
 
   Manager.MonitoringTargetIDList = (value: unknown, fieldName = 'TargetIDs') => {
     const list = Array.isArray(value) ? (value as unknown[]) : [value];

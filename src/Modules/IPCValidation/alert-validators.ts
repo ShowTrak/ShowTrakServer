@@ -1,5 +1,5 @@
 // Alert rule scope / action / trigger validators.
-import { fail, isPlainObject, normalizeNonEmptyString } from './primitives';
+import { fail, isPlainObject, normalizeNonEmptyString, normalizeNumericID } from './primitives';
 import type { IPCValidationManager } from './index';
 import { TRIGGERS } from '../AlertsManager/triggers';
 
@@ -121,18 +121,8 @@ export = function registerAlertValidators(Manager: IPCValidationManager): void {
     return value;
   }
 
-  Manager.AlertRuleID = (value: unknown, fieldName = 'RuleID') => {
-    if (typeof value === 'number') {
-      if (!Number.isInteger(value) || value <= 0) fail(`${fieldName} must be a positive integer`);
-      return value;
-    }
-    if (typeof value === 'string') {
-      const normalized = value.trim();
-      if (!/^\d+$/.test(normalized)) fail(`${fieldName} must be numeric`);
-      return parseInt(normalized, 10);
-    }
-    fail(`${fieldName} is invalid`);
-  };
+  Manager.AlertRuleID = (value: unknown, fieldName = 'RuleID') =>
+    normalizeNumericID(value, fieldName);
 
   Manager.AlertRuleCreatePayload = (value: unknown) => {
     if (!isPlainObject(value)) fail('Alert rule payload must be an object');

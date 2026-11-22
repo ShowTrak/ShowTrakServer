@@ -3,7 +3,7 @@
 // (Manager.Slug); colour is a palette index; scope mirrors the alert/whitelist
 // scope shape but, because tags apply to every client kind, its Clients are
 // scoped-ID strings (plain UUID, or monitor:/check:... prefixes), not bare UUIDs.
-import { fail, isPlainObject } from './primitives';
+import { fail, isPlainObject, normalizeNumericID } from './primitives';
 import type { IPCValidationManager } from './index';
 
 // A scoped client identifier as produced by the scope-dropdown: a UUID, or a
@@ -17,20 +17,7 @@ const SCOPED_ID_PATTERN = /^[A-Za-z0-9_:-]{1,128}$/;
 const TAG_DISPLAY_MODES = ['hidden', 'icon', 'name', 'both'];
 
 export = function registerTagValidators(Manager: IPCValidationManager): void {
-  Manager.TagID = (value: unknown, fieldName = 'TagID') => {
-    if (typeof value === 'number') {
-      if (!Number.isInteger(value) || value <= 0) fail(`${fieldName} must be a positive integer`);
-      return value;
-    }
-    if (typeof value === 'string') {
-      const normalized = value.trim();
-      if (!/^\d+$/.test(normalized)) fail(`${fieldName} must be numeric`);
-      return parseInt(normalized, 10);
-    }
-    fail(`${fieldName} is invalid`);
-    // unreachable: fail throws
-    return 0;
-  };
+  Manager.TagID = (value: unknown, fieldName = 'TagID') => normalizeNumericID(value, fieldName);
 
   Manager.TagColour = (value: unknown, fieldName = 'Colour') => {
     const N = typeof value === 'string' ? Number(value.trim()) : value;

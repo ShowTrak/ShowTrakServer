@@ -35,6 +35,21 @@ export function normalizeNonEmptyString(
   return normalized;
 }
 
+// A database row ID: a positive integer, or a string of digits. A string is only
+// checked to be digits, so "0" reads as 0 (which simply matches no row).
+export function normalizeNumericID(value: unknown, fieldName: string): number {
+  if (typeof value === 'number') {
+    if (!Number.isInteger(value) || value <= 0) fail(`${fieldName} must be a positive integer`);
+    return value;
+  }
+  if (typeof value === 'string') {
+    const normalized = value.trim();
+    if (!/^\d+$/.test(normalized)) fail(`${fieldName} must be numeric`);
+    return parseInt(normalized, 10);
+  }
+  return fail(`${fieldName} is invalid`);
+}
+
 // A string that may legitimately be absent; null/undefined normalize to null,
 // anything else must be a string (trimmed, length-capped; over-long input is
 // truncated rather than rejected since telemetry strings are display-only).

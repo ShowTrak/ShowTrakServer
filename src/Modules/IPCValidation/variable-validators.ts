@@ -9,7 +9,7 @@
 // validators only enforce the wire SHAPE (that an ID is an ID and a string is a
 // string), so a malformed renderer payload is refused before it reaches a
 // manager that assumes well-formed input.
-import { fail, isPlainObject } from './primitives';
+import { fail, isPlainObject, normalizeNumericID } from './primitives';
 import type { IPCValidationManager } from './index';
 
 // Generous relative to VariableManager's own 4096-char cap: this is the "is this
@@ -19,20 +19,8 @@ import type { IPCValidationManager } from './index';
 const MAX_WIRE_VALUE_LENGTH = 8192;
 
 export = function registerVariableValidators(Manager: IPCValidationManager): void {
-  Manager.VariableID = (value: unknown, fieldName = 'VariableID') => {
-    if (typeof value === 'number') {
-      if (!Number.isInteger(value) || value <= 0) fail(`${fieldName} must be a positive integer`);
-      return value;
-    }
-    if (typeof value === 'string') {
-      const normalized = value.trim();
-      if (!/^\d+$/.test(normalized)) fail(`${fieldName} must be numeric`);
-      return parseInt(normalized, 10);
-    }
-    fail(`${fieldName} is invalid`);
-    // unreachable: fail throws
-    return 0;
-  };
+  Manager.VariableID = (value: unknown, fieldName = 'VariableID') =>
+    normalizeNumericID(value, fieldName);
 
   Manager.VariableText = (value: unknown, fieldName = 'Value') => {
     if (typeof value !== 'string') fail(`${fieldName} must be a string`);

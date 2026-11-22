@@ -18,8 +18,8 @@ export = function registerDummyValidators(Manager: IPCValidationManager): void {
     return normalizeNonEmptyString(value, fieldName, { minLength: 2, maxLength: 128 });
   };
 
-  Manager.DummyClientCreatePayload = (value: unknown) => {
-    if (value === undefined || value === null) return {};
+  // Every field is optional; a create may also omit the payload altogether.
+  const normalizeDummyPayload = (value: unknown): Record<string, unknown> => {
     if (!isPlainObject(value)) fail('Dummy client payload must be an object');
     const out: Record<string, unknown> = {};
     if (Object.prototype.hasOwnProperty.call(value, 'DummyID')) {
@@ -42,26 +42,10 @@ export = function registerDummyValidators(Manager: IPCValidationManager): void {
     return out;
   };
 
-  Manager.DummyClientUpdatePayload = (value: unknown) => {
-    if (!isPlainObject(value)) fail('Dummy client payload must be an object');
-    const out: Record<string, unknown> = {};
-    if (Object.prototype.hasOwnProperty.call(value, 'DummyID')) {
-      out.DummyID = normalizeDummyID(value.DummyID);
-    }
-    if (Object.prototype.hasOwnProperty.call(value, 'Nickname')) {
-      out.Nickname = normalizeNonEmptyString(value.Nickname, 'Title', {
-        minLength: 1,
-        maxLength: 64,
-      });
-    }
-    if (Object.prototype.hasOwnProperty.call(value, 'Interval')) {
-      const Interval = Number(value.Interval);
-      if (!Number.isFinite(Interval)) fail('Interval must be a number');
-      out.Interval = Interval;
-    }
-    if (Object.prototype.hasOwnProperty.call(value, 'GroupID')) {
-      out.GroupID = Manager.GroupID(value.GroupID);
-    }
-    return out;
+  Manager.DummyClientCreatePayload = (value: unknown) => {
+    if (value === undefined || value === null) return {};
+    return normalizeDummyPayload(value);
   };
+
+  Manager.DummyClientUpdatePayload = normalizeDummyPayload;
 };
