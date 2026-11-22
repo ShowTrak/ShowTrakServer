@@ -20,120 +20,59 @@
 // failed) is NOT carried in mDNS; it lives in the proprietary ARC protocol on
 // UDP 4440. That is deliberately out of scope here.
 //
-// Freshness note (inherited from the NDI method, same trap): bonjour's Browser
-// emits `up` for a service EXACTLY ONCE and `down` only on an explicit goodbye:
-// re-announcements from our periodic re-query are deduped internally and never
-// re-emitted. Relying on `up` alone freezes each device's timestamp at discovery
-// time, so the grace window would expire seconds after boot and never recover. We
-// therefore also tap the raw `multicast-dns` `response` stream underneath bonjour
-// and bump each device's timestamp whenever it re-announces. bonjour still owns
-// add/remove bookkeeping; the tap only keeps timestamps honest.
-//
-// The browser is fully lazy (nothing starts until the first Observe()), so
-// importing this module (e.g. from the method registry) has NO side effects.
+// The process-wide browser, its freshness tap and its retry handling are shared
+// with NDI (./_mdns-browser); this module owns the device cache, keyed by name
+// and merged across service types. The browser is fully lazy (nothing starts
+// until the first Observe()), so importing this module (e.g. from the method
+// registry) has NO side effects.
 import { CreateLogger } from '../Logger';
-import { CreateBonjourErrorHandler } from '@showtrak/protocol/runtime';
 import { Pill, Rows, TextRow, Row, Note, FormatLatency, Card } from './debug';
+import {
+  MdnsPresenceBrowser,
+  ServiceFqdn,
+  ServiceString,
+  MatchesName,
+  NormalizeName,
+  NormalizeMatchMode,
+  GracePeriodFrom,
+  RETENTION_MS,
+  DEFAULT_MATCH_MODE,
+  DEFAULT_GRACE_PERIOD_MS,
+  MIN_GRACE_PERIOD_MS,
+  MAX_GRACE_PERIOD_MS,
+  type MdnsInstance,
+  type MdnsMatchMode,
+  type MdnsServiceType,
+} from './_mdns-browser';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
+
+export {
+  ServiceFqdn,
+  ServiceString,
+  NormalizeName,
+  NormalizeMatchMode,
+  DEFAULT_MATCH_MODE,
+  DEFAULT_GRACE_PERIOD_MS,
+  MIN_GRACE_PERIOD_MS,
+  MAX_GRACE_PERIOD_MS,
+};
 
 const Logger = CreateLogger('Dante');
 
 // The mDNS service types Dante devices advertise on. ARC is listed first because
 // its TXT record carries the richer metadata (model / firmware / rate / latency).
-export interface DanteServiceType {
-  Type: string;
-  Protocol: string;
-}
+export type DanteServiceType = MdnsServiceType;
 
 export const DANTE_SERVICE_TYPES: DanteServiceType[] = [
   { Type: 'netaudio-arc', Protocol: 'udp' },
   { Type: 'netaudio-cmc', Protocol: 'udp' },
 ];
 
-export function ServiceString(S: DanteServiceType): string {
-  return `_${S.Type}._${S.Protocol}`;
-}
-
-export function ServiceFqdn(S: DanteServiceType): string {
-  return `${ServiceString(S)}.local`;
-}
-
 // How this method matches the configured target against a visible device name.
-export type DanteMatchMode = 'exact' | 'contains';
-export const DEFAULT_MATCH_MODE: DanteMatchMode = 'contains';
-
-// Default freshness window: how recently a device must have been announced to
-// count as "currently present". Dante hardware announces on generous TTLs and we
-// re-query well within this, so a few seconds tolerates a missed re-announcement.
-export const DEFAULT_GRACE_PERIOD_MS = 8000;
-export const MIN_GRACE_PERIOD_MS = 1000;
-export const MAX_GRACE_PERIOD_MS = 120000;
+export type DanteMatchMode = MdnsMatchMode;
 
 // How responsive the checks feel. Presence changes on the order of seconds.
 export const DEFAULT_DANTE_INTERVAL_MS = 10000;
-
-const QUERY_INTERVAL_MS = 5000; // re-query the network so timestamps stay fresh
-const RETENTION_MS = 60000; // forget a device unheard-from this long
-const SWEEP_INTERVAL_MS = 30000;
-const RETRY_COOLDOWN_MS = 15000; // after a browse failure, wait before retrying
-
-// --- bonjour structural typing (no @types published for the classic package) --
-interface BonjourService {
-  name?: string;
-  fqdn?: string;
-  type?: string;
-  protocol?: string;
-  host?: string;
-  port?: number;
-  addresses?: string[];
-  txt?: Record<string, unknown> | null;
-}
-
-interface BonjourBrowser {
-  on(event: 'up', listener: (service: BonjourService) => void): void;
-  on(event: 'down', listener: (service: BonjourService) => void): void;
-  on(event: 'error', listener: (error: Error) => void): void;
-  start(): void;
-  update(): void;
-  stop(): void;
-}
-
-interface BonjourInstance {
-  find(options: Record<string, unknown>): BonjourBrowser;
-  destroy(): void;
-}
-
-// --- multicast-dns structural typing (the transport under bonjour) -----------
-// We tap this directly for per-announcement freshness; see the freshness note in
-// the file header.
-interface MdnsResourceRecord {
-  type?: string;
-  name?: string;
-  data?: unknown;
-  ttl?: number;
-}
-
-interface MdnsResponsePacket {
-  answers?: MdnsResourceRecord[];
-  additionals?: MdnsResourceRecord[];
-}
-
-type MdnsResponseHandler = (packet: MdnsResponsePacket) => void;
-
-interface MdnsLike {
-  on(event: 'response', listener: MdnsResponseHandler): void;
-  removeListener(event: 'response', listener: MdnsResponseHandler): void;
-}
-
-// Recover the raw multicast-dns emitter bonjour builds its Browser on. `server`
-// is a private field of bonjour-service's Bonjour class holding the mDNS server;
-// we degrade gracefully to null if a future version reshapes it.
-function ExtractMdns(Instance: BonjourInstance): MdnsLike | null {
-  const Server = (Instance as unknown as { server?: { mdns?: unknown } }).server;
-  const Mdns = Server && Server.mdns;
-  if (Mdns && typeof (Mdns as MdnsLike).on === 'function') return Mdns as MdnsLike;
-  return null;
-}
 
 // Strip the `._netaudio-xxx._udp.local` suffix from a fully-qualified instance
 // name to recover the Dante device name. Tries every known service type, so one
@@ -146,21 +85,6 @@ export function DeriveNameFromFqdn(Fqdn: string): string {
   }
   return N;
 }
-
-type BonjourFactory = (options?: Record<string, unknown>) => BonjourInstance;
-
-// bonjour-service exports a class whose optional second constructor argument is
-// an mDNS `errorCallback`. Its default (`function (err) { throw err }`) turns a
-// routine interface drop (send → EADDRNOTAVAIL) into an uncaught exception, so we
-// always pass a logging handler instead.
-const { Bonjour } = require('bonjour-service') as {
-  Bonjour: new (
-    options?: Record<string, unknown>,
-    errorCallback?: (err: unknown) => void
-  ) => BonjourInstance;
-};
-const OnBonjourError = CreateBonjourErrorHandler(Logger);
-const bonjour: BonjourFactory = (options) => new Bonjour(options, OnBonjourError);
 
 // The metadata we lift out of the merged TXT records. Every field is optional:
 // TXT content varies by manufacturer and firmware, and a device that answers on
@@ -188,25 +112,9 @@ export interface DanteSnapshot {
   Devices: DanteDevice[];
 }
 
-// Normalize a name for case-insensitive comparison.
-export function NormalizeName(Value: unknown): string {
-  return String(Value == null ? '' : Value)
-    .trim()
-    .toLowerCase();
-}
-
 // Does a visible device name satisfy the configured target under the given mode?
 // Comparison is case-insensitive. An empty target never matches.
-export function MatchesDevice(
-  CandidateName: unknown,
-  Target: unknown,
-  Mode: DanteMatchMode
-): boolean {
-  const C = NormalizeName(CandidateName);
-  const T = NormalizeName(Target);
-  if (!T) return false;
-  return Mode === 'exact' ? C === T : C.includes(T);
-}
+export const MatchesDevice = MatchesName;
 
 // TXT values arrive as strings from bonjour-service, but can be Buffers if a
 // future version switches to binary mode, so coerce defensively.
@@ -280,7 +188,7 @@ export function FormatDanteLatency(Ns: unknown): string {
   return `${Ms.toFixed(2)} ms`;
 }
 
-// The process-wide singleton browser.
+// The process-wide singleton browser and its device cache.
 class DanteBrowserImpl {
   // Keyed by NORMALIZED device name (not fqdn) so the same device seen on both
   // _netaudio-arc and _netaudio-cmc collapses into one record.
@@ -288,99 +196,38 @@ class DanteBrowserImpl {
   // Tracks which (device, service) pairs are currently up, so a `down` on one
   // service type doesn't evict a device still visible on the other.
   private ServiceKeys = new Map<string, Set<string>>();
-  private Instance: BonjourInstance | null = null;
-  private Browsers: BonjourBrowser[] = [];
-  private Mdns: MdnsLike | null = null;
-  private ResponseHandler: MdnsResponseHandler | null = null;
-  private State: 'idle' | 'ready' | 'failed' = 'idle';
-  private LastError: string | null = null;
-  private LastFailAt = 0;
-  private SweepTimer: NodeJS.Timeout | null = null;
-  private QueryTimer: NodeJS.Timeout | null = null;
+  private Browser = new MdnsPresenceBrowser({
+    Label: 'Dante',
+    Logger,
+    Services: DANTE_SERVICE_TYPES,
+    Hooks: {
+      Up: (Instance, Service) => this.HandleUp(Instance, Service),
+      Down: (Instance, Service) => this.HandleDown(Instance, Service),
+      Announced: (Fqdns, Now) => this.HandleAnnounced(Fqdns, Now),
+      Sweep: (Now) => this.Sweep(Now),
+    },
+  });
 
   // Start browsing if we aren't already. Cheap to call on every Run().
   Observe(): void {
-    this.EnsureStarted();
+    this.Browser.Observe();
   }
 
   // Read the current cache. Does not start the browser; callers Observe() first.
   Snapshot(): DanteSnapshot {
     return {
-      Ready: this.State === 'ready',
-      Error: this.State === 'failed' ? this.LastError : null,
+      Ready: this.Browser.Ready,
+      Error: this.Browser.Error,
       Devices: Array.from(this.Devices.values()),
     };
   }
 
-  private EnsureStarted(): void {
-    if (this.State === 'ready') return;
-    if (this.State === 'failed' && Date.now() - this.LastFailAt < RETRY_COOLDOWN_MS) return;
-
-    let Instance: BonjourInstance;
-    const Browsers: BonjourBrowser[] = [];
-    try {
-      Instance = bonjour({ reuseAddr: true, loopback: true });
-      for (const S of DANTE_SERVICE_TYPES) {
-        Browsers.push(Instance.find({ type: S.Type, protocol: S.Protocol }));
-      }
-    } catch (Err) {
-      this.Fail(Err);
-      return;
-    }
-
-    this.Instance = Instance;
-    this.Browsers = Browsers;
-    this.LastError = null;
-    this.State = 'ready';
-
-    Browsers.forEach((Browser, Index) => {
-      const Service = DANTE_SERVICE_TYPES[Index]!;
-      Browser.on('up', (Svc: BonjourService) => this.HandleUp(Svc, Service));
-      Browser.on('down', (Svc: BonjourService) => this.HandleDown(Svc, Service));
-      Browser.on('error', (Err: Error) => {
-        Logger.warn(
-          `Dante browser error (${ServiceString(Service)}): ${Err && Err.message ? Err.message : Err}`
-        );
-      });
-      try {
-        Browser.start();
-      } catch {
-        // Some bonjour builds auto-start on find(); a redundant start() is harmless.
-      }
-    });
-
-    // Tap the raw multicast-dns response stream so re-announcements refresh each
-    // device's timestamp (bonjour's `up` fires only once; see the file header).
-    const Mdns = ExtractMdns(Instance);
-    if (Mdns) {
-      const Handler: MdnsResponseHandler = (Packet) => this.HandleResponse(Packet);
-      Mdns.on('response', Handler);
-      this.Mdns = Mdns;
-      this.ResponseHandler = Handler;
-    } else {
-      Logger.warn(
-        'Dante: could not tap multicast-dns responses; presence may go stale between re-announcements'
-      );
-    }
-
-    // Kick an initial re-query shortly after start so we don't wait a full
-    // interval for the first announcements.
-    setTimeout(() => this.Requery(), 100);
-
-    this.EnsureTimers();
-    Logger.log(
-      `Dante browser started (${DANTE_SERVICE_TYPES.map((S) => ServiceString(S)).join(', ')})`
-    );
-  }
-
-  private HandleUp(Svc: BonjourService, Service: DanteServiceType): void {
-    const Name = Svc && Svc.name ? String(Svc.name).trim() : '';
-    const Fqdn = Svc && Svc.fqdn ? String(Svc.fqdn).trim() : '';
-    const DeviceName = Name || DeriveNameFromFqdn(Fqdn);
+  private HandleUp(Instance: MdnsInstance, Service: DanteServiceType): void {
+    const DeviceName = Instance.Name || DeriveNameFromFqdn(Instance.Fqdn);
     if (!DeviceName) return;
 
     const Key = NormalizeName(DeviceName);
-    const Info = ParseTxt(Svc && Svc.txt);
+    const Info = ParseTxt(Instance.Txt);
     const Existing = this.Devices.get(Key);
     if (Existing) {
       Existing.LastSeenAt = Date.now();
@@ -391,10 +238,8 @@ class DanteBrowserImpl {
     this.AddService(Key, Service);
   }
 
-  private HandleDown(Svc: BonjourService, Service: DanteServiceType): void {
-    const Name = Svc && Svc.name ? String(Svc.name).trim() : '';
-    const Fqdn = Svc && Svc.fqdn ? String(Svc.fqdn).trim() : '';
-    const DeviceName = Name || DeriveNameFromFqdn(Fqdn);
+  private HandleDown(Instance: MdnsInstance, Service: DanteServiceType): void {
+    const DeviceName = Instance.Name || DeriveNameFromFqdn(Instance.Fqdn);
     if (!DeviceName) return;
 
     const Key = NormalizeName(DeviceName);
@@ -433,51 +278,11 @@ class DanteBrowserImpl {
     );
   }
 
-  private Requery(): void {
-    if (this.State !== 'ready') return;
-    for (const Browser of this.Browsers) {
-      try {
-        Browser.update();
-      } catch {
-        // Best-effort re-query; the periodic timer will try again.
-      }
-    }
-  }
-
   // Bump (or re-create) the last-seen timestamp for every Dante device that just
-  // re-announced. Runs after bonjour's own `up` handler on the same packet, so a
-  // freshly-discovered device is already in the cache by the time we refresh it;
-  // if a device had been swept out (bonjour won't re-emit `up` for it), we
-  // re-create the entry here so it can recover.
-  private HandleResponse(Packet: MdnsResponsePacket): void {
-    if (!Packet) return;
-    const Records = [
-      ...(Array.isArray(Packet.answers) ? Packet.answers : []),
-      ...(Array.isArray(Packet.additionals) ? Packet.additionals : []),
-    ];
-
-    const Fqdns = new Set<string>();
-    for (const RR of Records) {
-      if (!RR || RR.ttl === 0) continue; // ttl 0 is a goodbye; bonjour's `down` handles it
-      for (const S of DANTE_SERVICE_TYPES) {
-        const Fqdn = ServiceFqdn(S);
-        const SrvSuffix = `.${Fqdn}`;
-        if (RR.type === 'PTR' && RR.name === Fqdn && typeof RR.data === 'string') {
-          Fqdns.add(RR.data.trim());
-        } else if (
-          RR.type === 'SRV' &&
-          typeof RR.name === 'string' &&
-          RR.name.toLowerCase().endsWith(SrvSuffix.toLowerCase())
-        ) {
-          Fqdns.add(RR.name.trim());
-        }
-      }
-    }
-    if (!Fqdns.size) return;
-
-    const Now = Date.now();
+  // re-announced, on either service type; a device the sweep dropped is
+  // re-created so it can recover.
+  private HandleAnnounced(Fqdns: ReadonlySet<string>, Now: number): void {
     for (const Fqdn of Fqdns) {
-      if (!Fqdn) continue;
       const DeviceName = DeriveNameFromFqdn(Fqdn);
       if (!DeviceName) continue;
       const Key = NormalizeName(DeviceName);
@@ -487,27 +292,7 @@ class DanteBrowserImpl {
     }
   }
 
-  private Fail(Err: unknown): void {
-    this.LastError = Err && (Err as Error).message ? (Err as Error).message : String(Err);
-    this.LastFailAt = Date.now();
-    this.State = 'failed';
-    this.TeardownInstance();
-    Logger.warn(`Dante browser unavailable: ${this.LastError}`);
-  }
-
-  private EnsureTimers(): void {
-    if (!this.SweepTimer) {
-      this.SweepTimer = setInterval(() => this.Sweep(), SWEEP_INTERVAL_MS);
-      if (typeof this.SweepTimer.unref === 'function') this.SweepTimer.unref();
-    }
-    if (!this.QueryTimer) {
-      this.QueryTimer = setInterval(() => this.Requery(), QUERY_INTERVAL_MS);
-      if (typeof this.QueryTimer.unref === 'function') this.QueryTimer.unref();
-    }
-  }
-
-  private Sweep(): void {
-    const Now = Date.now();
+  private Sweep(Now: number): void {
     for (const [Key, Device] of this.Devices) {
       if (Now - Device.LastSeenAt > RETENTION_MS) {
         this.Devices.delete(Key);
@@ -516,47 +301,9 @@ class DanteBrowserImpl {
     }
   }
 
-  private TeardownInstance(): void {
-    if (this.Mdns && this.ResponseHandler) {
-      try {
-        this.Mdns.removeListener('response', this.ResponseHandler);
-      } catch {
-        // ignore
-      }
-    }
-    this.Mdns = null;
-    this.ResponseHandler = null;
-    for (const Browser of this.Browsers) {
-      try {
-        Browser.stop();
-      } catch {
-        // ignore
-      }
-    }
-    this.Browsers = [];
-    if (this.Instance) {
-      try {
-        this.Instance.destroy();
-      } catch {
-        // ignore
-      }
-      this.Instance = null;
-    }
-  }
-
   // Test-only teardown so a suite can start/stop deterministically.
   Stop(): void {
-    if (this.SweepTimer) {
-      clearInterval(this.SweepTimer);
-      this.SweepTimer = null;
-    }
-    if (this.QueryTimer) {
-      clearInterval(this.QueryTimer);
-      this.QueryTimer = null;
-    }
-    this.TeardownInstance();
-    this.State = 'idle';
-    this.LastError = null;
+    this.Browser.Stop();
     this.Devices.clear();
     this.ServiceKeys.clear();
   }
@@ -604,10 +351,6 @@ export const Settings: MonitoringSettingField[] = [
     Note: 'How long a device may go unseen before the check reports Offline.',
   },
 ];
-
-export function NormalizeMatchMode(Value: unknown): DanteMatchMode {
-  return String(Value) === 'exact' ? 'exact' : 'contains';
-}
 
 interface EvaluateParams {
   Snapshot: DanteSnapshot;
@@ -668,12 +411,7 @@ export function RunDante(Target: MonitoringTargetLike): MonitoringResult {
   if (!DeviceName) return { Success: false, Error: 'No Dante device name configured' };
 
   const MatchMode = NormalizeMatchMode(Cfg.MatchMode);
-  const GracePeriodMs = Number.isFinite(Cfg.GracePeriodMs)
-    ? Math.min(
-        MAX_GRACE_PERIOD_MS,
-        Math.max(MIN_GRACE_PERIOD_MS, (Cfg.GracePeriodMs as number) | 0)
-      )
-    : DEFAULT_GRACE_PERIOD_MS;
+  const GracePeriodMs = GracePeriodFrom(Cfg.GracePeriodMs);
 
   DanteBrowser.Observe();
   const Snapshot = DanteBrowser.Snapshot();
