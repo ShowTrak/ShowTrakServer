@@ -49,7 +49,7 @@ import {
   type ArtPollReply,
   type ArtPollReplyPort,
 } from './_artnet-shared';
-import { Card, Esc, FormatLatency, Note, Pill, Row, Rows, TextRow } from './debug';
+import { Card, Esc, FormatLatency, Note, Pill, Row, Rows, TextRow, HealthPill } from './debug';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
 const ID = 'artnet-node';
@@ -513,13 +513,7 @@ function UniverseText(Port: NodePort): string {
 function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Address = Target && Target.Address ? String(Target.Address).trim() : '';
   const Reachable = !!(Result && Result.Success === true);
-  const Degraded = !!(Result && Result.Degraded);
-  const StatusPill =
-    Reachable && !Degraded
-      ? Pill('success', 'Healthy')
-      : Reachable
-        ? Pill('warning', (Result && Result.DegradedReason) || 'Degraded')
-        : Pill('danger', 'Offline');
+  const StatusPill = HealthPill(Result, 'Healthy');
 
   if (!Reachable) {
     return (

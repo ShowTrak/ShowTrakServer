@@ -54,7 +54,7 @@ import {
   type Ocp1Call,
   type Ocp1Probe,
 } from './_aes70-shared';
-import { Card, Esc, FormatLatency, Note, Pill, Row, Rows, TextRow } from './debug';
+import { Card, Esc, FormatLatency, Note, Pill, Row, Rows, TextRow, HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type {
   MonitoringActionDef,
@@ -815,12 +815,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Config = ParseConfig(Target);
   const Options = ParseHealthOptions(Target);
   const Reachable = !!(Result && Result.Success === true);
-  const Degraded = !!(Result && Result.Degraded);
-  const StatePill = !Reachable
-    ? Pill('danger', 'Offline')
-    : Degraded
-      ? Pill('warning', Result.DegradedReason || 'Degraded')
-      : Pill('success', 'Healthy');
+  const StatePill = HealthPill(Result, 'Healthy');
   const PortText =
     Reachable && Result.Port != null ? String(Result.Port) : PortsFor(Config).join(' or ');
 

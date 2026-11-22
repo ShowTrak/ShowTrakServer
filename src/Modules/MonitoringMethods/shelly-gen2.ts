@@ -50,7 +50,7 @@ import http from 'http';
 import crypto from 'crypto';
 import { URL } from 'url';
 import { ParseDigestChallenge } from './_brightsign-shared';
-import { Card, Esc, Pill, Rows, Row, TextRow, Note, FormatLatency } from './debug';
+import { Card, Esc, Pill, Rows, Row, TextRow, Note, FormatLatency, HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type {
   MonitoringActionDef,
@@ -1042,12 +1042,7 @@ function Fmt(Value: unknown, Unit: string, Places = 1): string | null {
 function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Config = ParseConfig(Target);
   const Reachable = !!(Result && Result.Success === true);
-  const Degraded = !!(Result && Result.Degraded);
-  const StatePill = !Reachable
-    ? Pill('danger', 'Offline')
-    : Degraded
-      ? Pill('warning', 'Degraded')
-      : Pill('success', 'Healthy');
+  const StatePill = HealthPill(Result, 'Healthy', false);
 
   const Head = Rows([
     TextRow('Device', `http://${Config.Address || '-'}:${Config.Port}`),

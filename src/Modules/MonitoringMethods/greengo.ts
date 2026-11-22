@@ -27,7 +27,7 @@
 // The script also accepts commands (talk, call, levels, identify). This check
 // sends nothing but the update request, so it never changes the device.
 import dgram from 'dgram';
-import { Card, FormatLatency, Note, Pill, Row, Rows, TextRow } from './debug';
+import { Card, FormatLatency, Note, Pill, Row, Rows, TextRow, HealthPill } from './debug';
 import { EncodeOscMessage, ParseOscPacket } from './_osc-shared';
 import type { OscMessage } from './_osc-shared';
 import { DEFAULT_MONITORING_INTERVAL_MS, MONITORING_INTEREST_TTL_MS } from '../Config/constants';
@@ -591,11 +591,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Config = ParseConfig(Target);
   const Online = !!(Result && Result.Success === true);
   const Degraded = !!(Result && Result.Degraded);
-  const StatusPill = !Online
-    ? Pill('danger', 'Offline')
-    : Degraded
-      ? Pill('warning', 'Degraded')
-      : Pill('success', 'Healthy');
+  const StatusPill = HealthPill(Result, 'Healthy', false);
   const Device = (Result && (Result.Device as Record<string, number>)) || {};
   const Age = Number(Result && Result.HeartbeatAgeMs);
 

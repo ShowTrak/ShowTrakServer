@@ -51,7 +51,7 @@ import {
   SnmpIdentityLabel,
   type SnmpConnection,
 } from './_snmp-shared';
-import { Card, Esc, Pill, Rows, Row, TextRow, Note, FormatLatency } from './debug';
+import { Card, Esc, Pill, Rows, Row, TextRow, Note, FormatLatency, HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
@@ -526,12 +526,7 @@ function PsuSummary(N: number, Status: unknown, Model: unknown, Temp: unknown): 
 function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Config = ParseConfig(Target);
   const Reachable = !!(Result && Result.Success === true);
-  const Degraded = !!(Result && Result.Degraded);
-  const StatePill = !Reachable
-    ? Pill('danger', 'Offline')
-    : Degraded
-      ? Pill('warning', 'Degraded')
-      : Pill('success', 'Healthy');
+  const StatePill = HealthPill(Result, 'Healthy', false);
   const Identity = SnmpIdentityLabel(Config);
 
   const Head = Rows([

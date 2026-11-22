@@ -14,7 +14,7 @@
 // Clear-Com publishes no specification for them, so every reader below is
 // tolerant: a field that is missing or of the wrong type reads as unknown, and
 // unknown is never treated as low or bad.
-import { Card, FormatLatency, Note, Pill, Row, Rows, TextRow } from './debug';
+import { Card, FormatLatency, Note, Pill, Row, Rows, TextRow, HealthPill } from './debug';
 import { AsList, IsObject, NumOrNull, StrOrNull } from './_videoproc-http-shared';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
@@ -418,11 +418,7 @@ export interface HeadOptions {
 export function ClearComDebug(Result: MonitoringResult, Head: HeadOptions): string {
   const Online = !!(Result && Result.Success === true);
   const Degraded = !!(Result && Result.Degraded);
-  const StatusPill = !Online
-    ? Pill('danger', 'Offline')
-    : Degraded
-      ? Pill('warning', 'Degraded')
-      : Pill('success', 'Healthy');
+  const StatusPill = HealthPill(Result, 'Healthy', false);
   const Str = (Value: unknown): string => (Value == null || Value === '' ? '' : String(Value));
 
   const Header = Rows([

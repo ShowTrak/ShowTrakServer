@@ -43,7 +43,7 @@
 // only judged while a transmitter is present; a switched-off spare pack is not
 // a flat battery, and that is what Require transmitter is for.
 import { RunTcpSession } from './_tcp-session';
-import { Card, FormatLatency, Note, Pill, Row, Rows, TextRow } from './debug';
+import { Card, FormatLatency, Note, Pill, Row, Rows, TextRow, HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
@@ -831,11 +831,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Config = ParseConfig(Target);
   const Online = !!(Result && Result.Success === true);
   const Degraded = !!(Result && Result.Degraded);
-  const StatusPill = !Online
-    ? Pill('danger', 'Offline')
-    : Degraded
-      ? Pill('warning', 'Degraded')
-      : Pill('success', 'Healthy');
+  const StatusPill = HealthPill(Result, 'Healthy', false);
   const Str = (Value: unknown): string => (Value == null || Value === '' ? '' : String(Value));
 
   const Head = Rows([

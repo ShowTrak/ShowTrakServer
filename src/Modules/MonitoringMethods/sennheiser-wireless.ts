@@ -38,7 +38,7 @@
 // transmitter is linked: a switched-off spare is not a flat battery.
 import dgram from 'dgram';
 import dns from 'dns';
-import { Card, FormatLatency, Note, Pill, Row, Rows, TextRow } from './debug';
+import { Card, FormatLatency, Note, Pill, Row, Rows, TextRow, HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import { IsArray } from '../Utils/guards';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
@@ -939,11 +939,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Config = ParseConfig(Target);
   const Online = !!(Result && Result.Success === true);
   const Degraded = !!(Result && Result.Degraded);
-  const StatusPill = !Online
-    ? Pill('danger', 'Offline')
-    : Degraded
-      ? Pill('warning', 'Degraded')
-      : Pill('success', 'Healthy');
+  const StatusPill = HealthPill(Result, 'Healthy', false);
   const Text = (Value: unknown): string => (Value == null || Value === '' ? '' : String(Value));
 
   const Head = Rows([

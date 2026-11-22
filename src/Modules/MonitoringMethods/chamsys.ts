@@ -11,7 +11,7 @@
 // no fixed default, there is no query/echo address, and a stray OSC message can
 // activate a playback, so the web server is the safe read-only channel.
 import { PerformHttpRequest } from './_http-shared';
-import { Pill, Rows, TextRow, Row, Note, FormatLatency } from './debug';
+import { Rows, TextRow, Row, Note, FormatLatency, HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
@@ -176,13 +176,8 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
 function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Config = ParseConfig(Target);
   const Reachable = !!(Result && Result.Success === true);
-  const Degraded = !!(Result && Result.Degraded);
 
-  const StatusPill = !Reachable
-    ? Pill('danger', 'Offline')
-    : Degraded
-      ? Pill('warning', (Result && (Result.DegradedReason as string)) || 'Degraded')
-      : Pill('success', 'Online');
+  const StatusPill = HealthPill(Result);
 
   const ExtraRows: Array<string | false | null | undefined> = [];
   if (Reachable) {

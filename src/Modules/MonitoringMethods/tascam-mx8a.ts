@@ -33,7 +33,7 @@
 // be.
 import { StringDecoder } from 'string_decoder';
 import { ReplyQueue, RunTcpSession } from './_tcp-session';
-import { Card, Esc, FormatLatency, Note, Pill, Row, Rows, TextRow } from './debug';
+import { Card, Esc, FormatLatency, Note, Pill, Row, Rows, TextRow, HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type {
   LiveLevelsFrame,
@@ -1879,12 +1879,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Config = ParseConfig(Target);
   const Options = ParseHealthOptions(Target);
   const Reachable = !!(Result && Result.Success === true);
-  const Degraded = !!(Result && Result.Degraded);
-  const StatePill = !Reachable
-    ? Pill('danger', 'Offline')
-    : Degraded
-      ? Pill('warning', Result.DegradedReason || 'Degraded')
-      : Pill('success', 'Healthy');
+  const StatePill = HealthPill(Result, 'Healthy');
 
   const Head = [
     TextRow('Host', `${Config.Address || '-'}:${Config.Port}`),

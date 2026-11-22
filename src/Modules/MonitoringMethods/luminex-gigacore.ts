@@ -62,7 +62,7 @@ import {
   type SwitchRequest,
   type SwitchResponse,
 } from './_switch-shared';
-import { FormatLatency, Note, Pill, Row, Rows, TextRow } from './debug';
+import { FormatLatency, Note, Row, Rows, TextRow, HealthPill } from './debug';
 import { WithProbeAgents, type ProbeAgents } from './_probe-agents';
 import { DEFAULT_MONITORING_INTERVAL_MS, MONITORING_INTEREST_TTL_MS } from '../Config/constants';
 import type {
@@ -812,12 +812,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Config = ParseConfig(Target);
   const Options = ParseHealthOptions(Target);
   const Reachable = !!(Result && Result.Success === true);
-  const Degraded = !!(Result && Result.Degraded);
-  const State = !Reachable
-    ? Pill('danger', 'Offline')
-    : Degraded
-      ? Pill('warning', Result.DegradedReason || 'Degraded')
-      : Pill('success', 'Healthy');
+  const State = HealthPill(Result, 'Healthy');
   const Scheme = Result && Result.Scheme ? String(Result.Scheme).toUpperCase() : null;
 
   const Head = [
