@@ -1,0 +1,19 @@
+// Typecheck-only program for the Web UI's offline-splash service worker.
+//
+// esbuild bundles src/WebUI/sw.ts to dist/WebUI/sw.js, served at /sw.js
+// (scripts/build-renderer.js). A service worker has no DOM, so this program
+// sees the WebWorker library and nothing else: no DOM, no Node, no jQuery. The
+// renderer programs, in turn, never include these files. The splash page's
+// script (src/WebUI/offline-splash.ts) runs in a page, but it is embedded by the
+// worker as source text and declares the little of `window` it uses itself.
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "WebWorker"],
+    "noEmit": true,
+    "types": []
+  },
+  "include": ["src/WebUI/**/*.ts"]
+}

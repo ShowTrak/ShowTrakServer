@@ -435,7 +435,7 @@ socket.on('connect', () => {
 
 // Register the offline-splash service worker. It never caches the app shell;
 // it only serves a "Connecting..." splash when ShowTrak Server is unreachable
-// and reloads back into the app once the server answers (see WebUI/sw.js).
+// and reloads back into the app once the server answers (see WebUI/sw.ts).
 try {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});

@@ -24,8 +24,6 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "rootDir": "./src",
     "outDir": "./dist-test",
-    "allowJs": true,
-    "checkJs": false,
     "types": ["jquery", "node"],
     "paths": {
       "@showtrak/protocol": ["./shared/src/index.d.ts"],

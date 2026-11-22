@@ -9,7 +9,7 @@
     "clean": "node -e \"for (const d of ['dist','dist-test']) require('node:fs').rmSync(d,{recursive:true,force:true})\"",
     "build:ts": "tsc -p tsconfig.json",
     "build:main": "node scripts/build-main.js",
-    "typecheck:renderer": "tsc -p tsconfig.renderer.json",
+    "typecheck:renderer": "tsc -p tsconfig.renderer.json && tsc -p tsconfig.preloader.json && tsc -p tsconfig.service-worker.json",
     "build:renderer": "node scripts/build-renderer.js",
     "build:test-renderer": "tsc -p tsconfig.renderer.test.json",
     "build:css": "node scripts/build-css.js",

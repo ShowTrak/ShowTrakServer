@@ -1,0 +1,23 @@
+// Typecheck-only program for the splash (preloader) window's page script.
+//
+// esbuild bundles src/UI/preloader.ts to dist/UI/preloader.js
+// (scripts/build-renderer.js); this checks it against the DOM and nothing else.
+// It is kept out of tsconfig.renderer.json on purpose: that program declares the
+// main window's `window.API` (src/UI/types/global.d.ts), while the splash window
+// has its own, much smaller bridge (src/bridge_preloader.ts, typed by
+// src/types/preloader-api.ts).
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "noEmit": true,
+    "types": [],
+    "paths": {
+      "@showtrak/protocol": ["./shared/src/index.d.ts"],
+      "@showtrak/protocol/*": ["./shared/src/*"]
+    }
+  },
+  "include": ["src/UI/preloader.ts"]
+}

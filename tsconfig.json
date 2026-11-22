@@ -3,8 +3,6 @@
   "compilerOptions": {
     "rootDir": "./src",
     "outDir": "./dist",
-    "allowJs": true,
-    "checkJs": false,
     "types": ["node"],
     "paths": {
       "@showtrak/protocol": ["./shared/src/index.d.ts"],

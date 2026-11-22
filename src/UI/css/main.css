@@ -7427,7 +7427,8 @@ body.is-web:not(.mode-edit) #ADD_MONITORING_TARGET_DROPDOWN {
 
 /* Splash variant of the overlay (loading + disconnected screens): brand mark
    pinned small top-center, status content centered on the backdrop. Mirrors
-   the service worker's offline splash (WebUI/sw.js) so the two look alike. */
+   the service worker's offline splash (WebUI/offline-splash.ts) so the two
+   look alike. */
 .web-overlay.web-splash {
   flex-direction: column;
 }

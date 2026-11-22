@@ -3,12 +3,13 @@
 // to the original src/ layout.
 //
 // TypeScript (tsconfig.json) compiles the Node-side code (src/Modules, src/main,
-// src/main.js, src/bridge_*.js) into dist/. The renderer UI, the served Web UI, and
+// src/main.ts, src/bridge_*.ts) into dist/. The renderer UI, the served Web UI, and
 // image/icon assets are intentionally excluded from compilation and must be copied
 // verbatim so the packaged app keeps working exactly as before.
 const fs = require('node:fs');
 const path = require('node:path');
 const { copyDir } = require('./lib/copy-dir');
+const { BUNDLES } = require('./build-renderer');
 
 const SRC_ROOT = path.resolve(__dirname, '..', 'src');
 const DIST_ROOT = path.resolve(__dirname, '..', 'dist');
@@ -26,13 +27,22 @@ const skipDirs = new Set([
   path.resolve(SRC_ROOT, 'UI', 'types'),
 ]);
 
+// Nothing copied from src/ may land on an esbuild output. The splash window's
+// script (dist/UI/preloader.js) and the Web UI service worker (dist/WebUI/sw.js)
+// were plain JavaScript under src/ until they became TypeScript; a leftover copy
+// of either (an older checkout's file, never deleted) would otherwise be copied
+// over the freshly bundled script, since this step runs after the bundling.
+const skipFiles = new Set(
+  BUNDLES.map((bundle) => path.resolve(SRC_ROOT, path.relative(DIST_ROOT, bundle.outfile)))
+);
+
 function main() {
   let copied = 0;
   for (const dir of ASSET_DIRECTORIES) {
     const source = path.join(SRC_ROOT, dir);
     const destination = path.join(DIST_ROOT, dir);
     if (fs.existsSync(source)) {
-      copyDir(source, destination, { skipDirs });
+      copyDir(source, destination, { skipDirs, skipFiles });
       copied += 1;
     }
   }

@@ -7,7 +7,8 @@
 //
 //   main process (src/**/*.ts)    tsc --watch,    -> restart Electron
 //                                 then the bundle (scripts/build-main.js)
-//   renderer (src/UI/js/app)      esbuild watch   -> reload the window
+//   renderer (src/UI/js/app),     esbuild watch   -> reload the window
+//   splash script, service worker
 //   markup / CSS / static assets  copy on change  -> reload the window
 //   protocol runtime (shared/)    build:shared    -> tsc picks it up
 //
@@ -138,21 +139,30 @@ function watchMainProcess() {
   return ready;
 }
 
+// The browser-side programs esbuild bundles (scripts/build-renderer.js).
+const BROWSER_TSCONFIGS = [
+  'tsconfig.renderer.json',
+  'tsconfig.preloader.json',
+  'tsconfig.service-worker.json',
+];
+
 function watchRendererTypes() {
-  const child = spawn(
-    process.execPath,
-    [TSC, '-p', 'tsconfig.renderer.json', '--noEmit', '--watch', '--preserveWatchOutput'],
-    { cwd: ROOT, stdio: ['ignore', 'pipe', 'inherit'] }
-  );
-  children.push(child);
-  child.stdout.setEncoding('utf8');
-  child.stdout.on('data', (text) => {
-    // Only surface problems; a clean pass is the normal case and is noise.
-    if (!/error TS|Found [1-9]\d* errors?/.test(text)) return;
-    for (const line of text.split(/\r?\n/)) {
-      if (line.trim()) console.log(`[renderer-types] ${line}`);
-    }
-  });
+  for (const tsconfig of BROWSER_TSCONFIGS) {
+    const child = spawn(
+      process.execPath,
+      [TSC, '-p', tsconfig, '--noEmit', '--watch', '--preserveWatchOutput'],
+      { cwd: ROOT, stdio: ['ignore', 'pipe', 'inherit'] }
+    );
+    children.push(child);
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (text) => {
+      // Only surface problems; a clean pass is the normal case and is noise.
+      if (!/error TS|Found [1-9]\d* errors?/.test(text)) return;
+      for (const line of text.split(/\r?\n/)) {
+        if (line.trim()) console.log(`[renderer-types] ${line}`);
+      }
+    });
+  }
 }
 
 async function watchRendererBundles() {

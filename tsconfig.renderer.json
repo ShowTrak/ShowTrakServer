@@ -6,8 +6,6 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "rootDir": "./src/UI",
     "noEmit": true,
-    "allowJs": true,
-    "checkJs": false,
     "types": ["jquery"],
     "paths": {
       "@showtrak/protocol": ["./shared/src/index.d.ts"],
