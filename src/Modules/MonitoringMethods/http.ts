@@ -1,36 +1,15 @@
 // HTTP/HTTPS monitoring. Performs an HTTP or HTTPS request against Target.Address
 // and validates that the response status falls within the configured range.
 // The request body is drained but not parsed.
-import {
-  PerformHttpRequest,
-  BuildHttpDebug,
-  HTTP_TARGET_FIELDS,
-  FOLLOW_REDIRECTS_FIELD,
-} from './_http-shared';
+import { PerformHttpRequest, BuildHttpDebug } from './_http-shared';
+import { HTTP_TARGET_FIELDS, FOLLOW_REDIRECTS_FIELD, ExpectedStatusFields } from './_http-fields';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
 const ID = 'http';
 
 const Settings: MonitoringSettingField[] = [
   ...HTTP_TARGET_FIELDS,
-  {
-    Key: 'ExpectedStatusMin',
-    Label: 'Expected Status Min',
-    Type: 'number',
-    Default: 200,
-    Min: 100,
-    Max: 599,
-    Advanced: true,
-  },
-  {
-    Key: 'ExpectedStatusMax',
-    Label: 'Expected Status Max',
-    Type: 'number',
-    Default: 399,
-    Min: 100,
-    Max: 599,
-    Advanced: true,
-  },
+  ...ExpectedStatusFields(399),
   FOLLOW_REDIRECTS_FIELD,
   {
     Key: 'IgnoreTlsErrors',

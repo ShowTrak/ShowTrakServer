@@ -2,6 +2,7 @@
 // validation can be relaxed via IgnoreTlsErrors for self-signed appliances on
 // internal networks.
 import { PerformHttpRequest, BuildHttpDebug } from './_http-shared';
+import { ExpectedStatusFields } from './_http-fields';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
 const ID = 'https';
@@ -10,24 +11,7 @@ const Settings: MonitoringSettingField[] = [
   { Key: 'Port', Label: 'Port', Type: 'number', Default: 443, Min: 1, Max: 65535, Required: true },
   { Key: 'Path', Label: 'Path', Type: 'string', Default: '/' },
   { Key: 'Method', Label: 'HTTP Method', Type: 'string', Default: 'GET' },
-  {
-    Key: 'ExpectedStatusMin',
-    Label: 'Expected Status Min',
-    Type: 'number',
-    Default: 200,
-    Min: 100,
-    Max: 599,
-    Advanced: true,
-  },
-  {
-    Key: 'ExpectedStatusMax',
-    Label: 'Expected Status Max',
-    Type: 'number',
-    Default: 399,
-    Min: 100,
-    Max: 599,
-    Advanced: true,
-  },
+  ...ExpectedStatusFields(399),
   {
     Key: 'FollowRedirects',
     Label: 'Follow Redirects',

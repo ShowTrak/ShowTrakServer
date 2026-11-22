@@ -4,12 +4,8 @@
 //     expected value.
 //   - Text contains: raw substring search inside the response body.
 // The body is capped at 1 MiB to prevent unbounded memory use.
-import {
-  PerformHttpRequest,
-  BuildHttpDebug,
-  HTTP_TARGET_FIELDS,
-  FOLLOW_REDIRECTS_FIELD,
-} from './_http-shared';
+import { PerformHttpRequest, BuildHttpDebug } from './_http-shared';
+import { HTTP_TARGET_FIELDS, FOLLOW_REDIRECTS_FIELD, ExpectedStatusFields } from './_http-fields';
 import {
   DebugBody,
   Esc,
@@ -26,24 +22,7 @@ const ID = 'http-json';
 
 const Settings: MonitoringSettingField[] = [
   ...HTTP_TARGET_FIELDS,
-  {
-    Key: 'ExpectedStatusMin',
-    Label: 'Expected Status Min',
-    Type: 'number',
-    Default: 200,
-    Min: 100,
-    Max: 599,
-    Advanced: true,
-  },
-  {
-    Key: 'ExpectedStatusMax',
-    Label: 'Expected Status Max',
-    Type: 'number',
-    Default: 299,
-    Min: 100,
-    Max: 599,
-    Advanced: true,
-  },
+  ...ExpectedStatusFields(299),
   {
     Key: 'JsonPath',
     Label: 'JSON path',

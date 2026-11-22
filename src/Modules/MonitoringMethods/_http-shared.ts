@@ -8,56 +8,12 @@ import http from 'http';
 import https from 'https';
 import { URL } from 'url';
 import { Pill, Rows, TextRow, Row, FormatLatency } from './debug';
-import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
+import type { MonitoringResult, MonitoringTargetLike } from './types';
 import { CachedLookup, RequestHostname } from './_dns-cache';
 
 const MAX_BODY_BYTES = 1024 * 1024;
 const MAX_REDIRECTS = 5;
 const ALLOWED_METHODS = new Set(['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS']);
-
-// The editor fields naming the request, shared by the http and http-json
-// methods (the legacy https method keeps its own older set).
-export const HTTP_TARGET_FIELDS: MonitoringSettingField[] = [
-  {
-    Key: 'Protocol',
-    Label: 'Protocol',
-    Type: 'select',
-    Default: 'https',
-    Options: [
-      { value: 'http', label: 'HTTP' },
-      { value: 'https', label: 'HTTPS' },
-    ],
-  },
-  {
-    Key: 'Port',
-    Label: 'Port',
-    Type: 'number',
-    Default: 0,
-    Min: 0,
-    Max: 65535,
-    Note: 'Leave at 0 to use the protocol default: 80 for HTTP, 443 for HTTPS.',
-  },
-  { Key: 'Path', Label: 'Path', Type: 'string', Default: '/' },
-  {
-    Key: 'Method',
-    Label: 'HTTP Method',
-    Type: 'select',
-    Default: 'GET',
-    Options: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'].map((M) => ({
-      value: M,
-      label: M,
-    })),
-  },
-];
-
-export const FOLLOW_REDIRECTS_FIELD: MonitoringSettingField = {
-  Key: 'FollowRedirects',
-  Label: 'Follow Redirects',
-  Type: 'boolean',
-  Default: false,
-  Advanced: true,
-  Note: 'When off, a 3xx redirect is checked against the expected status range as-is rather than followed.',
-};
 
 interface HttpRequestState {
   Method: string;

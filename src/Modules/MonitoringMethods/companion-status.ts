@@ -18,6 +18,7 @@
 //     (A version string is extracted best-effort from the body when present and
 //      surfaced for display only; it never changes the pass/fail decision.)
 import { PerformHttpRequest, BuildHttpDebug } from './_http-shared';
+import { ExpectedStatusFields } from './_http-fields';
 import { TextRow, Rows } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
@@ -31,24 +32,7 @@ const Settings: MonitoringSettingField[] = [
   // Address-only; operators who have enabled Companion's HTTP API can still point
   // at a specific endpoint (e.g. /api/custom-variable/<name>/value).
   { Key: 'Path', Label: 'Path', Type: 'string', Default: '/', Advanced: true },
-  {
-    Key: 'ExpectedStatusMin',
-    Label: 'Expected Status Min',
-    Type: 'number',
-    Default: 200,
-    Min: 100,
-    Max: 599,
-    Advanced: true,
-  },
-  {
-    Key: 'ExpectedStatusMax',
-    Label: 'Expected Status Max',
-    Type: 'number',
-    Default: 399,
-    Min: 100,
-    Max: 599,
-    Advanced: true,
-  },
+  ...ExpectedStatusFields(399),
   {
     Key: 'Timeout',
     Label: 'Timeout (ms)',
