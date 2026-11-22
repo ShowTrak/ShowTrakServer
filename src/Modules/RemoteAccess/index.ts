@@ -25,6 +25,7 @@ import { Manager as SettingsManager } from '../SettingsManager';
 import { Manager as ModeManager } from '../ModeManager';
 import type { SubscribeChannel } from '../IPCRegistry/channels';
 import { IsArray } from '../Utils/guards';
+import type { OSCBulkActionType, SdkRpcError } from '@showtrak/protocol';
 
 /**
  * Settings prefix identifying a remote surface. Every permission this module
@@ -322,7 +323,10 @@ export function ToPublicSettings<T>(Settings: readonly T[] | null | undefined): 
 // desktop window rather than a shared server state: opening or closing modals on
 // every logged-in browser would yank the UI out from under whoever is using it.
 // These types are dropped from the web push and delivered to the desktop only.
-const SUPPRESSED_BULK_ACTIONS = new Set<string>(['OpenClientModal', 'CloseModals']);
+const SUPPRESSED_BULK_ACTIONS = new Set<string>([
+  'OpenClientModal',
+  'CloseModals',
+] satisfies OSCBulkActionType[]);
 
 const ReadBool = async (Key: string, Default: boolean): Promise<boolean> => {
   const Value = await SettingsManager.GetValue(Key);
@@ -406,8 +410,9 @@ export async function ReadSurfacePermissions(Prefix: SurfacePrefix): Promise<Sur
 }
 
 /** Why a channel was refused. Distinguishable because the two mean very different
- * things to whoever is holding the phone: one they can fix themselves. */
-export type DenyReason = 'edit_mode_required' | 'forbidden';
+ * things to whoever is holding the phone: one they can fix themselves. Both are
+ * answers the protocol declares for an `/sdk` rpc call (SdkRpcError). */
+export type DenyReason = Extract<SdkRpcError, 'edit_mode_required' | 'forbidden'>;
 
 export interface ChannelDecision {
   allowed: boolean;

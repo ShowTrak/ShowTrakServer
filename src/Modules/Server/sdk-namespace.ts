@@ -39,7 +39,22 @@ import type { FanoutNamespace } from './push-fanout';
 import { RegisterClientPushSink } from './client-push';
 import crypto from 'crypto';
 import type { Server } from 'socket.io';
-import type { ClientToServerEvents, ServerToClientEvents } from '@showtrak/protocol';
+import type {
+  AssertTrue,
+  ChannelListCheck,
+  ClientToServerEvents,
+  GroupView,
+  SdkAuthMode,
+  SdkCommandName,
+  SdkCommandResult,
+  SdkDeviceOnlyPushChannel,
+  SdkHandshakeAuth,
+  SdkLiveLevelsResponse,
+  SdkPushChannel,
+  SdkRpcResponse,
+  SdkServerToClientEvents,
+  ServerToClientEvents,
+} from '@showtrak/protocol';
 import { CreateLogger } from '../Logger';
 import { IsArray } from '../Utils/guards';
 import { Manager as BroadcastManager } from '../Broadcast';
@@ -157,27 +172,17 @@ const ApiKeyThrottle = CreateAuthThrottle(SDK_AUTH_MAX_FAILURES);
 const PairingThrottle = CreateAuthThrottle(SDK_PAIRING_MAX_FAILURES);
 
 // Structural socket/namespace types: the `/sdk` namespace speaks its own
-// string-keyed command/push protocol, not the client wire contract.
+// command/push protocol (the protocol's sdk.d.ts), not the client wire contract.
 interface SdkSocket {
   id: string;
   handshake: {
     address: string;
-    auth: {
-      apiKey?: string;
-      /**
-       * Explicit pairing intent. Required rather than inferred from the presence
-       * of a PIN, because pairing with protection off carries no credential at
-       * all; without an explicit flag, "pair me" and "I forgot my API key" would
-       * be the same handshake.
-       */
-      pair?: boolean;
-      pin?: string;
-      pairingCode?: string;
-      deviceToken?: string;
-      deviceName?: string;
-      platform?: string;
-      [k: string]: unknown;
-    };
+    // Whatever the SDK sent, read as the contract describes it. `pair` is
+    // explicit pairing intent, required rather than inferred from the presence
+    // of a PIN, because pairing with protection off carries no credential at
+    // all; without an explicit flag, "pair me" and "I forgot my API key" would
+    // be the same handshake.
+    auth: SdkHandshakeAuth & Record<string, unknown>;
   };
   /**
    * How this socket authenticated. Stamped by the handshake middleware and read
@@ -197,7 +202,11 @@ interface SdkSocket {
   PendingDeviceToken?: string | null;
   /** How the audit log names this session's edits ("SDK", "ShowTrak Remote (iPad)"). */
   AuditSource?: string;
-  emit(event: string, ...args: unknown[]): boolean;
+  // Every push this socket is sent directly is one the contract declares.
+  emit<Event extends keyof SdkServerToClientEvents>(
+    event: Event,
+    ...args: Parameters<SdkServerToClientEvents[Event]>
+  ): boolean;
   on(event: string, listener: (...args: never[]) => void): void;
   disconnect(close?: boolean): void;
 }
@@ -209,13 +218,12 @@ interface SdkNamespace {
   to?: FanoutNamespace['to'];
 }
 
-/** Which credential a connected socket presented at the handshake. */
-type SdkAuthMode = 'apikey' | 'device';
 type SdkIOServer = Server<ClientToServerEvents, ServerToClientEvents>;
-type AckCallback = (response?: unknown) => void;
+// The acknowledgement an SDK passes with an event, answered as the contract
+// declares. Nothing guarantees one was passed, hence the checks before each call.
+type SdkAck<Response> = ((response: Response) => void) | undefined;
 
 type PublicClientInput = Parameters<typeof ToPublicClient>[0];
-type PublicGroupInput = Parameters<typeof ToPublicGroup>[0];
 type PublicMonitorInput = Parameters<typeof ToPublicMonitor>[0];
 type PublicDummyInput = Parameters<typeof ToPublicDummy>[0];
 type PublicFreeKioskInput = Parameters<typeof ToPublicFreeKiosk>[0];
@@ -223,8 +231,9 @@ type PublicFreeKioskInput = Parameters<typeof ToPublicFreeKiosk>[0];
 // Channels forwarded to every connected SDK socket (raw PushToRenderers names).
 // Monitors and dummies ride their own list/update channels (as the Web UI does);
 // the SDK projects each entity into a client-shaped view so integrations treat
-// clients, monitors and dummies uniformly.
-const SDK_PUSH_ALLOWLIST = new Set<string>([
+// clients, monitors and dummies uniformly. Exactly the protocol's SdkPushChannel
+// (checked below), so a push cannot be forwarded without being declared there.
+const SDK_PUSH_CHANNELS = [
   'SetFullClientList',
   'ClientUpdated',
   'SetFullMonitoringTargetList',
@@ -264,7 +273,9 @@ const SDK_PUSH_ALLOWLIST = new Set<string>([
   // (menu actions, show-file, fullscreen, native/app updates, network discovery)
   // and ANYTHING carrying settings: settings hold the SDK API key and the
   // workspace PIN, so a surface that could read them could mint its own access.
-]);
+] as const;
+type _SdkPushChannelsMatch = AssertTrue<ChannelListCheck<SdkPushChannel, typeof SDK_PUSH_CHANNELS>>;
+const SDK_PUSH_ALLOWLIST = new Set<string>(SDK_PUSH_CHANNELS);
 
 // Allowlisted channels that only a paired device (ShowTrak Remote) is sent.
 // They feed management screens and the alert tray's sounds; an integration
@@ -276,7 +287,8 @@ const SDK_PUSH_ALLOWLIST = new Set<string>([
 // for any of them, and from 1.7 on they are documented as device-only. The
 // show-time state an integration does read (clients, tags, scripts, mode,
 // executions, alerts raised, pending adoption) stays on the shared push.
-const SDK_DEVICE_ONLY_PUSH = new Set<string>([
+// Exactly the protocol's SdkDeviceOnlyPushChannel (checked below).
+const SDK_DEVICE_ONLY_CHANNELS = [
   'SetFullAlertRuleList',
   'USBDeviceAdded',
   'USBDeviceRemoved',
@@ -287,7 +299,11 @@ const SDK_DEVICE_ONLY_PUSH = new Set<string>([
   'SetFullMonitoringActionFavouriteList',
   'AuditLogAppended',
   'UpdateSettings',
-]);
+] as const;
+type _SdkDeviceOnlyChannelsMatch = AssertTrue<
+  ChannelListCheck<SdkDeviceOnlyPushChannel, typeof SDK_DEVICE_ONLY_CHANNELS>
+>;
+const SDK_DEVICE_ONLY_PUSH = new Set<string>(SDK_DEVICE_ONLY_CHANNELS);
 
 // Serialize a push payload for the SDK wire (same client projection the Web UI
 // and desktop consume). Monitor/dummy channels are projected to the client shape.
@@ -300,7 +316,7 @@ function TransformSdkPush(channel: string, args: unknown[]): unknown[] {
     case 'SetFullClientList':
       return [
         ((args[0] as PublicClientInput[]) || []).map(ToPublicClient),
-        ((args[1] as PublicGroupInput[]) || []).map(ToPublicGroup),
+        ((args[1] as GroupView[]) || []).map(ToPublicGroup),
       ];
     case 'ClientUpdated':
       return [ToPublicClient(args[0] as PublicClientInput)];
@@ -376,7 +392,7 @@ async function EnsureApiKey(): Promise<void> {
 }
 
 // Map a wire command name + args object to a ControlService call.
-async function DispatchCommand(name: unknown, rawArgs: unknown) {
+async function DispatchCommand(name: unknown, rawArgs: unknown): Promise<SdkCommandResult> {
   const args = (rawArgs && typeof rawArgs === 'object' ? rawArgs : {}) as Record<string, unknown>;
   const slug = String(args.slug ?? '');
   const scriptSlug = String(args.scriptSlug ?? '');
@@ -385,7 +401,12 @@ async function DispatchCommand(name: unknown, rawArgs: unknown) {
   // Every name below is additive: an SDK never sends a command it does not know,
   // and an older server answers a newer one's with "Unknown command" rather than
   // anything worse, so new verbs need no version handshake.
-  switch (name) {
+  //
+  // Read as the protocol's command names so the switch is checked both ways:
+  // every case must be a declared command, and every declared command must have
+  // a case (the default branch below). Anything else still lands in default.
+  const Command = name as SdkCommandName;
+  switch (Command) {
     case 'wol.all':
       return ControlService.WakeAll();
     case 'wol.client':
@@ -458,8 +479,10 @@ async function DispatchCommand(name: unknown, rawArgs: unknown) {
       return ControlService.Shutdown();
     case 'system.shutdownForce':
       return ControlService.ShutdownForce();
-    default:
+    default: {
+      const _Unhandled: never = Command;
       return { ok: false, detail: `Unknown command "${String(name)}"` };
+    }
   }
 }
 
@@ -759,12 +782,13 @@ function SetupSdkNamespace(io: SdkIOServer) {
     if (socket.PendingDeviceToken) {
       const DeviceToken = socket.PendingDeviceToken;
       socket.PendingDeviceToken = null;
-      socket.emit('paired', { deviceId: socket.DeviceID, deviceToken: DeviceToken });
+      // The pairing branch of the handshake set DeviceID along with the token.
+      socket.emit('paired', { deviceId: socket.DeviceID as string, deviceToken: DeviceToken });
     }
 
     await SendInitialState(socket);
 
-    socket.on('command', (name: unknown, args: unknown, ack: AckCallback) => {
+    socket.on('command', (name: unknown, args: unknown, ack: SdkAck<SdkCommandResult>) => {
       void (async () => {
         try {
           const Result = await RunWithAuditSource(socket.AuditSource || 'SDK', () =>
@@ -787,7 +811,7 @@ function SetupSdkNamespace(io: SdkIOServer) {
     // file and was handed out to fire cues; silently widening every existing key
     // to "can delete every group" is privilege escalation for integrations that
     // never asked for it. Companion keeps the command surface it already had.
-    socket.on('rpc', (channel: unknown, args: unknown, ack: AckCallback) => {
+    socket.on('rpc', (channel: unknown, args: unknown, ack: SdkAck<SdkRpcResponse>) => {
       void (async () => {
         try {
           if (socket.AuthMode !== 'device') {
@@ -821,7 +845,7 @@ function SetupSdkNamespace(io: SdkIOServer) {
     // keep a device's only control connection busy, so it stops on close and on
     // disconnect, which a revoked device is put through too.
     const LiveLevelsKey = `sdk:${socket.id}`;
-    socket.on('monitorlive:open', (TargetID: unknown, ack: AckCallback) => {
+    socket.on('monitorlive:open', (TargetID: unknown, ack: SdkAck<SdkLiveLevelsResponse>) => {
       if (socket.AuthMode !== 'device') return ack && ack({ error: 'forbidden' });
       try {
         const Snapshot = OpenMonitorLiveLevels(LiveLevelsKey, TargetID, (Frames) => {

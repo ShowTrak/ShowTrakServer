@@ -649,8 +649,9 @@ OSC.CreateRoute(
 // TriggerIntegratedEvent IPC handler, so an event fired over OSC behaves
 // identically to one fired from the SDK or the context menu.
 //
-// ControlService.CommandResult is shape-compatible with RouteResult ({ ok,
-// detail }), so its return value is the route result verbatim.
+// ControlService answers with the protocol's SdkCommandResult, which is
+// shape-compatible with RouteResult ({ ok, detail }), so its return value is the
+// route result verbatim.
 async function runEventCommand(Command: Promise<RouteResult>): Promise<RouteResult> {
   const Result = await Command;
   if (!Result.ok) {

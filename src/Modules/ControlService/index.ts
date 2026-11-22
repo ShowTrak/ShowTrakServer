@@ -35,14 +35,19 @@ import { GetRetryTarget } from '../ScriptExecutionManager/retry';
 import { GetFreeKioskCommand } from '../FreeKiosk/commands';
 import { DescribeError } from '@showtrak/protocol/runtime';
 import { GetHandler } from '../../main/handler-registry';
-import type { FreeKioskTerminalView } from '@showtrak/protocol';
+import type {
+  AssertTrue,
+  ChannelListCheck,
+  FreeKioskTerminalView,
+  OSCBulkActionType,
+  SdkCommandResult,
+  SdkViewMode,
+} from '@showtrak/protocol';
 
 const Logger = CreateLogger('ControlService');
 
-export interface CommandResult {
-  ok: boolean;
-  detail: string;
-}
+// Every command answers with the protocol's SdkCommandResult: `/sdk` acks it as
+// it is, and the OSC routes that delegate here return it as their route result.
 
 interface ResolvedClient {
   UUID: string;
@@ -52,8 +57,8 @@ interface ResolvedClient {
   GroupID?: number | null;
 }
 
-const ok = (detail = ''): CommandResult => ({ ok: true, detail: String(detail || '') });
-const fail = (detail: unknown): CommandResult => ({
+const ok = (detail = ''): SdkCommandResult => ({ ok: true, detail: String(detail || '') });
+const fail = (detail: unknown): SdkCommandResult => ({
   ok: false,
   detail: String(detail || 'Request failed'),
 });
@@ -106,7 +111,7 @@ async function resolveTag(Key: string) {
 
 async function resolveGroupClients(
   Key: string
-): Promise<[CommandResult, null] | [null, ResolvedClient[]]> {
+): Promise<[SdkCommandResult, null] | [null, ResolvedClient[]]> {
   const Group = await resolveGroup(Key);
   if (!Group) return [fail(`Invalid Group "${Key}"`), null];
   const Clients = await getAllClients();
@@ -115,7 +120,7 @@ async function resolveGroupClients(
 
 async function resolveTagClients(
   Key: string
-): Promise<[CommandResult, null] | [null, ResolvedClient[]]> {
+): Promise<[SdkCommandResult, null] | [null, ResolvedClient[]]> {
   const Tag = await resolveTag(Key);
   if (!Tag) return [fail(`Invalid Tag "${Key}"`), null];
   const Clients = await getAllClients();
@@ -139,12 +144,12 @@ function isIntegrated(client: ResolvedClient): boolean {
 // --- Dispatch helpers ----------------------------------------------------
 
 // Call a shared IPC handler by channel; treat a tuple [Err, _] with a truthy
-// Err as failure. Returns a CommandResult.
+// Err as failure. Returns a SdkCommandResult.
 async function dispatchHandler(
   channel: string,
   args: unknown[],
   detail: string
-): Promise<CommandResult> {
+): Promise<SdkCommandResult> {
   const Handler = GetHandler(channel);
   if (typeof Handler !== 'function') return fail(`Handler "${channel}" unavailable`);
   const Result = await Handler(null, ...args);
@@ -152,17 +157,18 @@ async function dispatchHandler(
   return ok(detail);
 }
 
-function emitBulk(type: string, uuids: string[], arg: unknown = null): void {
+function emitBulk(type: OSCBulkActionType, uuids: string[], arg: unknown = null): void {
   Broadcast.emit('OSCBulkAction', type, uuids, arg);
 }
 
-// The desktop's three client-list layouts (src/UI/js/app/lib/list-view.ts).
+// The desktop's three client-list layouts (src/UI/js/app/lib/list-view.ts):
+// exactly the protocol's SdkViewMode, which view.set names.
 const VIEW_MODES = ['grid', 'compact', 'list'] as const;
-type ViewMode = (typeof VIEW_MODES)[number];
+type _ViewModesMatch = AssertTrue<ChannelListCheck<SdkViewMode, typeof VIEW_MODES>>;
 
-function parseViewMode(Value: unknown): ViewMode | null {
+function parseViewMode(Value: unknown): SdkViewMode | null {
   const Text = typeof Value === 'string' ? Value.trim().toLowerCase() : '';
-  return (VIEW_MODES as readonly string[]).includes(Text) ? (Text as ViewMode) : null;
+  return (VIEW_MODES as readonly string[]).includes(Text) ? (Text as SdkViewMode) : null;
 }
 
 // A command's optional single value. Integrations fill it from a text field, so
@@ -235,7 +241,7 @@ async function sendKioskCommand(
   Targets: Promise<KioskTargets>,
   CommandID: string,
   RawValue: unknown
-): Promise<CommandResult> {
+): Promise<SdkCommandResult> {
   const [TargetErr, Terminals, Target] = await Targets;
   if (Terminals === null) return fail(TargetErr);
 
@@ -286,22 +292,22 @@ async function sendKioskCommand(
 
 export const ControlService = {
   // Wake-on-LAN (server-side via the shared WakeOnLan handler) -------------
-  async WakeAll(): Promise<CommandResult> {
+  async WakeAll(): Promise<SdkCommandResult> {
     const uuids = (await getAllClients()).map((c) => c.UUID);
     return dispatchHandler('WakeOnLan', [uuids], `Wake-on-LAN queued for ${uuids.length} clients`);
   },
-  async WakeClient(slug: string): Promise<CommandResult> {
+  async WakeClient(slug: string): Promise<SdkCommandResult> {
     const c = await resolveClientByKey(slug);
     if (!c) return fail(`Invalid Client "${slug}"`);
     return dispatchHandler('WakeOnLan', [[c.UUID]], `Wake-on-LAN queued for "${c.Slug || c.UUID}"`);
   },
-  async WakeGroup(slug: string): Promise<CommandResult> {
+  async WakeGroup(slug: string): Promise<SdkCommandResult> {
     const [err, clients] = await resolveGroupClients(slug);
     if (err) return err;
     const uuids = clients.map((c) => c.UUID);
     return dispatchHandler('WakeOnLan', [uuids], `Wake-on-LAN queued for group "${slug}"`);
   },
-  async WakeTag(slug: string): Promise<CommandResult> {
+  async WakeTag(slug: string): Promise<SdkCommandResult> {
     const [err, clients] = await resolveTagClients(slug);
     if (err) return err;
     const uuids = clients.map((c) => c.UUID);
@@ -309,7 +315,7 @@ export const ControlService = {
   },
 
   // Scripts (by script slug = folder ID) ----------------------------------
-  async RunScriptOnAll(scriptSlug: string): Promise<CommandResult> {
+  async RunScriptOnAll(scriptSlug: string): Promise<SdkCommandResult> {
     if (!(await ScriptManager.Get(scriptSlug))) return fail(`Invalid Script "${scriptSlug}"`);
     const uuids = (await getAllClients()).map((c) => c.UUID);
     return dispatchHandler(
@@ -318,7 +324,7 @@ export const ControlService = {
       `Script "${scriptSlug}" queued for ${uuids.length} clients`
     );
   },
-  async RunScriptOnClient(slug: string, scriptSlug: string): Promise<CommandResult> {
+  async RunScriptOnClient(slug: string, scriptSlug: string): Promise<SdkCommandResult> {
     const c = await resolveClientByKey(slug);
     if (!c) return fail(`Invalid Client "${slug}"`);
     if (!(await ScriptManager.Get(scriptSlug))) return fail(`Invalid Script "${scriptSlug}"`);
@@ -328,7 +334,7 @@ export const ControlService = {
       `Script "${scriptSlug}" queued for "${c.Slug || c.UUID}"`
     );
   },
-  async RunScriptOnGroup(slug: string, scriptSlug: string): Promise<CommandResult> {
+  async RunScriptOnGroup(slug: string, scriptSlug: string): Promise<SdkCommandResult> {
     const [err, clients] = await resolveGroupClients(slug);
     if (err) return err;
     if (!(await ScriptManager.Get(scriptSlug))) return fail(`Invalid Script "${scriptSlug}"`);
@@ -338,7 +344,7 @@ export const ControlService = {
       `Script "${scriptSlug}" queued for group "${slug}"`
     );
   },
-  async RunScriptOnTag(slug: string, scriptSlug: string): Promise<CommandResult> {
+  async RunScriptOnTag(slug: string, scriptSlug: string): Promise<SdkCommandResult> {
     const [err, clients] = await resolveTagClients(slug);
     if (err) return err;
     if (!(await ScriptManager.Get(scriptSlug))) return fail(`Invalid Script "${scriptSlug}"`);
@@ -350,7 +356,7 @@ export const ControlService = {
   },
 
   // Integrated events (integrated clients only) ---------------------------
-  async TriggerEventOnAll(eventSlug: string): Promise<CommandResult> {
+  async TriggerEventOnAll(eventSlug: string): Promise<SdkCommandResult> {
     const uuids = (await getAllClients()).filter(isIntegrated).map((c) => c.UUID);
     if (uuids.length === 0) return fail('No integrated clients');
     return dispatchHandler(
@@ -359,7 +365,7 @@ export const ControlService = {
       `Event "${eventSlug}" queued for ${uuids.length} integrated clients`
     );
   },
-  async TriggerEventOnClient(slug: string, eventSlug: string): Promise<CommandResult> {
+  async TriggerEventOnClient(slug: string, eventSlug: string): Promise<SdkCommandResult> {
     const c = await resolveClientByKey(slug);
     if (!c) return fail(`Invalid Client "${slug}"`);
     if (!isIntegrated(c)) return fail(`Client "${slug}" is not an integrated client`);
@@ -369,7 +375,7 @@ export const ControlService = {
       `Event "${eventSlug}" queued for "${c.Slug || c.UUID}"`
     );
   },
-  async TriggerEventOnGroup(slug: string, eventSlug: string): Promise<CommandResult> {
+  async TriggerEventOnGroup(slug: string, eventSlug: string): Promise<SdkCommandResult> {
     const [err, clients] = await resolveGroupClients(slug);
     if (err) return err;
     const uuids = clients.filter(isIntegrated).map((c) => c.UUID);
@@ -380,7 +386,7 @@ export const ControlService = {
       `Event "${eventSlug}" queued for group "${slug}"`
     );
   },
-  async TriggerEventOnTag(slug: string, eventSlug: string): Promise<CommandResult> {
+  async TriggerEventOnTag(slug: string, eventSlug: string): Promise<SdkCommandResult> {
     const [err, clients] = await resolveTagClients(slug);
     if (err) return err;
     const uuids = clients.filter(isIntegrated).map((c) => c.UUID);
@@ -393,22 +399,22 @@ export const ControlService = {
   },
 
   // Alerts (authoritative server state) -----------------------------------
-  async SetAlertsEnabled(enabled: boolean): Promise<CommandResult> {
+  async SetAlertsEnabled(enabled: boolean): Promise<SdkCommandResult> {
     const State = AlertsManager.SetActionsEnabled(!!enabled);
     return ok(`Alert actions ${State ? 'enabled' : 'disabled'}`);
   },
-  async ToggleAlerts(): Promise<CommandResult> {
+  async ToggleAlerts(): Promise<SdkCommandResult> {
     const State = AlertsManager.SetActionsEnabled(!AlertsManager.GetActionsEnabled());
     return ok(`Alert actions ${State ? 'enabled' : 'disabled'}`);
   },
 
   // Show / Edit mode (authoritative server state) -------------------------
-  async SetMode(mode: string): Promise<CommandResult> {
+  async SetMode(mode: string): Promise<SdkCommandResult> {
     const Next = String(mode).toUpperCase() === 'EDIT' ? 'EDIT' : 'SHOW';
     ModeManager.Set(Next);
     return ok(`Mode set to ${Next}`);
   },
-  async ToggleMode(): Promise<CommandResult> {
+  async ToggleMode(): Promise<SdkCommandResult> {
     const Next = ModeManager.Get() === 'EDIT' ? 'SHOW' : 'EDIT';
     ModeManager.Set(Next);
     return ok(`Mode set to ${Next}`);
@@ -425,7 +431,7 @@ export const ControlService = {
   // Modal actions are addressed at the operator's own desktop window: the web
   // namespace drops them (WEB_SUPPRESSED_BULK_ACTIONS) so a Companion press does
   // not throw a modal up on every logged-in browser as well.
-  async OpenClientModal(slug: string): Promise<CommandResult> {
+  async OpenClientModal(slug: string): Promise<SdkCommandResult> {
     const c = await resolveClientByKey(slug);
     if (c) {
       if (isIntegrated(c)) return fail(`"${c.Slug || c.UUID}" is not a ShowTrak client`);
@@ -472,7 +478,7 @@ export const ControlService = {
   // Identify is addressed by UUID at the manager, so resolve the slug first. Only
   // real clients can be identified: monitors, dummies and FreeKiosk terminals
   // have no ShowTrak agent to draw the overlay, so they never resolve here.
-  async Identify(slug: string): Promise<CommandResult> {
+  async Identify(slug: string): Promise<SdkCommandResult> {
     const c = await resolveClientByKey(slug);
     if (!c) return fail(`Invalid Client "${slug}"`);
     const [Err] = await IdentifyManager.Identify(c.UUID);
@@ -480,7 +486,7 @@ export const ControlService = {
     return ok(`Identifying "${c.Slug || c.UUID}"`);
   },
 
-  async StopIdentify(slug: string): Promise<CommandResult> {
+  async StopIdentify(slug: string): Promise<SdkCommandResult> {
     const c = await resolveClientByKey(slug);
     if (!c) return fail(`Invalid Client "${slug}"`);
     const [Err] = await IdentifyManager.Stop(c.UUID);
@@ -490,7 +496,7 @@ export const ControlService = {
 
   // Dismiss every open modal on the desktop renderer. No targets; the renderer
   // closes whatever it currently has open.
-  async CloseModals(): Promise<CommandResult> {
+  async CloseModals(): Promise<SdkCommandResult> {
     emitBulk('CloseModals', []);
     return ok('Closed all modals');
   },
@@ -500,7 +506,7 @@ export const ControlService = {
   // browser alike (unlike the modal actions, which are desktop-only). `mode`
   // names the layout (grid / compact / list); SDKs before 1.8 send only
   // `compact`, which still means compact vs grid.
-  async SetView(mode: unknown, compact?: unknown): Promise<CommandResult> {
+  async SetView(mode: unknown, compact?: unknown): Promise<SdkCommandResult> {
     let Next = parseViewMode(mode);
     if (!Next && mode == null && typeof compact === 'boolean') {
       Next = compact ? 'compact' : 'grid';
@@ -509,7 +515,7 @@ export const ControlService = {
     emitBulk('SetViewMode', [], Next);
     return ok(`View set to ${Next}`);
   },
-  async ToggleCompactView(): Promise<CommandResult> {
+  async ToggleCompactView(): Promise<SdkCommandResult> {
     emitBulk('ToggleCompactView', []);
     return ok('Toggled the compact view');
   },
@@ -526,7 +532,7 @@ export const ControlService = {
     actionId: string,
     value?: unknown,
     params?: unknown
-  ): Promise<CommandResult> {
+  ): Promise<SdkCommandResult> {
     const Target =
       typeof MonitoringTargetManager.GetBySlug === 'function'
         ? await MonitoringTargetManager.GetBySlug(slug)
@@ -580,24 +586,24 @@ export const ControlService = {
     slug: string,
     commandId: string,
     value?: unknown
-  ): Promise<CommandResult> {
+  ): Promise<SdkCommandResult> {
     return sendKioskCommand(resolveKioskTargets('terminal', slug), commandId, value);
   },
   async FreeKioskCommandOnGroup(
     slug: string,
     commandId: string,
     value?: unknown
-  ): Promise<CommandResult> {
+  ): Promise<SdkCommandResult> {
     return sendKioskCommand(resolveKioskTargets('group', slug), commandId, value);
   },
   async FreeKioskCommandOnTag(
     slug: string,
     commandId: string,
     value?: unknown
-  ): Promise<CommandResult> {
+  ): Promise<SdkCommandResult> {
     return sendKioskCommand(resolveKioskTargets('tag', slug), commandId, value);
   },
-  async FreeKioskCommandOnAll(commandId: string, value?: unknown): Promise<CommandResult> {
+  async FreeKioskCommandOnAll(commandId: string, value?: unknown): Promise<SdkCommandResult> {
     return sendKioskCommand(resolveKioskTargets('all', ''), commandId, value);
   },
 
@@ -605,7 +611,7 @@ export const ControlService = {
   // The /sdk twin of OSC /API/Dummy/<slug>/Heartbeat. No IP is recorded: the
   // socket belongs to the integration relaying the heartbeat, not to whatever
   // the dummy stands for, so its address would be the wrong one.
-  async DummyHeartbeat(slug: string): Promise<CommandResult> {
+  async DummyHeartbeat(slug: string): Promise<SdkCommandResult> {
     const [Err] = await DummyClientManager.Heartbeat(slug, null);
     if (Err) return fail(Err);
     return ok(`Dummy heartbeat accepted for "${slug}"`);
@@ -615,7 +621,7 @@ export const ControlService = {
   // Retry every failed execution that can be retried: what the panel's Retry
   // button does. Goes through the same handler, so the whitelist, per-client
   // queue and audit log apply exactly as on the first run.
-  async RetryFailedExecutions(): Promise<CommandResult> {
+  async RetryFailedExecutions(): Promise<SdkCommandResult> {
     const Executions = await ScriptExecutionManager.GetAllExecutions();
     const RequestIDs = Executions.filter((Execution) => GetRetryTarget(Execution)).map(
       (Execution) => Execution.RequestID
@@ -632,12 +638,12 @@ export const ControlService = {
     return ok(`Retried ${Retried} failed execution${Retried === 1 ? '' : 's'}`);
   },
   // Clear finished rows from the panel. Anything still queued or running stays.
-  async ClearSettledExecutions(): Promise<CommandResult> {
+  async ClearSettledExecutions(): Promise<SdkCommandResult> {
     return dispatchHandler('Scripts:ClearSettledExecutions', [], 'Cleared finished executions');
   },
 
   // Save the current show file --------------------------------------------
-  async SaveShow(): Promise<CommandResult> {
+  async SaveShow(): Promise<SdkCommandResult> {
     const Handler = GetHandler('Show:Save');
     if (typeof Handler !== 'function') return fail('Save handler unavailable');
     try {
@@ -657,12 +663,12 @@ export const ControlService = {
   // Mirrors the OSC /API/Shutdown routes: the same Broadcast events the desktop
   // menu raises, so save prompts and show-mode guards behave identically. The
   // graceful variant may be blocked by those prompts; Force skips them.
-  async Shutdown(): Promise<CommandResult> {
+  async Shutdown(): Promise<SdkCommandResult> {
     Logger.warn('Received shutdown command via SDK');
     Broadcast.emit('Shutdown');
     return ok('Shutdown requested');
   },
-  async ShutdownForce(): Promise<CommandResult> {
+  async ShutdownForce(): Promise<SdkCommandResult> {
     Logger.warn('Received force shutdown command via SDK');
     Broadcast.emit('ShutdownForce');
     return ok('Force shutdown requested');

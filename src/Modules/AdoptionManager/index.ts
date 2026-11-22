@@ -4,6 +4,7 @@
 import { CreateLogger } from '../Logger';
 import { Manager as BroadcastManager } from '../Broadcast';
 import type { ValidatedAdoptionHeartbeat } from '../SocketValidation';
+import type { PendingAdoptionView } from '@showtrak/protocol';
 
 const Logger = CreateLogger('AdoptionManager');
 
@@ -15,8 +16,10 @@ import { Manager as ClientManager } from '../ClientManager';
 // heartbeat from an unadopted machine looks itself up here.
 const ClientsPendingAdoption = new Map<string, ClientPendingAdoption>();
 
-class ClientPendingAdoption {
-  State: string;
+// Pushed as it is (SetDevicesPendingAdoption, to the renderer, the Web UI and
+// /sdk), so it is the protocol's PendingAdoptionView.
+class ClientPendingAdoption implements PendingAdoptionView {
+  State: PendingAdoptionView['State'];
   UUID: string;
   Hostname: string;
   Version: string;
@@ -98,7 +101,7 @@ const Manager = {
   },
 
   // Update UI-visible state for a pending device (e.g., "Adopting")
-  async SetState(UUID: string, State: string): Promise<void> {
+  async SetState(UUID: string, State: PendingAdoptionView['State']): Promise<void> {
     const client = ClientsPendingAdoption.get(UUID);
     if (!client) {
       Logger.log(`Client ${UUID} not found in pending adoption list.`);

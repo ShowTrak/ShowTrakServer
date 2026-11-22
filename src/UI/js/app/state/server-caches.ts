@@ -24,6 +24,7 @@ import type {
   GroupView,
   TagView,
   VariableView,
+  PendingAdoptionView,
 } from '@showtrak/protocol';
 
 export let Config = {} as AppConfig;
@@ -52,8 +53,8 @@ export const GroupUUIDCache = new Map<string, string[]>();
 export const GroupSelectableUUIDCache = new Map<string, string[]>();
 
 // Pending adoption devices (unadopted clients discovered by the server)
-export let PendingAdoption: ClientView[] = [];
-export function setPendingAdoption(value: ClientView[]): void {
+export let PendingAdoption: PendingAdoptionView[] = [];
+export function setPendingAdoption(value: PendingAdoptionView[]): void {
   PendingAdoption = value;
 }
 
