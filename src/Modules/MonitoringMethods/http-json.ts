@@ -4,7 +4,12 @@
 //     expected value.
 //   - Text contains: raw substring search inside the response body.
 // The body is capped at 1 MiB to prevent unbounded memory use.
-import { PerformHttpRequest, BuildHttpDebug } from './_http-shared';
+import {
+  PerformHttpRequest,
+  BuildHttpDebug,
+  HTTP_TARGET_FIELDS,
+  FOLLOW_REDIRECTS_FIELD,
+} from './_http-shared';
 import {
   DebugBody,
   Esc,
@@ -20,36 +25,7 @@ import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } f
 const ID = 'http-json';
 
 const Settings: MonitoringSettingField[] = [
-  {
-    Key: 'Protocol',
-    Label: 'Protocol',
-    Type: 'select',
-    Default: 'https',
-    Options: [
-      { value: 'http', label: 'HTTP' },
-      { value: 'https', label: 'HTTPS' },
-    ],
-  },
-  {
-    Key: 'Port',
-    Label: 'Port',
-    Type: 'number',
-    Default: 0,
-    Min: 0,
-    Max: 65535,
-    Note: 'Leave at 0 to use the protocol default: 80 for HTTP, 443 for HTTPS.',
-  },
-  { Key: 'Path', Label: 'Path', Type: 'string', Default: '/' },
-  {
-    Key: 'Method',
-    Label: 'HTTP Method',
-    Type: 'select',
-    Default: 'GET',
-    Options: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'].map((M) => ({
-      value: M,
-      label: M,
-    })),
-  },
+  ...HTTP_TARGET_FIELDS,
   {
     Key: 'ExpectedStatusMin',
     Label: 'Expected Status Min',
@@ -82,14 +58,7 @@ const Settings: MonitoringSettingField[] = [
     Default: '',
     Note: 'Compared as text. Degraded when the value at the JSON path (or the body) does not match.',
   },
-  {
-    Key: 'FollowRedirects',
-    Label: 'Follow Redirects',
-    Type: 'boolean',
-    Default: false,
-    Advanced: true,
-    Note: 'When off, a 3xx redirect is checked against the expected status range as-is rather than followed.',
-  },
+  FOLLOW_REDIRECTS_FIELD,
   {
     Key: 'IgnoreTlsErrors',
     Label: 'Ignore TLS Errors',

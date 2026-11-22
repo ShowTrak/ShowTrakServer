@@ -1,42 +1,18 @@
 // HTTP/HTTPS monitoring. Performs an HTTP or HTTPS request against Target.Address
 // and validates that the response status falls within the configured range.
 // The request body is drained but not parsed.
-import { PerformHttpRequest, BuildHttpDebug } from './_http-shared';
+import {
+  PerformHttpRequest,
+  BuildHttpDebug,
+  HTTP_TARGET_FIELDS,
+  FOLLOW_REDIRECTS_FIELD,
+} from './_http-shared';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
 const ID = 'http';
 
 const Settings: MonitoringSettingField[] = [
-  {
-    Key: 'Protocol',
-    Label: 'Protocol',
-    Type: 'select',
-    Default: 'https',
-    Options: [
-      { value: 'http', label: 'HTTP' },
-      { value: 'https', label: 'HTTPS' },
-    ],
-  },
-  {
-    Key: 'Port',
-    Label: 'Port',
-    Type: 'number',
-    Default: 0,
-    Min: 0,
-    Max: 65535,
-    Note: 'Leave at 0 to use the protocol default: 80 for HTTP, 443 for HTTPS.',
-  },
-  { Key: 'Path', Label: 'Path', Type: 'string', Default: '/' },
-  {
-    Key: 'Method',
-    Label: 'HTTP Method',
-    Type: 'select',
-    Default: 'GET',
-    Options: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'].map((M) => ({
-      value: M,
-      label: M,
-    })),
-  },
+  ...HTTP_TARGET_FIELDS,
   {
     Key: 'ExpectedStatusMin',
     Label: 'Expected Status Min',
@@ -55,14 +31,7 @@ const Settings: MonitoringSettingField[] = [
     Max: 599,
     Advanced: true,
   },
-  {
-    Key: 'FollowRedirects',
-    Label: 'Follow Redirects',
-    Type: 'boolean',
-    Default: false,
-    Advanced: true,
-    Note: 'When off, a 3xx redirect is checked against the expected status range as-is rather than followed.',
-  },
+  FOLLOW_REDIRECTS_FIELD,
   {
     Key: 'IgnoreTlsErrors',
     Label: 'Ignore TLS Errors',
