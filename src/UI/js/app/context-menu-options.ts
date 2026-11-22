@@ -36,6 +36,7 @@ import {
   GetFavouritesForSelection,
   GetMethodAction,
   RunMonitoringAction,
+  type FavouriteForSelection,
 } from './monitoring-actions';
 import {
   GetScriptSkipReason,
@@ -67,6 +68,43 @@ interface ContextMenuOption {
   // Runs something against the selected entities, so it may clear the
   // selection afterwards (see UI_CLEAR_SELECTION_AFTER_ACTION).
   ActsOnSelection?: boolean;
+}
+
+/**
+ * A starred check action as a menu row: confirmed first when the action is
+ * destructive ("<Label> on <What>?"), then run on `TargetIDs`, narrowed to
+ * `CheckIDs` when given.
+ */
+function FavouriteOption(
+  { Favourite, TargetIDs }: FavouriteForSelection,
+  What: string,
+  CheckIDs?: number[]
+): ContextMenuOption {
+  const Action = GetMethodAction(Favourite.Method, Favourite.ActionID);
+  return {
+    Type: 'Action',
+    Title: Favourite.Label,
+    Class: Action && Action.Destructive ? 'text-warning' : 'text-light',
+    Icon: `bi-${Favourite.Icon || 'lightning'}`,
+    IconColour: Action && Action.Destructive ? '#e74c3c' : '#9b59b6',
+    ActsOnSelection: true,
+    Action: async function () {
+      if (Action && Action.Destructive) {
+        const Confirmed = await ConfirmationDialog(`${Favourite.Label} on ${What}?`, {
+          ConfirmLabel: Favourite.Label,
+        });
+        if (!Confirmed) return false;
+      }
+      await RunMonitoringAction(
+        TargetIDs,
+        Favourite.Method,
+        Favourite.ActionID,
+        Favourite.Params || {},
+        Favourite.Label,
+        CheckIDs
+      );
+    },
+  };
 }
 
 /**
@@ -365,34 +403,9 @@ export async function BuildContextMenuOptions(
       // whereas Run Checks Now is a diagnostic. A favourite is offered when
       // ANY selected monitor has a check of its method and runs only on those
       // (the same rule the script and remote-event sections above follow).
-      for (const { Favourite, TargetIDs } of GetFavouritesForSelection(MonitorTargetIDs)) {
-        const Action = GetMethodAction(Favourite.Method, Favourite.ActionID);
-        Options.push({
-          Type: 'Action',
-          Title: Favourite.Label,
-          Class: Action && Action.Destructive ? 'text-warning' : 'text-light',
-          Icon: `bi-${Favourite.Icon || 'lightning'}`,
-          IconColour: Action && Action.Destructive ? '#e74c3c' : '#9b59b6',
-          ActsOnSelection: true,
-          Action: async function () {
-            if (Action && Action.Destructive) {
-              const Confirmed = await ConfirmationDialog(
-                `${Favourite.Label} on ${
-                  TargetIDs.length === 1 ? 'this monitor' : `${TargetIDs.length} monitors`
-                }?`,
-                { ConfirmLabel: Favourite.Label }
-              );
-              if (!Confirmed) return false;
-            }
-            await RunMonitoringAction(
-              TargetIDs,
-              Favourite.Method,
-              Favourite.ActionID,
-              Favourite.Params || {},
-              Favourite.Label
-            );
-          },
-        });
+      for (const Entry of GetFavouritesForSelection(MonitorTargetIDs)) {
+        const Count = Entry.TargetIDs.length;
+        Options.push(FavouriteOption(Entry, Count === 1 ? 'this monitor' : `${Count} monitors`));
       }
 
       Options.push({
@@ -430,35 +443,8 @@ export async function BuildContextMenuOptions(
       PushSection('Checks');
       const CheckWord = (Count: number) => (Count === 1 ? 'this check' : `${Count} checks`);
 
-      for (const { Favourite, TargetIDs, CheckIDs: ForChecks } of GetFavouritesForChecks(
-        CheckIDs
-      )) {
-        const Action = GetMethodAction(Favourite.Method, Favourite.ActionID);
-        Options.push({
-          Type: 'Action',
-          Title: Favourite.Label,
-          Class: Action && Action.Destructive ? 'text-warning' : 'text-light',
-          Icon: `bi-${Favourite.Icon || 'lightning'}`,
-          IconColour: Action && Action.Destructive ? '#e74c3c' : '#9b59b6',
-          ActsOnSelection: true,
-          Action: async function () {
-            if (Action && Action.Destructive) {
-              const Confirmed = await ConfirmationDialog(
-                `${Favourite.Label} on ${CheckWord(ForChecks.length)}?`,
-                { ConfirmLabel: Favourite.Label }
-              );
-              if (!Confirmed) return false;
-            }
-            await RunMonitoringAction(
-              TargetIDs,
-              Favourite.Method,
-              Favourite.ActionID,
-              Favourite.Params || {},
-              Favourite.Label,
-              ForChecks
-            );
-          },
-        });
+      for (const Entry of GetFavouritesForChecks(CheckIDs)) {
+        Options.push(FavouriteOption(Entry, CheckWord(Entry.CheckIDs.length), Entry.CheckIDs));
       }
 
       Options.push({

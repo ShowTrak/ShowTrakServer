@@ -12,6 +12,28 @@ import {
   SelectAll,
   StopIdentifyingForUUIDs,
 } from './selection-init';
+
+// Open the context menu centred in the window, as a right-click there would.
+// `ErrorLabel` names the shortcut in the non-fatal error report.
+function OpenContextMenuAtCentre(ErrorLabel: string): void {
+  try {
+    const pageWidth = $(window).width() || 0;
+    const pageHeight = $(window).height() || 0;
+    const centerX = Math.floor(pageWidth / 2);
+    const centerY = Math.floor(pageHeight / 2);
+    const evt = $.Event('contextmenu');
+    evt.pageX = centerX;
+    evt.pageY = centerY;
+    // The menu is position:fixed and positions from clientX/clientY, so set
+    // those too (the width/height here are already viewport-relative).
+    evt.clientX = centerX;
+    evt.clientY = centerY;
+    $('html').trigger(evt);
+  } catch (err) {
+    HandleNonFatalError(ErrorLabel, err);
+  }
+}
+
 // Called by the bootstrap orchestrator in main.ts, never at import time.
 export function InitKeyboard() {
   document.addEventListener('keydown', function (e) {
@@ -122,22 +144,7 @@ export function InitKeyboard() {
       e.key.toLowerCase() === 'm'
     ) {
       e.preventDefault();
-      try {
-        const pageWidth = $(window).width() || 0;
-        const pageHeight = $(window).height() || 0;
-        const centerX = Math.floor(pageWidth / 2);
-        const centerY = Math.floor(pageHeight / 2);
-        const evt = $.Event('contextmenu');
-        evt.pageX = centerX;
-        evt.pageY = centerY;
-        // The menu is position:fixed and positions from clientX/clientY, so set
-        // those too (the width/height here are already viewport-relative).
-        evt.clientX = centerX;
-        evt.clientY = centerY;
-        $('html').trigger(evt);
-      } catch (err) {
-        HandleNonFatalError('Keyboard:OpenContextMenuCenter', err);
-      }
+      OpenContextMenuAtCentre('Keyboard:OpenContextMenuCenter');
       return;
     }
 
@@ -172,20 +179,7 @@ export function InitKeyboard() {
     // Open context menu via keyboard: standard Windows bindings
     if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
       e.preventDefault();
-      try {
-        const pageWidth = $(window).width() || 0;
-        const pageHeight = $(window).height() || 0;
-        const centerX = Math.floor(pageWidth / 2);
-        const centerY = Math.floor(pageHeight / 2);
-        const evt = $.Event('contextmenu');
-        evt.pageX = centerX;
-        evt.pageY = centerY;
-        evt.clientX = centerX;
-        evt.clientY = centerY;
-        $('html').trigger(evt);
-      } catch (err) {
-        HandleNonFatalError('Keyboard:OpenContextMenuHotkey', err);
-      }
+      OpenContextMenuAtCentre('Keyboard:OpenContextMenuHotkey');
       return;
     }
 
