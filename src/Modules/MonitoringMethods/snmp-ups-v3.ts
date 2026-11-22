@@ -15,13 +15,15 @@
 import snmp from 'net-snmp';
 import {
   DEFAULT_PORT,
-  HEALTH_DEFAULTS,
+  UPS_HEALTH_FIELDS,
+  ParseUpsTarget,
   RunUpsHealth,
   ParseThresholds,
   UpsDebug,
   IdentityRow,
   EvaluateHealth,
   type SnmpSession,
+  type UpsTarget,
 } from './_snmp-ups-shared';
 import {
   V3CredentialFields,
@@ -50,104 +52,15 @@ const Settings: MonitoringSettingField[] = [
     Required: true,
   },
   ...V3CredentialFields(),
-  {
-    Key: 'OutputIndex',
-    Label: 'Output/input line index',
-    Type: 'number',
-    Default: 1,
-    Min: 1,
-    Max: 64,
-    Advanced: true,
-  },
-  {
-    Key: 'CheckCharge',
-    Label: 'Check battery charge',
-    Type: 'boolean',
-    Default: false,
-    Note: 'Enable to report Degraded when the card reports a charge below the minimum.',
-  },
-  {
-    Key: 'MinCharge',
-    Label: 'Minimum charge (%)',
-    Type: 'number',
-    Default: HEALTH_DEFAULTS.MinCharge,
-    Min: 0,
-    Max: 100,
-    VisibleWhen: { Key: 'CheckCharge', Equals: true },
-  },
-  {
-    Key: 'CheckLoad',
-    Label: 'Check load',
-    Type: 'boolean',
-    Default: false,
-    Note: 'Enable to report Degraded when output load exceeds the maximum percentage of rated capacity.',
-  },
-  {
-    Key: 'MaxLoad',
-    Label: 'Maximum load (%)',
-    Type: 'number',
-    Default: HEALTH_DEFAULTS.MaxLoad,
-    Min: 1,
-    Max: 100,
-    VisibleWhen: { Key: 'CheckLoad', Equals: true },
-  },
-  {
-    Key: 'CheckTemperature',
-    Label: 'Check battery temperature',
-    Type: 'boolean',
-    Default: false,
-    Note: 'Enable to threshold battery temperature; skipped when the card does not report one.',
-  },
-  {
-    Key: 'MaxTemperature',
-    Label: 'Maximum battery temperature (°C)',
-    Type: 'number',
-    Default: HEALTH_DEFAULTS.MaxTemperature,
-    Min: 0,
-    Max: 100,
-    VisibleWhen: { Key: 'CheckTemperature', Equals: true },
-  },
-  {
-    Key: 'Timeout',
-    Label: 'Timeout (ms)',
-    Type: 'number',
-    Default: 4000,
-    Min: 500,
-    Max: 30000,
-    Advanced: true,
-  },
-  {
-    Key: 'Retries',
-    Label: 'Retries',
-    Type: 'number',
-    Default: 1,
-    Min: 0,
-    Max: 5,
-    Advanced: true,
-  },
+  ...UPS_HEALTH_FIELDS,
 ];
 
-interface V3Config extends V3Credentials {
-  Address: string;
-  Port: number;
-  OutputIndex: number;
-  TimeoutMs: number;
-  Retries: number;
-}
+interface V3Config extends UpsTarget, V3Credentials {}
 
 function ParseConfig(Target: MonitoringTargetLike): V3Config {
-  const Cfg = (Target && Target.Settings) || {};
-  const Num = (Value: unknown, Fallback: number): number => {
-    const N = Number(Value);
-    return Number.isFinite(N) ? N : Fallback;
-  };
   return {
-    Address: Target && Target.Address ? String(Target.Address).trim() : '',
-    Port: Num(Cfg.Port, DEFAULT_PORT) | 0,
-    ...ParseV3Credentials(Cfg),
-    OutputIndex: Math.max(1, Num(Cfg.OutputIndex, 1) | 0),
-    TimeoutMs: Num(Cfg.Timeout, 4000),
-    Retries: Math.max(0, Num(Cfg.Retries, 1) | 0),
+    ...ParseUpsTarget(Target),
+    ...ParseV3Credentials((Target && Target.Settings) || {}),
   };
 }
 

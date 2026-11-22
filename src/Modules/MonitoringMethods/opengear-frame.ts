@@ -43,12 +43,13 @@ import snmp from 'net-snmp';
 import { ProbeOids, type OidReading } from './snmp-oid';
 import { DEFAULT_PORT, type SnmpSession } from './_snmp-ups-shared';
 import {
-  V3CredentialFields,
-  ParseV3Credentials,
-  ValidateV3Credentials,
-  BuildUser,
-  V3IdentityLabel,
-  type V3Credentials,
+  SNMP_VERSION_FIELDS,
+  SnmpBudgetFields,
+  ParseSnmpCredentials,
+  SnmpConnectionError,
+  CreateSnmpSessionFactory,
+  SnmpIdentityLabel,
+  type SnmpConnection,
 } from './_snmp-shared';
 import { Card, Esc, Pill, Rows, Row, TextRow, Note, FormatLatency } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
@@ -131,27 +132,7 @@ const Settings: MonitoringSettingField[] = [
     Max: 65535,
     Advanced: true,
   },
-  {
-    Key: 'Version',
-    Label: 'SNMP version',
-    Type: 'select',
-    Default: '2c',
-    Options: [
-      { value: '2c', label: 'v2c' },
-      { value: '1', label: 'v1' },
-      { value: '3', label: 'v3' },
-    ],
-  },
-  {
-    Key: 'Community',
-    Sensitive: true,
-    Label: 'Community string',
-    Type: 'string',
-    Default: 'public',
-    Required: true,
-    VisibleWhen: { Key: 'Version', In: ['1', '2c'] },
-  },
-  ...V3CredentialFields({ Key: 'Version', Equals: '3' }),
+  ...SNMP_VERSION_FIELDS,
   {
     Key: 'Slots',
     Label: 'Monitored slots',
@@ -183,51 +164,21 @@ const Settings: MonitoringSettingField[] = [
     Max: 100,
     VisibleWhen: { Key: 'CheckTemperature', Equals: true },
   },
-  {
-    Key: 'Timeout',
-    Label: 'Timeout (ms)',
-    Type: 'number',
-    Default: DEFAULT_TIMEOUT_MS,
-    Min: 500,
-    Max: 30000,
-    Advanced: true,
-    Note: 'Budget for the whole check, retries included.',
-  },
-  {
-    Key: 'Retries',
-    Label: 'Retries',
-    Type: 'number',
-    Default: 1,
-    Min: 0,
-    Max: 5,
-    Advanced: true,
-  },
+  ...SnmpBudgetFields(DEFAULT_TIMEOUT_MS),
 ];
 
 // --- Config ---------------------------------------------------------------------
 
-interface FrameConfig extends V3Credentials {
-  Address: string;
-  Port: number;
-  Version: '1' | '2c' | '3';
-  Community: string;
-  TimeoutMs: number;
-  Retries: number;
-}
-
-function ParseConfig(Target: MonitoringTargetLike): FrameConfig {
+function ParseConfig(Target: MonitoringTargetLike): SnmpConnection {
   const Cfg = (Target && Target.Settings) || {};
   const Num = (Value: unknown, Fallback: number): number => {
     const N = Number(Value);
     return Value === '' || Value == null || !Number.isFinite(N) ? Fallback : N;
   };
-  const RawVersion = String(Cfg.Version ?? '2c');
   return {
-    ...ParseV3Credentials(Cfg),
+    ...ParseSnmpCredentials(Cfg),
     Address: Target && Target.Address ? String(Target.Address).trim() : '',
     Port: Num(Cfg.Port, DEFAULT_PORT) | 0,
-    Version: RawVersion === '1' || RawVersion === '3' ? RawVersion : '2c',
-    Community: Cfg.Community == null || Cfg.Community === '' ? 'public' : String(Cfg.Community),
     TimeoutMs: Math.max(500, Num(Cfg.Timeout, DEFAULT_TIMEOUT_MS)),
     Retries: Math.max(0, Math.min(5, Num(Cfg.Retries, 1) | 0)),
   };
@@ -260,22 +211,6 @@ export function ParseConditions(Cfg: Record<string, unknown>): FrameConditions {
     CheckTemperature: Cfg.CheckTemperature === true,
     MaxAmbientTemperature: Cfg.MaxAmbientTemperature === '' || !Number.isFinite(Max) ? 35 : Max,
   };
-}
-
-function CreateSessionFor(Config: FrameConfig, BudgetMs: number): () => SnmpSession {
-  // Retries share the budget: each attempt gets an equal slice of it.
-  const Options: Record<string, unknown> = {
-    port: Config.Port,
-    timeout: Math.max(100, Math.floor(BudgetMs / (Config.Retries + 1))),
-    retries: Config.Retries,
-  };
-  if (Config.Version === '3') {
-    Options.version = snmp.Version3;
-    if (Config.Context) Options.context = Config.Context;
-    return () => snmp.createV3Session(Config.Address, BuildUser(Config), Options);
-  }
-  Options.version = Config.Version === '1' ? snmp.Version1 : snmp.Version2c;
-  return () => snmp.createSession(Config.Address, Config.Community, Options);
 }
 
 // --- Card table walk --------------------------------------------------------------
@@ -478,20 +413,14 @@ function StringOf(Reading: OidReading | undefined): string | null {
 
 async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   const Config = ParseConfig(Target);
-  if (!Config.Address) return { Success: false, Error: 'No address configured' };
-  if (Config.Port < 1 || Config.Port > 65535) {
-    return { Success: false, Error: `Invalid port: ${Config.Port}` };
-  }
-  if (Config.Version === '3') {
-    const CredentialError = ValidateV3Credentials(Config);
-    if (CredentialError) return { Success: false, Error: CredentialError };
-  }
+  const ConnectionError = SnmpConnectionError(Config);
+  if (ConnectionError) return { Success: false, Error: ConnectionError };
 
   const Started = Date.now();
   const Deadline = Started + Config.TimeoutMs;
   const Keys = Object.keys(FRAME_OIDS);
   const Probe = await ProbeOids(
-    CreateSessionFor(Config, Config.TimeoutMs),
+    CreateSnmpSessionFactory(Config, Config.TimeoutMs),
     Keys.map((Key) => FRAME_OIDS[Key] as string),
     Config.TimeoutMs
   );
@@ -514,7 +443,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   let Cards: CardRow[] | null = null;
   let CardError: string | null = null;
   if (Remaining > 0) {
-    const Walk = await WalkCards(CreateSessionFor(Config, Remaining), Remaining);
+    const Walk = await WalkCards(CreateSnmpSessionFactory(Config, Remaining), Remaining);
     if (Walk.Ok) Cards = FoldCardRows(Walk.Varbinds);
     else CardError = Walk.Error || 'Card table walk failed';
   } else {
@@ -603,9 +532,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     : Degraded
       ? Pill('warning', 'Degraded')
       : Pill('success', 'Healthy');
-  // The community string is a credential, so only the version is shown.
-  const Identity =
-    Config.Version === '3' ? `v3 · ${V3IdentityLabel(Config)}` : `v${Config.Version}`;
+  const Identity = SnmpIdentityLabel(Config);
 
   const Head = Rows([
     TextRow('Host', `${Config.Address || '-'}:${Config.Port}`),

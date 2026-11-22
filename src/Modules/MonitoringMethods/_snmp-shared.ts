@@ -1,14 +1,22 @@
-// Shared SNMPv3 (User-based Security Model, RFC 3414) credential handling for
-// every method that can talk SNMPv3: snmp-ups-v3 and snmp-oid. The editor
-// fields, the protocol tables, the derived security level and the net-snmp USM
-// user all live here so the methods cannot drift apart on what "authPriv with
-// SHA-256 / AES-128" means.
+// Shared SNMP plumbing.
+//
+// SNMPv3 (User-based Security Model, RFC 3414) credential handling for every
+// method that can talk SNMPv3: snmp-ups-v3, snmp-oid, igmp-querier and
+// opengear-frame. The editor fields, the protocol tables, the derived security
+// level and the net-snmp USM user all live here so the methods cannot drift
+// apart on what "authPriv with SHA-256 / AES-128" means.
+//
+// The connection itself for the methods that speak every version (snmp-oid,
+// igmp-querier, opengear-frame): the version/community/v3 editor fields, the
+// timeout budget fields, the parsed connection, its validation and the session
+// factory.
 import snmp, {
   type User,
   type AuthProtocols,
   type PrivProtocols,
   type SecurityLevel,
 } from 'net-snmp';
+import type { SnmpSession } from './_snmp-ups-shared';
 import type { MonitoringSettingField, MonitoringSettingVisibleWhen } from './types';
 
 // Editor value -> net-snmp AuthProtocol. 'none' means no message authentication
@@ -173,4 +181,131 @@ export function V3IdentityLabel(Config: V3Credentials): string {
     return `${Config.Username} · ${Level} (${Config.AuthProtocol})`;
   }
   return `${Config.Username} · ${Level}`;
+}
+
+// --- Connection (methods that speak v1, v2c and v3) ----------------------------
+
+export type SnmpVersion = '1' | '2c' | '3';
+
+// The version select, the community string (v1/v2c) and the v3 user (v3), each
+// shown only for the versions that use it.
+export const SNMP_VERSION_FIELDS: MonitoringSettingField[] = [
+  {
+    Key: 'Version',
+    Label: 'SNMP version',
+    Type: 'select',
+    Default: '2c',
+    Options: [
+      { value: '2c', label: 'v2c' },
+      { value: '1', label: 'v1' },
+      { value: '3', label: 'v3' },
+    ],
+  },
+  {
+    Key: 'Community',
+    Sensitive: true,
+    Label: 'Community string',
+    Type: 'string',
+    Default: 'public',
+    Required: true,
+    VisibleWhen: { Key: 'Version', In: ['1', '2c'] },
+  },
+  ...V3CredentialFields({ Key: 'Version', Equals: '3' }),
+];
+
+// The Timeout (one budget for the whole check) and Retries fields.
+export function SnmpBudgetFields(DefaultTimeoutMs: number): MonitoringSettingField[] {
+  return [
+    {
+      Key: 'Timeout',
+      Label: 'Timeout (ms)',
+      Type: 'number',
+      Default: DefaultTimeoutMs,
+      Min: 500,
+      Max: 30000,
+      Advanced: true,
+      Note: 'Budget for the whole check, retries included.',
+    },
+    {
+      Key: 'Retries',
+      Label: 'Retries',
+      Type: 'number',
+      Default: 1,
+      Min: 0,
+      Max: 5,
+      Advanced: true,
+    },
+  ];
+}
+
+export interface SnmpConnection extends V3Credentials {
+  Address: string;
+  Port: number;
+  Version: SnmpVersion;
+  Community: string;
+  TimeoutMs: number;
+  Retries: number;
+}
+
+// The version and its credentials off a settings object: an unknown version
+// reads as v2c, an empty community as "public".
+export function ParseSnmpCredentials(
+  Cfg: Record<string, unknown>
+): Pick<SnmpConnection, 'Version' | 'Community'> & V3Credentials {
+  const Version = String(Cfg.Version);
+  return {
+    Version: Version === '1' || Version === '3' ? Version : '2c',
+    Community: Cfg.Community == null || Cfg.Community === '' ? 'public' : String(Cfg.Community),
+    ...ParseV3Credentials(Cfg),
+  };
+}
+
+// Why the connection cannot be attempted, or null when it can.
+export function SnmpConnectionError(Config: SnmpConnection): string | null {
+  if (!Config.Address) return 'No address configured';
+  if (Config.Port < 1 || Config.Port > 65535) return `Invalid port: ${Config.Port}`;
+  if (Config.Version === '3') return ValidateV3Credentials(Config);
+  return null;
+}
+
+// A factory for sessions to the configured agent. Retries share the budget:
+// each attempt gets an equal slice of it.
+export function CreateSnmpSessionFactory(
+  Config: SnmpConnection,
+  BudgetMs: number = Config.TimeoutMs
+): () => SnmpSession {
+  const Options: Record<string, unknown> = {
+    port: Config.Port,
+    timeout: Math.max(100, Math.floor(BudgetMs / (Config.Retries + 1))),
+    retries: Config.Retries,
+  };
+  if (Config.Version === '3') {
+    Options.version = snmp.Version3;
+    if (Config.Context) Options.context = Config.Context;
+    return () => snmp.createV3Session(Config.Address, BuildUser(Config), Options);
+  }
+  Options.version = Config.Version === '1' ? snmp.Version1 : snmp.Version2c;
+  return () => snmp.createSession(Config.Address, Config.Community, Options);
+}
+
+// "v2c", or "v3 · user · authPriv (sha/aes)" for the debug panel. The community
+// string is a credential, so only the version is shown for v1/v2c.
+export function SnmpIdentityLabel(Config: SnmpConnection): string {
+  return Config.Version === '3' ? `v3 · ${V3IdentityLabel(Config)}` : `v${Config.Version}`;
+}
+
+// The PDU error-status of an agent's error reply (net-snmp's RequestFailedError):
+// the agent DID answer. Null for a transport failure (timeout, unreachable).
+export function SnmpErrorStatusOf(Err: unknown): number | null {
+  if (!Err || typeof Err !== 'object') return null;
+  const E = Err as { name?: unknown; status?: unknown };
+  if (E.name === 'RequestFailedError' || typeof E.status === 'number') {
+    const N = Number(E.status);
+    return Number.isFinite(N) ? N : 5;
+  }
+  return null;
+}
+
+export function SnmpErrorText(Err: unknown): string {
+  return Err instanceof Error ? Err.message || String(Err) : String(Err);
 }

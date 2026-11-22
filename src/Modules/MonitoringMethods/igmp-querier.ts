@@ -38,16 +38,18 @@
 //   the table, or no IGMP rows at all) = Degraded, or Offline when the operator
 //   chooses.
 //   Degraded = a querier other than the expected address.
-import snmp from 'net-snmp';
 import { Card, Esc, Pill, Rows, Row, TextRow, Note, FormatLatency } from './debug';
 import { DEFAULT_PORT, type SnmpSession } from './_snmp-ups-shared';
 import {
-  V3CredentialFields,
-  ParseV3Credentials,
-  ValidateV3Credentials,
-  BuildUser,
-  V3IdentityLabel,
-  type V3Credentials,
+  SNMP_VERSION_FIELDS,
+  SnmpBudgetFields,
+  ParseSnmpCredentials,
+  SnmpConnectionError,
+  CreateSnmpSessionFactory,
+  SnmpIdentityLabel,
+  SnmpErrorStatusOf,
+  SnmpErrorText,
+  type SnmpConnection,
 } from './_snmp-shared';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
@@ -90,27 +92,7 @@ const Settings: MonitoringSettingField[] = [
     Max: 65535,
     Required: true,
   },
-  {
-    Key: 'Version',
-    Label: 'SNMP version',
-    Type: 'select',
-    Default: '2c',
-    Options: [
-      { value: '2c', label: 'v2c' },
-      { value: '1', label: 'v1' },
-      { value: '3', label: 'v3' },
-    ],
-  },
-  {
-    Key: 'Community',
-    Sensitive: true,
-    Label: 'Community string',
-    Type: 'string',
-    Default: 'public',
-    Required: true,
-    VisibleWhen: { Key: 'Version', In: ['1', '2c'] },
-  },
-  ...V3CredentialFields({ Key: 'Version', Equals: '3' }),
+  ...SNMP_VERSION_FIELDS,
   {
     Key: 'Interfaces',
     Label: 'Monitored interfaces',
@@ -149,42 +131,18 @@ const Settings: MonitoringSettingField[] = [
     ],
     Note: 'Automatic reads IGMP-STD-MIB and falls back to MGMD-STD-MIB when it has no rows.',
   },
-  {
-    Key: 'Timeout',
-    Label: 'Timeout (ms)',
-    Type: 'number',
-    Default: DEFAULT_TIMEOUT_MS,
-    Min: 500,
-    Max: 30000,
-    Advanced: true,
-    Note: 'Budget for the whole check, retries included.',
-  },
-  {
-    Key: 'Retries',
-    Label: 'Retries',
-    Type: 'number',
-    Default: 1,
-    Min: 0,
-    Max: 5,
-    Advanced: true,
-  },
+  ...SnmpBudgetFields(DEFAULT_TIMEOUT_MS),
 ];
 
 // --- Config ------------------------------------------------------------------
 
 type MibChoice = 'auto' | 'igmp' | 'mgmd';
 
-interface IgmpConfig extends V3Credentials {
-  Address: string;
-  Port: number;
-  Version: '1' | '2c' | '3';
-  Community: string;
+interface IgmpConfig extends SnmpConnection {
   Interfaces: string[];
   ExpectedQuerier: string;
   MissingOffline: boolean;
   Mib: MibChoice;
-  TimeoutMs: number;
-  Retries: number;
 }
 
 function ParseConfig(Target: MonitoringTargetLike): IgmpConfig {
@@ -193,7 +151,6 @@ function ParseConfig(Target: MonitoringTargetLike): IgmpConfig {
     const N = Number(Value);
     return Number.isFinite(N) ? N : Fallback;
   };
-  const Version = String(Cfg.Version);
   const Mib = String(Cfg.Mib);
   const RawList = Array.isArray(Cfg.Interfaces)
     ? Cfg.Interfaces
@@ -211,9 +168,7 @@ function ParseConfig(Target: MonitoringTargetLike): IgmpConfig {
   return {
     Address: Target && Target.Address ? String(Target.Address).trim() : '',
     Port: Num(Cfg.Port, DEFAULT_PORT) | 0,
-    Version: Version === '1' || Version === '3' ? Version : '2c',
-    Community: Cfg.Community == null || Cfg.Community === '' ? 'public' : String(Cfg.Community),
-    ...ParseV3Credentials(Cfg),
+    ...ParseSnmpCredentials(Cfg),
     Interfaces,
     ExpectedQuerier: Cfg.ExpectedQuerier == null ? '' : String(Cfg.ExpectedQuerier).trim(),
     MissingOffline: String(Cfg.MissingState) === 'offline',
@@ -400,15 +355,9 @@ export interface ProbeResult {
   Rows: QuerierRow[];
 }
 
-function ErrorText(Err: unknown): string {
-  return Err instanceof Error ? Err.message || String(Err) : String(Err);
-}
-
 // An agent's error-status reply (RequestFailedError): it DID answer.
 function IsAgentError(Err: unknown): boolean {
-  if (!Err || typeof Err !== 'object') return false;
-  const E = Err as { name?: unknown; status?: unknown };
-  return E.name === 'RequestFailedError' || typeof E.status === 'number';
+  return SnmpErrorStatusOf(Err) != null;
 }
 
 // Walk one table, then read the names of its interfaces, over one session and
@@ -441,14 +390,14 @@ export function ProbeQuerier(
     try {
       Session = CreateSession();
     } catch (Err) {
-      Offline(ErrorText(Err));
+      Offline(SnmpErrorText(Err));
       return;
     }
     Deadline = setTimeout(
       () => Offline(`No SNMP reply within ${BudgetMs} ms (timeout exceeded)`),
       BudgetMs
     );
-    Session.on('error', (Err: Error) => Offline(ErrorText(Err)));
+    Session.on('error', (Err: Error) => Offline(SnmpErrorText(Err)));
 
     // Resolves the varbinds under Base; rejects only on a transport failure.
     // An agent error status ends the walk with what was read so far.
@@ -525,38 +474,16 @@ export function ProbeQuerier(
         Mib: Used,
         Rows,
       });
-    })().catch((Err) => Offline(ErrorText(Err)));
+    })().catch((Err) => Offline(SnmpErrorText(Err)));
   });
 }
 
 // --- Run ---------------------------------------------------------------------
 
-function CreateSessionFor(Config: IgmpConfig): () => SnmpSession {
-  // Retries share the budget: each attempt gets an equal slice of it.
-  const Options: Record<string, unknown> = {
-    port: Config.Port,
-    timeout: Math.max(100, Math.floor(Config.TimeoutMs / (Config.Retries + 1))),
-    retries: Config.Retries,
-  };
-  if (Config.Version === '3') {
-    Options.version = snmp.Version3;
-    if (Config.Context) Options.context = Config.Context;
-    return () => snmp.createV3Session(Config.Address, BuildUser(Config), Options);
-  }
-  Options.version = Config.Version === '1' ? snmp.Version1 : snmp.Version2c;
-  return () => snmp.createSession(Config.Address, Config.Community, Options);
-}
-
 async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   const Config = ParseConfig(Target);
-  if (!Config.Address) return { Success: false, Error: 'No address configured' };
-  if (Config.Port < 1 || Config.Port > 65535) {
-    return { Success: false, Error: `Invalid port: ${Config.Port}` };
-  }
-  if (Config.Version === '3') {
-    const CredentialError = ValidateV3Credentials(Config);
-    if (CredentialError) return { Success: false, Error: CredentialError };
-  }
+  const ConnectionError = SnmpConnectionError(Config);
+  if (ConnectionError) return { Success: false, Error: ConnectionError };
   if (Config.Interfaces.length > MAX_INTERFACES) {
     return { Success: false, Error: `Too many interfaces (at most ${MAX_INTERFACES})` };
   }
@@ -567,7 +494,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
     };
   }
 
-  const Probe = await ProbeQuerier(CreateSessionFor(Config), Config.Mib, Config.TimeoutMs);
+  const Probe = await ProbeQuerier(CreateSnmpSessionFactory(Config), Config.Mib, Config.TimeoutMs);
   if (!Probe.Reachable) return { Success: false, Error: Probe.Error || 'No SNMP reply' };
 
   const { Verdicts, Missing, Unexpected } = Evaluate(Probe.Rows, Config);
@@ -629,9 +556,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Reachable = !!(Result && Result.Success === true);
   const Answered = Reachable || !!(Result && Result.AgentAnswered);
 
-  // The community string is a credential, so only the version is shown.
-  const Identity =
-    Config.Version === '3' ? `v3 · ${V3IdentityLabel(Config)}` : `v${Config.Version}`;
+  const Identity = SnmpIdentityLabel(Config);
   const MibLabel =
     Result && Result.Mib === 'mgmd'
       ? 'MGMD-STD-MIB (RFC 5519)'

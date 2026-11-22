@@ -10,7 +10,7 @@
 // not tied to any single vendor's proprietary MIB.
 import snmp from 'net-snmp';
 import { Esc, Pill, Rows, Row, TextRow, Note, FormatLatency } from './debug';
-import type { MonitoringResult } from './types';
+import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
 export const DEFAULT_PORT = 161;
 
@@ -50,6 +50,111 @@ export const HEALTH_DEFAULTS = {
   MaxLoad: 90,
   MaxTemperature: 45,
 };
+
+// The editor fields after each method's own transport fields: the UPS line
+// to read, the health thresholds and their toggles, then timeout and retries.
+export const UPS_HEALTH_FIELDS: MonitoringSettingField[] = [
+  {
+    Key: 'OutputIndex',
+    Label: 'Output/input line index',
+    Type: 'number',
+    Default: 1,
+    Min: 1,
+    Max: 64,
+    Advanced: true,
+  },
+  {
+    Key: 'CheckCharge',
+    Label: 'Check battery charge',
+    Type: 'boolean',
+    Default: false,
+    Note: 'Enable to report Degraded when the card reports a charge below the minimum.',
+  },
+  {
+    Key: 'MinCharge',
+    Label: 'Minimum charge (%)',
+    Type: 'number',
+    Default: HEALTH_DEFAULTS.MinCharge,
+    Min: 0,
+    Max: 100,
+    VisibleWhen: { Key: 'CheckCharge', Equals: true },
+  },
+  {
+    Key: 'CheckLoad',
+    Label: 'Check load',
+    Type: 'boolean',
+    Default: false,
+    Note: 'Enable to report Degraded when output load exceeds the maximum percentage of rated capacity.',
+  },
+  {
+    Key: 'MaxLoad',
+    Label: 'Maximum load (%)',
+    Type: 'number',
+    Default: HEALTH_DEFAULTS.MaxLoad,
+    Min: 1,
+    Max: 100,
+    VisibleWhen: { Key: 'CheckLoad', Equals: true },
+  },
+  {
+    Key: 'CheckTemperature',
+    Label: 'Check battery temperature',
+    Type: 'boolean',
+    Default: false,
+    Note: 'Enable to threshold battery temperature; skipped when the card does not report one.',
+  },
+  {
+    Key: 'MaxTemperature',
+    Label: 'Maximum battery temperature (°C)',
+    Type: 'number',
+    Default: HEALTH_DEFAULTS.MaxTemperature,
+    Min: 0,
+    Max: 100,
+    VisibleWhen: { Key: 'CheckTemperature', Equals: true },
+  },
+  {
+    Key: 'Timeout',
+    Label: 'Timeout (ms)',
+    Type: 'number',
+    Default: 4000,
+    Min: 500,
+    Max: 30000,
+    Advanced: true,
+  },
+  {
+    Key: 'Retries',
+    Label: 'Retries',
+    Type: 'number',
+    Default: 1,
+    Min: 0,
+    Max: 5,
+    Advanced: true,
+  },
+];
+
+// The settings both methods read the same way; each adds its own credentials.
+export interface UpsTarget {
+  Address: string;
+  Port: number;
+  OutputIndex: number;
+  // Per attempt: the session's own timeout, not a whole-check budget.
+  TimeoutMs: number;
+  Retries: number;
+}
+
+export function ParseUpsTarget(Target: MonitoringTargetLike): UpsTarget {
+  const Cfg = (Target && Target.Settings) || {};
+  const Num = (Value: unknown, Fallback: number): number => {
+    const N = Number(Value);
+    return Number.isFinite(N) ? N : Fallback;
+  };
+  return {
+    Address: Target && Target.Address ? String(Target.Address).trim() : '',
+    Port: Num(Cfg.Port, DEFAULT_PORT) | 0,
+    OutputIndex: Math.max(1, Num(Cfg.OutputIndex, 1) | 0),
+    TimeoutMs: Num(Cfg.Timeout, 4000),
+    Retries: Math.max(0, Num(Cfg.Retries, 1) | 0),
+  };
+}
 
 export interface HealthReadings {
   BatteryStatus?: number | null;

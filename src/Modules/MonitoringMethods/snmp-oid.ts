@@ -23,12 +23,15 @@ import snmp from 'net-snmp';
 import { Card, Esc, Pill, Rows, Row, TextRow, Note, FormatLatency } from './debug';
 import { DEFAULT_PORT, type SnmpSession } from './_snmp-ups-shared';
 import {
-  V3CredentialFields,
-  ParseV3Credentials,
-  ValidateV3Credentials,
-  BuildUser,
-  V3IdentityLabel,
-  type V3Credentials,
+  SNMP_VERSION_FIELDS,
+  SnmpBudgetFields,
+  ParseSnmpCredentials,
+  SnmpConnectionError,
+  CreateSnmpSessionFactory,
+  SnmpIdentityLabel,
+  SnmpErrorStatusOf,
+  SnmpErrorText,
+  type SnmpConnection,
 } from './_snmp-shared';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
@@ -86,27 +89,7 @@ const Settings: MonitoringSettingField[] = [
     Max: 65535,
     Required: true,
   },
-  {
-    Key: 'Version',
-    Label: 'SNMP version',
-    Type: 'select',
-    Default: '2c',
-    Options: [
-      { value: '2c', label: 'v2c' },
-      { value: '1', label: 'v1' },
-      { value: '3', label: 'v3' },
-    ],
-  },
-  {
-    Key: 'Community',
-    Sensitive: true,
-    Label: 'Community string',
-    Type: 'string',
-    Default: 'public',
-    Required: true,
-    VisibleWhen: { Key: 'Version', In: ['1', '2c'] },
-  },
-  ...V3CredentialFields({ Key: 'Version', Equals: '3' }),
+  ...SNMP_VERSION_FIELDS,
   {
     Key: 'Oids',
     Label: 'OIDs',
@@ -116,25 +99,7 @@ const Settings: MonitoringSettingField[] = [
     Required: true,
     Note: 'One OID per entry, optionally followed by a comparison, e.g. 1.3.6.1.2.1.1.5.0 = Stage Left or 1.3.6.1.2.1.2.2.1.8.1 != 2. The comparisons are =, !=, >, <, contains and present. A bare OID only has to exist. Text is compared without regard to case.',
   },
-  {
-    Key: 'Timeout',
-    Label: 'Timeout (ms)',
-    Type: 'number',
-    Default: DEFAULT_TIMEOUT_MS,
-    Min: 500,
-    Max: 30000,
-    Advanced: true,
-    Note: 'Budget for the whole check, retries included.',
-  },
-  {
-    Key: 'Retries',
-    Label: 'Retries',
-    Type: 'number',
-    Default: 1,
-    Min: 0,
-    Max: 5,
-    Advanced: true,
-  },
+  ...SnmpBudgetFields(DEFAULT_TIMEOUT_MS),
 ];
 
 // --- Entries -----------------------------------------------------------------
@@ -243,14 +208,8 @@ export function ParseEntry(Raw: string): OidEntry {
 
 // --- Config ------------------------------------------------------------------
 
-interface SnmpOidConfig extends V3Credentials {
-  Address: string;
-  Port: number;
-  Version: '1' | '2c' | '3';
-  Community: string;
+interface SnmpOidConfig extends SnmpConnection {
   RawEntries: string[];
-  TimeoutMs: number;
-  Retries: number;
 }
 
 function ParseConfig(Target: MonitoringTargetLike): SnmpOidConfig {
@@ -259,7 +218,6 @@ function ParseConfig(Target: MonitoringTargetLike): SnmpOidConfig {
     const N = Number(Value);
     return Number.isFinite(N) ? N : Fallback;
   };
-  const Version = String(Cfg.Version);
   const RawList = Array.isArray(Cfg.Oids)
     ? Cfg.Oids
     : Cfg.Oids == null || Cfg.Oids === ''
@@ -268,9 +226,7 @@ function ParseConfig(Target: MonitoringTargetLike): SnmpOidConfig {
   return {
     Address: Target && Target.Address ? String(Target.Address).trim() : '',
     Port: Num(Cfg.Port, DEFAULT_PORT) | 0,
-    Version: Version === '1' || Version === '3' ? Version : '2c',
-    Community: Cfg.Community == null || Cfg.Community === '' ? 'public' : String(Cfg.Community),
-    ...ParseV3Credentials(Cfg),
+    ...ParseSnmpCredentials(Cfg),
     RawEntries: RawList.map((E) => String(E == null ? '' : E).trim()).filter(Boolean),
     TimeoutMs: Math.max(500, Num(Cfg.Timeout, DEFAULT_TIMEOUT_MS)),
     Retries: Math.max(0, Math.min(5, Num(Cfg.Retries, 1) | 0)),
@@ -467,20 +423,6 @@ interface ProbeResult {
 }
 
 // net-snmp reports an agent's error-status reply (the agent DID answer) as a
-// RequestFailedError carrying the numeric status; everything else is transport.
-function ErrorStatusOf(Err: unknown): number | null {
-  if (!Err || typeof Err !== 'object') return null;
-  const E = Err as { name?: unknown; status?: unknown };
-  if (E.name === 'RequestFailedError' || typeof E.status === 'number') {
-    const N = Number(E.status);
-    return Number.isFinite(N) ? N : 5;
-  }
-  return null;
-}
-
-function ErrorText(Err: unknown): string {
-  return Err instanceof Error ? Err.message || String(Err) : String(Err);
-}
 
 // GET every OID over one session, inside an absolute deadline covering the
 // whole probe. One request carries all OIDs; if the agent answers it with an
@@ -514,14 +456,14 @@ export function ProbeOids(
     try {
       Session = CreateSession();
     } catch (Err) {
-      Offline(ErrorText(Err));
+      Offline(SnmpErrorText(Err));
       return;
     }
     Deadline = setTimeout(
       () => Offline(`No SNMP reply within ${BudgetMs} ms (timeout exceeded)`),
       BudgetMs
     );
-    Session.on('error', (Err: Error) => Offline(ErrorText(Err)));
+    Session.on('error', (Err: Error) => Offline(SnmpErrorText(Err)));
 
     const Get = (List: string[]): Promise<unknown[]> =>
       new Promise<unknown[]>((Resolve, Reject) => {
@@ -545,8 +487,8 @@ export function ProbeOids(
         Done(Reads);
       },
       (Err) => {
-        if (ErrorStatusOf(Err) == null) {
-          Offline(ErrorText(Err));
+        if (SnmpErrorStatusOf(Err) == null) {
+          Offline(SnmpErrorText(Err));
           return;
         }
         // The agent answered with an error status: read each OID on its own.
@@ -555,7 +497,7 @@ export function ProbeOids(
             Get([Oid]).then(
               (Varbinds) => DecodeVarbind(Oid, Varbinds[0]),
               (OneErr) => {
-                const Status = ErrorStatusOf(OneErr);
+                const Status = SnmpErrorStatusOf(OneErr);
                 if (Status == null) throw OneErr;
                 const Name = ERROR_STATUS_NAMES[Status] || `error-status ${Status}`;
                 return { Reading: { Oid, Type: null, Value: null, Exception: Name }, Number: null };
@@ -564,7 +506,7 @@ export function ProbeOids(
           )
         ).then(
           (List) => Done(new Map(List.map((D) => [D.Reading.Oid, D]))),
-          (OneErr) => Offline(ErrorText(OneErr))
+          (OneErr) => Offline(SnmpErrorText(OneErr))
         );
       }
     );
@@ -573,32 +515,10 @@ export function ProbeOids(
 
 // --- Run ---------------------------------------------------------------------
 
-function CreateSessionFor(Config: SnmpOidConfig): () => SnmpSession {
-  // Retries share the budget: each attempt gets an equal slice of it.
-  const Options: Record<string, unknown> = {
-    port: Config.Port,
-    timeout: Math.max(100, Math.floor(Config.TimeoutMs / (Config.Retries + 1))),
-    retries: Config.Retries,
-  };
-  if (Config.Version === '3') {
-    Options.version = snmp.Version3;
-    if (Config.Context) Options.context = Config.Context;
-    return () => snmp.createV3Session(Config.Address, BuildUser(Config), Options);
-  }
-  Options.version = Config.Version === '1' ? snmp.Version1 : snmp.Version2c;
-  return () => snmp.createSession(Config.Address, Config.Community, Options);
-}
-
 async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   const Config = ParseConfig(Target);
-  if (!Config.Address) return { Success: false, Error: 'No address configured' };
-  if (Config.Port < 1 || Config.Port > 65535) {
-    return { Success: false, Error: `Invalid port: ${Config.Port}` };
-  }
-  if (Config.Version === '3') {
-    const CredentialError = ValidateV3Credentials(Config);
-    if (CredentialError) return { Success: false, Error: CredentialError };
-  }
+  const ConnectionError = SnmpConnectionError(Config);
+  if (ConnectionError) return { Success: false, Error: ConnectionError };
   if (!Config.RawEntries.length) return { Success: false, Error: 'No OIDs configured' };
   if (Config.RawEntries.length > MAX_ENTRIES) {
     return { Success: false, Error: `Too many OID entries (at most ${MAX_ENTRIES})` };
@@ -608,11 +528,11 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   try {
     Entries = Config.RawEntries.map(ParseEntry);
   } catch (Err) {
-    return { Success: false, Error: `Invalid OID entry ${ErrorText(Err)}` };
+    return { Success: false, Error: `Invalid OID entry ${SnmpErrorText(Err)}` };
   }
   const Oids = Array.from(new Set(Entries.map((E) => E.Oid)));
 
-  const Probe = await ProbeOids(CreateSessionFor(Config), Oids, Config.TimeoutMs);
+  const Probe = await ProbeOids(CreateSnmpSessionFactory(Config), Oids, Config.TimeoutMs);
   if (!Probe.Reachable) return { Success: false, Error: Probe.Error || 'No SNMP reply' };
 
   const Reasons: string[] = [];
@@ -680,9 +600,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Config = ParseConfig(Target);
   const Reachable = !!(Result && Result.Success === true);
 
-  // The community string is a credential, so only the version is shown.
-  const Identity =
-    Config.Version === '3' ? `v3 · ${V3IdentityLabel(Config)}` : `v${Config.Version}`;
+  const Identity = SnmpIdentityLabel(Config);
 
   const Head = Rows([
     TextRow('Host', `${Config.Address || '-'}:${Config.Port}`),
