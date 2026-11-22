@@ -5,8 +5,9 @@ import path from 'node:path';
 import fs from 'node:fs';
 // const { Config } = require('./Modules/Config');
 
-// scripts/trim-electron-locales.js, a CommonJS build script (scripts/ stays
-// JavaScript). It is required lazily, inside the hook that uses it, as before.
+// shared/scripts/trim-electron-locales.js, a CommonJS build script the ShowTrak
+// apps share (scripts stay JavaScript). It is required lazily, inside the hook
+// that uses it, as before.
 interface TrimElectronLocalesModule {
   trimElectronLocales(buildPath: string): number;
 }
@@ -222,10 +223,10 @@ const config: ForgeConfig = {
   hooks: {
     // Drop Chromium's UI translations (~45 MB) before the app is copied in and
     // signed; the UI is English and Chromium falls back to en-US. See
-    // scripts/trim-electron-locales.js.
+    // shared/scripts/trim-electron-locales.js.
     packageAfterExtract: async (_forgeConfig, buildPath) => {
       const { trimElectronLocales } =
-        require('./scripts/trim-electron-locales') as TrimElectronLocalesModule;
+        require('./shared/scripts/trim-electron-locales') as TrimElectronLocalesModule;
       const removed = trimElectronLocales(buildPath);
       console.log(`[forge] Removed ${removed} unused Chromium locale pack(s)`);
     },

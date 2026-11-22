@@ -9,7 +9,7 @@
 // serves dist/WebUI at `/`.
 const fs = require('node:fs');
 const path = require('node:path');
-const { copyDir } = require('./lib/copy-dir');
+const { copyDir } = require('../shared/scripts/lib/copy-dir');
 
 const ROOT = path.resolve(__dirname, '..');
 const SRC_UI = path.join(ROOT, 'src', 'UI');

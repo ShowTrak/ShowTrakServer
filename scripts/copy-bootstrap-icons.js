@@ -1,51 +1,12 @@
-// Copies Bootstrap Icons font and CSS from node_modules into src/UI/vendors for local serving.
-// bootstrap-icons is a devDependency (build-time only; the copied font/CSS ships in dist/), so
-// this postinstall hook requires a full install; it will fail under `npm ci --omit=dev`.
+// postinstall: copies the Bootstrap Icons font and CSS from node_modules into
+// src/UI/vendors/bootstrap-icons for local serving, through
+// shared/scripts/copy-bootstrap-icons.js (shared with ShowTrak Timers).
 //
-// The copied files are gitignored: package.json is the one place the version lives, so a
-// Dependabot bump updates what ships. That makes this copy the ONLY source of the icons, so a
-// failure fails the install rather than producing an app with blank icon glyphs.
-const fs = require('fs');
-const path = require('path');
+// The copied files are gitignored: package.json is the one place the version
+// lives, so a Dependabot bump updates what ships. That makes this copy the ONLY
+// source of the icons, so a failure fails the install rather than producing an
+// app with blank icon glyphs. bootstrap-icons is a devDependency, so this needs
+// a full install; it fails under `npm ci --omit=dev`.
+const path = require('node:path');
 
-function ensureDir(p) {
-  if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
-}
-
-function copyFile(src, dest) {
-  ensureDir(path.dirname(dest));
-  fs.copyFileSync(src, dest);
-}
-
-function copyDir(srcDir, destDir) {
-  ensureDir(destDir);
-  for (const entry of fs.readdirSync(srcDir)) {
-    const s = path.join(srcDir, entry);
-    const d = path.join(destDir, entry);
-    const stat = fs.statSync(s);
-    if (stat.isDirectory()) copyDir(s, d);
-    else copyFile(s, d);
-  }
-}
-
-const SRC_ROOT = path.resolve(__dirname, '..');
-const NODE_ROOT = path.join(SRC_ROOT, 'node_modules', 'bootstrap-icons');
-const UI_VENDOR_ROOT = path.join(SRC_ROOT, 'src', 'UI', 'vendors', 'bootstrap-icons');
-
-try {
-  // Copy full font folder and the main CSS files
-  copyDir(path.join(NODE_ROOT, 'font'), path.join(UI_VENDOR_ROOT, 'font'));
-  // Copy unminified and minified CSS for flexibility
-  copyFile(
-    path.join(NODE_ROOT, 'font', 'bootstrap-icons.css'),
-    path.join(UI_VENDOR_ROOT, 'font', 'bootstrap-icons.css')
-  );
-  copyFile(
-    path.join(NODE_ROOT, 'font', 'bootstrap-icons.min.css'),
-    path.join(UI_VENDOR_ROOT, 'font', 'bootstrap-icons.min.css')
-  );
-  console.log('[postinstall] Copied Bootstrap Icons to UI/vendors/bootstrap-icons');
-} catch (e) {
-  console.error('[postinstall] Failed to copy Bootstrap Icons:', e.message);
-  process.exit(1);
-}
+require('../shared/scripts/copy-bootstrap-icons').main({ root: path.resolve(__dirname, '..') });

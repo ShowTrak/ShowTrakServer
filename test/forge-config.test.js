@@ -120,8 +120,12 @@ test('the packager leaves sources, configs and per-file output out of the app', 
     '/dist/main.js',
     '/dist/Modules/DB/index.js',
     '/dist/WebUI/sw.js.map',
-    '/scripts/trim-electron-locales.js',
+    '/scripts/build-main.js',
+    '/shared/scripts/trim-electron-locales.js',
     '/node_modules/@showtrak/protocol/src/index.d.ts',
+    '/node_modules/@showtrak/protocol/src/ui/toasts.ts',
+    '/node_modules/@showtrak/protocol/scripts/dev.js',
+    '/node_modules/@showtrak/protocol/spec/ui/toasts.spec.js',
   ]) {
     assert.equal(ignored(file), true, `${file} should be left out`);
   }
