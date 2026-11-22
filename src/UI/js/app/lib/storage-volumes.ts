@@ -9,23 +9,30 @@ import type {
   StorageVolumeView,
 } from '@showtrak/protocol';
 import { AudioPlatformLabel, IsVersionAtLeast } from './audio-devices';
+import {
+  BYTES_PER_GB,
+  STORAGE_DEFAULT_MIN_FREE_PERCENT,
+  MAX_FREE_PERCENT,
+  MAX_FREE_GB,
+  FreePercentOf,
+  FormatStorageBytes,
+} from '../../../../common/storage-volumes';
+
+export { BYTES_PER_GB, FreePercentOf, FormatStorageBytes };
 
 /** The first ShowTrak Client release that reports its volumes. */
 export const MINIMUM_STORAGE_MONITORING_VERSION = [3, 28, 0] as const;
 export const MINIMUM_STORAGE_MONITORING_VERSION_LABEL =
   MINIMUM_STORAGE_MONITORING_VERSION.join('.');
 
-/** A GB as sizes are shown and `MinFreeGB` is set (mirrors BYTES_PER_GB on the server). */
-export const BYTES_PER_GB = 1024 ** 3;
-
-/** The limits the server accepts (mirrors ClientManager/storage). */
+/** The limits the server accepts. */
 export const STORAGE_LIMITS = {
-  MinFreePercent: { Min: 1, Max: 99, Unit: '%' },
-  MinFreeGB: { Min: 1, Max: 1024 * 1024, Unit: 'GB' },
+  MinFreePercent: { Min: 1, Max: MAX_FREE_PERCENT, Unit: '%' },
+  MinFreeGB: { Min: 1, Max: MAX_FREE_GB, Unit: 'GB' },
 } as const;
 
 /** What ticking an empty percentage row fills in (the server's first-mark default). */
-export const DEFAULT_MIN_FREE_PERCENT = '10';
+export const DEFAULT_MIN_FREE_PERCENT = String(STORAGE_DEFAULT_MIN_FREE_PERCENT);
 
 /**
  * Which overall message the section shows, on the power section's rules:
@@ -98,30 +105,6 @@ export function StorageSectionMessage(
 /** The volumes the section lists, in the order the server sent them. */
 export function StorageVolumesOf(Client: ClientView): StorageVolumeView[] {
   return Client.StorageStatus?.Volumes || [];
-}
-
-// --- Sizes --------------------------------------------------------------------
-// A copy of the formatting in Modules/ClientManager/storage.ts (the renderer is
-// a separate bundle), so the card and the server's issue text agree.
-
-/** "184 GB", "9.4 GB", "512 MB", rounded down, so a volume under a limit never reads as at it. */
-export function FormatStorageBytes(Bytes: number): string {
-  const Units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
-  let Value = Math.max(0, Number(Bytes) || 0);
-  let Unit = 0;
-  while (Value >= 1024 && Unit < Units.length - 1) {
-    Value /= 1024;
-    Unit += 1;
-  }
-  const Decimals = Value >= 100 || Unit === 0 ? 0 : 1;
-  const Factor = 10 ** Decimals;
-  return `${(Math.floor(Value * Factor) / Factor).toFixed(Decimals)} ${Units[Unit]}`;
-}
-
-/** Free space as a percentage of the volume; null for a volume of unknown size. */
-export function FreePercentOf(Volume: Pick<StorageVolumeView, 'TotalBytes' | 'FreeBytes'>) {
-  if (!(Volume.TotalBytes > 0)) return null;
-  return (Volume.FreeBytes / Volume.TotalBytes) * 100;
 }
 
 const KIND_LABELS: Record<StorageVolumeView['Kind'], string> = {

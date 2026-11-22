@@ -25,16 +25,23 @@ import type {
 import { AsRecord } from './normalizers';
 import { CollectorStatusOf } from './health';
 import type { CriticalKind } from './critical-kind';
+import {
+  BYTES_PER_GB,
+  STORAGE_DEFAULT_MIN_FREE_PERCENT,
+  MAX_FREE_PERCENT,
+  MAX_FREE_GB,
+  FreePercentOf,
+  FormatStorageBytes,
+} from '../../common/storage-volumes';
 
-/** A GB as the cards show sizes, and as `MinFreeGB` is set in. */
-export const BYTES_PER_GB = 1024 ** 3;
-
-/** What a first "Monitor" press guards free space at. */
-export const STORAGE_DEFAULT_MIN_FREE_PERCENT = 10;
-
-export const MAX_FREE_PERCENT = 99;
-/** A petabyte: far beyond any single volume, only here to bound the input. */
-export const MAX_FREE_GB = 1024 * 1024;
+export {
+  BYTES_PER_GB,
+  STORAGE_DEFAULT_MIN_FREE_PERCENT,
+  MAX_FREE_PERCENT,
+  MAX_FREE_GB,
+  FreePercentOf,
+  FormatStorageBytes,
+};
 
 const MAX_VOLUMES = 128;
 
@@ -139,31 +146,6 @@ export function normalizeStorageSnapshot(Snapshot: unknown): ObservedStorage {
     Status: CollectorStatusOf(S.Status),
     Volumes,
   };
-}
-
-/** Free space as a percentage of the volume; null for a volume of unknown size. */
-export function FreePercentOf(
-  Volume: Pick<StorageVolume, 'TotalBytes' | 'FreeBytes'>
-): number | null {
-  if (!(Volume.TotalBytes > 0)) return null;
-  return (Volume.FreeBytes / Volume.TotalBytes) * 100;
-}
-
-/**
- * "184 GB", "9.4 GB", "512 MB". Rounded DOWN, so a volume just under a limit
- * never reads as being at it ("49.9 GB free (minimum 50 GB)", not "50 GB").
- */
-export function FormatStorageBytes(Bytes: number): string {
-  const Units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
-  let Value = Math.max(0, Bytes);
-  let Unit = 0;
-  while (Value >= 1024 && Unit < Units.length - 1) {
-    Value /= 1024;
-    Unit += 1;
-  }
-  const Decimals = Value >= 100 || Unit === 0 ? 0 : 1;
-  const Factor = 10 ** Decimals;
-  return `${(Math.floor(Value * Factor) / Factor).toFixed(Decimals)} ${Units[Unit]}`;
 }
 
 /** "6%", or "6.4%" under 10% where the decimal matters. Rounded down, like the sizes. */
