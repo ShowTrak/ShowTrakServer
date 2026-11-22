@@ -2,6 +2,7 @@
 // the compact tile label and the method/address summaries. Shared by the tiles
 // (../monitoring) and the history modal (../monitoring-history-modal).
 import type { MonitoringTargetView } from '@showtrak/protocol';
+import { DescribeMonitorError } from '../../../../common/monitor-error';
 
 export function FormatInterval(ms: unknown) {
   const n = Number(ms) || 0;
@@ -111,26 +112,7 @@ export function FormatMonitorStatus(
   }
   const ErrorText = typeof LastError === 'string' ? LastError.trim() : '';
   if (!ErrorText) return 'Offline';
-  if (
-    /timed?\s*out|timeout|unreachable|refused|reset|network\s+is\s+unreachable|no\s+route\s+to\s+host|socket\s+hang\s+up|econnrefused|econnreset|ehostunreach|enetunreach/i.test(
-      ErrorText
-    )
-  ) {
-    return 'Offline';
-  }
-  if (/enotfound|eai_again|nxdomain|dns|name\s+or\s+service\s+not\s+known/i.test(ErrorText)) {
-    return 'DNS Error';
-  }
-  if (
-    /cert|certificate|tls|ssl|self\s*signed|unable\s+to\s+verify|hostname\/?ip\s+does\s+not\s+match/i.test(
-      ErrorText
-    )
-  ) {
-    return 'TLS Error';
-  }
-  const HttpMatch = ErrorText.match(/\bHTTP\s+(\d{3})\b/i);
-  if (HttpMatch) return `HTTP ${HttpMatch[1]}`;
-  return ErrorText;
+  return DescribeMonitorError(ErrorText);
 }
 
 /**

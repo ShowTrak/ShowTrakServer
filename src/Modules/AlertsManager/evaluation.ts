@@ -4,6 +4,7 @@ import type { AlertRuleView } from '@showtrak/protocol';
 import { TRIGGERS } from './triggers';
 import { ScopeCoversEntity } from '../ScopeMatching';
 import type { ScopeTag } from '../ScopeMatching';
+import { DescribeMonitorError } from '../../common/monitor-error';
 
 // Rules are evaluated as the in-memory rule normalizeRuleRow produces, which is
 // the protocol's AlertRuleView: the same object the editor receives.
@@ -216,26 +217,7 @@ function triggerMatches(Rule: AlertRuleView, Context: AlertContext): boolean {
 
 function describeMonitorReason(Context: AlertContext): string {
   const ErrorText = typeof Context.LastError === 'string' ? Context.LastError.trim() : '';
-  if (
-    /timed?\s*out|timeout|unreachable|refused|reset|network\s+is\s+unreachable|no\s+route\s+to\s+host|socket\s+hang\s+up|econnrefused|econnreset|ehostunreach|enetunreach/i.test(
-      ErrorText
-    )
-  ) {
-    return 'Offline';
-  }
-  if (/enotfound|eai_again|nxdomain|dns|name\s+or\s+service\s+not\s+known/i.test(ErrorText)) {
-    return 'DNS Error';
-  }
-  if (
-    /cert|certificate|tls|ssl|self\s*signed|unable\s+to\s+verify|hostname\/?ip\s+does\s+not\s+match/i.test(
-      ErrorText
-    )
-  ) {
-    return 'TLS Error';
-  }
-  const HttpMatch = ErrorText.match(/\bHTTP\s+(\d{3})\b/i);
-  if (HttpMatch) return `HTTP ${HttpMatch[1]}`;
-  if (ErrorText) return ErrorText;
+  if (ErrorText) return DescribeMonitorError(ErrorText);
   if (Number.isFinite(Context.LastLatencyMs))
     return `${Math.round(Context.LastLatencyMs as number)}ms`;
   return 'unknown reason';
