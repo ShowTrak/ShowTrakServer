@@ -16,7 +16,6 @@ export default defineConfig([
       'out/**',
       'dist/**',
       'dist-test/**',
-      'forge.config.mjs',
       '.vscode/**',
     ],
   },
@@ -44,29 +43,9 @@ export default defineConfig([
     },
   },
   {
-    files: ['src/UI/js/app/**/*.js'],
-    rules: {
-      // Classic renderer scripts share globals across many files.
-      // Keep lint coverage enabled while avoiding false positives.
-      'no-undef': 'off',
-      'no-unused-vars': 'off',
-      'no-useless-escape': 'off',
-    },
-  },
-  {
-    // Non-renderer source (main process, modules, bridges, tests, scripts).
-    // Renderer files intentionally keep var/globals, so these rules are scoped
-    // away from src/UI/js/app.
-    files: [
-      'src/Modules/**/*.js',
-      'src/main.js',
-      'src/main/**/*.js',
-      'src/bridge_main.js',
-      'src/bridge_preloader.js',
-      'test/**/*.js',
-      'test-support/**/*.js',
-      'scripts/**/*.js',
-    ],
+    // The JavaScript left in the repo: tests, their support code and the build
+    // scripts. Everything under src/ is TypeScript.
+    files: ['test/**/*.js', 'test-support/**/*.js', 'scripts/**/*.js'],
     rules: {
       eqeqeq: ['error', 'smart'],
       'no-var': 'error',
@@ -74,7 +53,8 @@ export default defineConfig([
     },
   },
   {
-    // TypeScript source (main process, modules, renderer, shared types).
+    // TypeScript source (main process, modules, renderer, shared types) and
+    // the tool configs (this file and forge.config.ts).
     files: ['**/*.ts'],
     extends: [js.configs.recommended, ...tseslint.configs.recommended, prettier],
     languageOptions: {

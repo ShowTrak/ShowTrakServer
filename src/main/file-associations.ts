@@ -5,7 +5,7 @@
 // - macOS: Launch Services sends an 'open-file' event, both when the file
 //   launches the app (the event fires before 'ready') and when the app is
 //   already running. The document type itself is declared in Info.plist (see
-//   CFBundleDocumentTypes in forge.config.js).
+//   CFBundleDocumentTypes in forge.config.ts).
 // - Windows: the path is a command-line argument, of this process when the file
 //   launched the app, or of a second instance (which hands its arguments over
 //   through 'second-instance' and exits) when it was already running. Squirrel

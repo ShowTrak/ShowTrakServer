@@ -1,21 +1,42 @@
-const { FusesPlugin } = require('@electron-forge/plugin-fuses');
-const { FuseV1Options, FuseVersion } = require('@electron/fuses');
-const path = require('node:path');
-const fs = require('node:fs');
+import type { ForgeConfig } from '@electron-forge/shared-types';
+import { FusesPlugin } from '@electron-forge/plugin-fuses';
+import { FuseV1Options, FuseVersion } from '@electron/fuses';
+import path from 'node:path';
+import fs from 'node:fs';
 // const { Config } = require('./Modules/Config');
+
+// scripts/trim-electron-locales.js, a CommonJS build script (scripts/ stays
+// JavaScript). It is required lazily, inside the hook that uses it, as before.
+interface TrimElectronLocalesModule {
+  trimElectronLocales(buildPath: string): number;
+}
 
 const appleSignIdentity = process.env.APPLE_SIGN_IDENTITY;
 const appleSigningKeychain = process.env.APPLE_KEYCHAIN_PATH;
+const appleApiKeyPath = process.env.APPLE_API_KEY_PATH;
+const appleApiKeyId = process.env.APPLE_API_KEY_ID;
+const appleApiIssuerId = process.env.APPLE_API_ISSUER_ID;
 const shouldSignMac = Boolean(appleSignIdentity);
 const shouldNotarizeMac =
-  shouldSignMac &&
-  Boolean(
-    process.env.APPLE_API_KEY_PATH &&
-    process.env.APPLE_API_KEY_ID &&
-    process.env.APPLE_API_ISSUER_ID
-  );
+  shouldSignMac && !!appleApiKeyPath && !!appleApiKeyId && !!appleApiIssuerId;
 
-module.exports = {
+// macOS signing options. hardenedRuntime, entitlements, entitlementsInherit and
+// gatekeeperAssess are options of @electron/osx-sign before 1.0; since then it
+// reads per-file settings from optionsForFile() only. It ignores these four, so
+// the app is signed with osx-sign's default entitlements (hardened runtime on),
+// not build/entitlements.mac.plist. They are kept as they were: passing them
+// through optionsForFile() instead would change how the app is signed.
+const osxSignOptions = {
+  identity: appleSignIdentity,
+  ...(appleSigningKeychain ? { keychain: appleSigningKeychain } : {}),
+  hardenedRuntime: true,
+  entitlements: path.resolve(import.meta.dirname, 'build/entitlements.mac.plist'),
+  entitlementsInherit: path.resolve(import.meta.dirname, 'build/entitlements.mac.plist'),
+  gatekeeperAssess: false,
+  strictVerify: true,
+};
+
+const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     // Copy the *contents* of symlinks rather than the links themselves.
@@ -68,7 +89,7 @@ module.exports = {
       /^\/\.claude($|\/)/,
       // Config & docs.
       /^\/tsconfig.*\.json$/,
-      /^\/eslint\.config\.mjs$/,
+      /^\/(eslint|forge)\.config\.ts$/,
       /^\/\.prettier/,
       /^\/\.gitignore$/,
       /^\/(README|TODO|DEVELOPMENT)\.md$/,
@@ -119,26 +140,15 @@ module.exports = {
         },
       ],
     },
-    ...(shouldSignMac
-      ? {
-          osxSign: {
-            identity: appleSignIdentity,
-            ...(appleSigningKeychain ? { keychain: appleSigningKeychain } : {}),
-            hardenedRuntime: true,
-            entitlements: path.resolve(__dirname, 'build/entitlements.mac.plist'),
-            entitlementsInherit: path.resolve(__dirname, 'build/entitlements.mac.plist'),
-            gatekeeperAssess: false,
-            strictVerify: true,
-          },
-        }
-      : {}),
+    ...(shouldSignMac ? { osxSign: osxSignOptions } : {}),
     ...(shouldNotarizeMac
       ? {
+          // notarytool is the only tool @electron/notarize has (since v2), so
+          // it no longer takes the `tool: 'notarytool'` this used to pass.
           osxNotarize: {
-            tool: 'notarytool',
-            appleApiKey: process.env.APPLE_API_KEY_PATH,
-            appleApiKeyId: process.env.APPLE_API_KEY_ID,
-            appleApiIssuer: process.env.APPLE_API_ISSUER_ID,
+            appleApiKey: appleApiKeyPath,
+            appleApiKeyId: appleApiKeyId,
+            appleApiIssuer: appleApiIssuerId,
           },
         }
       : {}),
@@ -166,10 +176,12 @@ module.exports = {
     {
       name: '@electron-forge/maker-zip',
       platforms: ['darwin'],
+      config: {},
     },
     {
       name: '@electron-forge/maker-zip',
       platforms: ['linux'],
+      config: {},
     },
     {
       name: '@electron-forge/maker-deb',
@@ -212,7 +224,8 @@ module.exports = {
     // signed; the UI is English and Chromium falls back to en-US. See
     // scripts/trim-electron-locales.js.
     packageAfterExtract: async (_forgeConfig, buildPath) => {
-      const { trimElectronLocales } = require('./scripts/trim-electron-locales');
+      const { trimElectronLocales } =
+        require('./scripts/trim-electron-locales') as TrimElectronLocalesModule;
       const removed = trimElectronLocales(buildPath);
       console.log(`[forge] Removed ${removed} unused Chromium locale pack(s)`);
     },
@@ -226,7 +239,7 @@ module.exports = {
       const sqlite3 = path.join(buildPath, 'node_modules', 'sqlite3');
       const release = path.join(sqlite3, 'build', 'Release');
       if (!fs.existsSync(path.join(release, 'node_sqlite3.node'))) return;
-      const remove = (target) => fs.rmSync(target, { recursive: true, force: true });
+      const remove = (target: string) => fs.rmSync(target, { recursive: true, force: true });
       remove(path.join(sqlite3, 'bin'));
       for (const entry of fs.readdirSync(path.dirname(release))) {
         if (entry !== 'Release') remove(path.join(path.dirname(release), entry));
@@ -278,3 +291,5 @@ module.exports = {
     },
   },
 };
+
+export default config;

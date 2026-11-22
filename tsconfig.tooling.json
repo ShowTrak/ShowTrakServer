@@ -1,0 +1,18 @@
+// Typecheck-only program for the repo's TypeScript tool configs:
+// forge.config.ts (Electron Forge) and eslint.config.ts (ESLint).
+//
+// Both tools load their config through jiti, which transpiles the TypeScript
+// and settles ES module / CommonJS interop itself (several of the packages
+// imported are ES modules only). So the configs are checked the way a bundler
+// sees them (module "preserve", bundler resolution) rather than the way Node's
+// own loader would, and with Node's types only.
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["forge.config.ts", "eslint.config.ts"]
+}

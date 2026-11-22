@@ -7,7 +7,7 @@
 // the system language's pack is missing, so removing the others changes nothing
 // a user sees.
 //
-// Called from forge.config.js (packageAfterExtract), i.e. on the freshly
+// Called from forge.config.ts (packageAfterExtract), i.e. on the freshly
 // extracted Electron, before the app is copied in and before macOS signing.
 //
 //   Windows / Linux: <build>/locales/<lang>.pak

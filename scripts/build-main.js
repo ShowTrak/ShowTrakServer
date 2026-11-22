@@ -20,7 +20,7 @@
 // evaluated exactly when it is first required, as it was before.
 //
 // The per-file tree stays in dist/ for the test suite and coverage, which load
-// dist/Modules/** individually; packaging leaves it out (forge.config.js).
+// dist/Modules/** individually; packaging leaves it out (forge.config.ts).
 //
 // Kept external (loaded from node_modules at runtime):
 //   electron                  provided by the runtime

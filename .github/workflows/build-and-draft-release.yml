@@ -176,7 +176,7 @@ jobs:
 
       # rpm for the rpm maker, zip for the zip maker (it runs the zip command),
       # binutils for readelf in the package check, build-essential to compile
-      # sqlite3 on ARM64 (rebuildConfig in forge.config.js). The x64 image has
+      # sqlite3 on ARM64 (rebuildConfig in forge.config.ts). The x64 image has
       # all but rpm; the ARM64 image carries fewer tools, so they are named.
       - name: Install Linux packaging tools
         if: runner.os == 'Linux'

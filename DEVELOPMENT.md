@@ -307,7 +307,7 @@ Used by packaging and CI when signing/notarization is enabled:
 - `src/WebUI/` - browser-based companion UI
 - `src/Modules/` - domain modules and infrastructure
 - `test/` - Node test runner suite for managers, integrations, and behavior
-- `forge.config.js` - Electron Forge packaging/maker/signing configuration
+- `forge.config.ts` - Electron Forge packaging/maker/signing configuration
 
 ## Support
 
