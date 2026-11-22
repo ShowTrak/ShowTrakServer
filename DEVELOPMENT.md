@@ -280,6 +280,25 @@ allowlists. Types used inside one module stay local. A protocol type that is
 wrong or missing is fixed in ShowTrak-Protocol, then picked up by bumping the
 submodule.
 
+`shared/` also holds the code the desktop apps used to copy between them,
+compiled by `npm run build:shared` (the first step of `build`, also run on
+postinstall):
+
+| Import                             | What the Server takes from it                                                                                                        |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `@showtrak/protocol/runtime`       | The logger, the process guards, network-error classification, checksums, durable file writes, update channels                        |
+| `@showtrak/protocol/common`        | Type guards (`IsArray`, `IsObject`, `IsRecord`, `ArrayOrEmpty`) and script argument parsing; isomorphic, so `src/common` may use it  |
+| `@showtrak/protocol/electron-main` | The self-updater, show file associations, window guards and zoom, first paint, dev reload, the renderer push bus                     |
+| `@showtrak/protocol/ui/<module>`   | The renderer kit: toasts, the confirmation dialog, the Software Update modal, Markdown, QR codes, menus, modal header, settings tabs |
+
+The Server's own module for each is its configuration: `src/main/app-updater.ts`
+names its release repository, `src/Modules/Logger` its name, logs folder and log
+console feed, `src/UI/js/app/lib/toasts.ts` its icon style. The build, dev, test
+and release scripts under `scripts/` are likewise the Server's settings for
+`shared/scripts/`. A fix to shared code is made in ShowTrak-Protocol, with its
+spec (`spec/**/*.spec.js`, run there), and picked up by bumping the submodule;
+the Server's tests cover its configuration of it.
+
 ## Networking and Runtime Notes
 
 - Main server/socket port defaults to `3000`.
@@ -344,7 +363,7 @@ Used by packaging and CI when signing/notarization is enabled:
 - `src/main.ts` - Electron main process and lifecycle orchestration
 - `src/main/` - main-process wiring: broadcast bridge, history stores, retention sweep, IPC registrars
 - `src/bridge_main.ts` - preload bridge and IPC channel allowlists
-- `shared/` - `@showtrak/protocol`: the wire and every other cross-boundary type, shared with the other ShowTrak apps (git submodule)
+- `shared/` - `@showtrak/protocol`: the wire and every other cross-boundary type, and the code and build scripts the desktop apps share (git submodule)
 - `src/UI/` - desktop renderer UI
 - `src/WebUI/` - browser-based companion UI
 - `src/Modules/` - domain modules and infrastructure
