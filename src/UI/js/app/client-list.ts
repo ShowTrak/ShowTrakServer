@@ -84,6 +84,7 @@ import {
 import { ApplyListSearch } from './list-filter';
 import { SyncTileWidgets } from './tile-widgets';
 import { IndexClients } from './lib/client-patches';
+import { IsArray } from './lib/guards';
 
 // Every client of the last full list, by UUID. The values are the list's own
 // objects (shared with __LastClients and AllClients), so a live patch applied
@@ -257,7 +258,7 @@ async function RetryExecutions(RequestIDs: string[], Button: HTMLButtonElement |
   if (Button) Button.disabled = true;
   try {
     const Result = await window.API.RetryScriptExecutions(RequestIDs);
-    const Err = Array.isArray(Result) ? Result[0] : null;
+    const Err = IsArray(Result) ? Result[0] : null;
     if (Err) Notify(`Retry failed: ${String(Err)}`, 'error', 6000);
   } catch (e) {
     HandleNonFatalError('RetryScriptExecutions', e);
@@ -327,21 +328,29 @@ function InitClientListPush() {
   // panel header. Delegated, so they survive the in-place row updates.
   $(document)
     .off('click.execRetry')
-    .on('click.execRetry', '#EXECUTION_TOAST [data-retry-request]', function (e) {
-      e.preventDefault();
-      const RequestID = this.getAttribute('data-retry-request');
-      if (RequestID) void RetryExecutions([RequestID], this as HTMLButtonElement);
-    })
-    .on('click.execRetry', '#EXECUTION_TOAST [data-console-request]', function (e) {
-      e.preventDefault();
-      const Execution = PanelExecutionsByID.get(this.getAttribute('data-console-request') || '');
-      if (!Execution) return;
-      // When the view closes, re-evaluate the panel: it may have settled (and
-      // become due to close itself) while the operator was reading.
-      OpenExecutionConsole(Execution, () => {
-        if (ExecutionsHandler) void ExecutionsHandler(LastAllExecutions);
-      });
-    })
+    .on(
+      'click.execRetry',
+      '#EXECUTION_TOAST [data-retry-request]',
+      function (this: HTMLElement, e) {
+        e.preventDefault();
+        const RequestID = this.getAttribute('data-retry-request');
+        if (RequestID) void RetryExecutions([RequestID], this as HTMLButtonElement);
+      }
+    )
+    .on(
+      'click.execRetry',
+      '#EXECUTION_TOAST [data-console-request]',
+      function (this: HTMLElement, e) {
+        e.preventDefault();
+        const Execution = PanelExecutionsByID.get(this.getAttribute('data-console-request') || '');
+        if (!Execution) return;
+        // When the view closes, re-evaluate the panel: it may have settled (and
+        // become due to close itself) while the operator was reading.
+        OpenExecutionConsole(Execution, () => {
+          if (ExecutionsHandler) void ExecutionsHandler(LastAllExecutions);
+        });
+      }
+    )
     .on('click.execRetry', '#EXECUTION_TOAST [data-retry-all]', function (e) {
       e.preventDefault();
       void RetryExecutions(RetryableExecutionIDs.slice(), this as HTMLButtonElement);

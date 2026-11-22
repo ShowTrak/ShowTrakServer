@@ -3,6 +3,8 @@
 // src/Modules/FreeKiosk/commands.ts (the renderer cannot import across its
 // rootDir); test/renderer-freekiosk-menu.test.js holds the two together.
 
+import { IsArray } from './guards';
+
 export const FREEKIOSK_MENU_POLL_SETTING_KEY = 'FREEKIOSK_MENU_POLL';
 
 export function FreeKioskMenuSettingKey(CommandID: string): string {
@@ -15,6 +17,7 @@ export function IsFreeKioskMenuActionEnabled(
   SettingsList: readonly { Key: string; Value: unknown }[] | null | undefined,
   Key: string
 ): boolean {
-  if (!Array.isArray(SettingsList)) return true;
-  return SettingsList.find((Setting) => Setting && Setting.Key === Key)?.Value !== false;
+  if (!IsArray(SettingsList)) return true;
+  const Settings: readonly { Key: string; Value: unknown }[] = SettingsList;
+  return Settings.find((Setting) => Setting && Setting.Key === Key)?.Value !== false;
 }

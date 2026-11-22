@@ -4,7 +4,7 @@
 // (rendering, placement, keyboard navigation, tap-to-confirm). What the menu
 // OFFERS for a selection lives here: one section per kind of selected entity,
 // each action running against the compatible subset of the selection.
-import type { ClientView } from '@showtrak/protocol';
+import type { ClientView, IntegratedAction } from '@showtrak/protocol';
 import {
   AllClients,
   FreeKioskCommandsCache,
@@ -47,6 +47,7 @@ import {
   FreeKioskMenuSettingKey,
   IsFreeKioskMenuActionEnabled,
 } from './lib/freekiosk-menu';
+import { IsArray } from './lib/guards';
 
 export // One row in the right-click / mobile context menu. `Type` selects how the row
 // renders (informational label, section header, divider, or actionable item);
@@ -252,7 +253,7 @@ export async function BuildContextMenuOptions(
             const Succeeded: string[] = [];
             const Failed: { UUID: string; Error: unknown }[] = [];
             Results.forEach((Result, Index) => {
-              const Err = Array.isArray(Result) ? Result[0] : null;
+              const Err = IsArray(Result) ? Result[0] : null;
               // Results is mapped 1:1 from UUIDs, so Index is always in range
               if (Err) Failed.push({ UUID: UUIDs[Index]!, Error: Err });
               else Succeeded.push(UUIDs[Index]!);
@@ -319,15 +320,15 @@ export async function BuildContextMenuOptions(
     // An event is offered if ANY selected integrated client declares it;
     // triggering it targets only the integrated clients that declare it.
     if (IntegratedClients.length > 0) {
-      const EventCatalogue = new Map();
-      const EventTargets = new Map();
+      const EventCatalogue = new Map<string, IntegratedAction>();
+      const EventTargets = new Map<string, string[]>();
       for (const Client of IntegratedClients) {
         const Actions = Array.isArray(Client.IntegratedActions) ? Client.IntegratedActions : [];
         for (const Action of Actions) {
           if (!Action || !Action.ID) continue;
           if (!EventCatalogue.has(Action.ID)) EventCatalogue.set(Action.ID, Action);
           if (!EventTargets.has(Action.ID)) EventTargets.set(Action.ID, []);
-          EventTargets.get(Action.ID).push(Client.UUID);
+          EventTargets.get(Action.ID)!.push(Client.UUID);
         }
       }
       const EventOptions = [...EventCatalogue.values()]

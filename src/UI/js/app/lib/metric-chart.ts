@@ -15,6 +15,7 @@
 // gaps, which is the detail that matters most here.
 import type { FreeKioskMetricSample } from '@showtrak/protocol';
 import { MONITOR_HISTORY_BLOCK_COUNT, MONITOR_HISTORY_WINDOW_MS } from './history-window';
+import { ArrayOrEmpty } from './guards';
 
 export interface MetricChartThreshold {
   operator: 'below' | 'above' | 'outside' | 'inside';
@@ -103,7 +104,7 @@ export function BuildMetricChartModel(
   const BucketMs = WindowMs / BucketCount;
   const BucketWidth = Width / BucketCount;
 
-  const Sorted = (Array.isArray(Samples) ? Samples : [])
+  const Sorted = ArrayOrEmpty(Samples)
     .filter((S) => S && Number.isFinite(Number(S.ts)))
     .sort((a, b) => a.ts - b.ts);
 

@@ -41,7 +41,7 @@ async function LoadIconNames(): Promise<string[]> {
   try {
     const Response = await fetch('./vendors/bootstrap-icons/font/bootstrap-icons.json');
     if (!Response.ok) throw new Error(`HTTP ${Response.status}`);
-    const Manifest = await Response.json();
+    const Manifest: unknown = await Response.json();
     IconNameCache = Object.keys(Manifest || {}).sort((a, b) => a.localeCompare(b));
   } catch (Err) {
     HandleNonFatalError('IconPicker:LoadManifest', Err);

@@ -125,3 +125,22 @@ export interface AlertScopeModel {
   AllClientValueSet: Set<string>;
   LabelByValue: Map<string, string>;
 }
+
+/** A network-discovered device as merged/stored in the discovery results map. */
+export interface DiscoveredDevice {
+  ID?: string;
+  Name?: string;
+  Address?: string;
+  Hostname?: string | null;
+  Source?: string;
+  ServiceType?: string;
+  Port?: number | null;
+  MethodHint?: string;
+  Services?: Array<{ type: string; port: number | null; name?: string | null }>;
+  // Every TCP port any probe found open, accumulated across results.
+  OpenPorts?: number[];
+  // Answered PJLink's UDP search.
+  PJLink?: boolean;
+  // The check the operator picked from the suggestions; unset means the best.
+  ChosenMethod?: string;
+}

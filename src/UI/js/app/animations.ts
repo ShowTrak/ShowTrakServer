@@ -70,7 +70,9 @@
   // position to their new one and gently fade in brand-new elements.
   function PlayFlipState(root: Element | null, previous: unknown) {
     if (!root || !AnimationsEnabled() || !(previous instanceof Map) || previous.size === 0) return;
-    const previousRects: FlipState = previous;
+    // Only CaptureFlipState's maps come back here; the window API carries them
+    // through as unknown.
+    const previousRects = previous as FlipState;
 
     const nodes = Array.from(root.querySelectorAll<HTMLElement>(FLIP_SELECTOR));
     const records: FlipRecord[] = [];

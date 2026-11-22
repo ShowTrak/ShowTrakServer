@@ -14,6 +14,7 @@
 // As on the server, this answers ONLY "is it covered": what an ABSENT scope
 // means is the caller's decision, and the callers genuinely disagree: an absent
 // script whitelist means "every client", an absent tag scope means "no clients".
+import { ArrayOrEmpty } from './guards';
 
 /** Permissive scope shape: accepts wire views and editor drafts alike. */
 export interface ScopeShape {
@@ -62,7 +63,7 @@ export function IndexTagsByID(
   Tags: readonly ScopeTagLike[] | null | undefined
 ): Map<number, ScopeTagLike> {
   const Index = new Map<number, ScopeTagLike>();
-  for (const Tag of Array.isArray(Tags) ? Tags : []) {
+  for (const Tag of ArrayOrEmpty(Tags)) {
     if (!Tag || !Number.isFinite(Number(Tag.TagID))) continue;
     Index.set(Number(Tag.TagID), Tag);
   }

@@ -8,6 +8,7 @@
 // editor only because both are reached from the same modal; nothing in the
 // editor calls into this module, so it is a self-contained feature.
 import type { NetworkScanEvent, NetworkScanResult } from '@showtrak/protocol';
+import type { DiscoveredDevice } from '../state/types';
 import { closeModal, openModal } from '../lib/modal';
 import { buildModalHeader } from '../lib/modal-header';
 import {
@@ -26,25 +27,6 @@ import { CloseAllModals } from '../modals';
 import { Notify } from '../selection-init';
 import { EnsureMonitoringMethodsLoaded } from './method-fields';
 import { FALLBACK_METHOD, SuggestChecks, type CheckSuggestion } from '../lib/check-suggestions';
-
-/** A network-discovered device as merged/stored in the discovery results map. */
-interface DiscoveredDevice {
-  ID?: string;
-  Name?: string;
-  Address?: string;
-  Hostname?: string | null;
-  Source?: string;
-  ServiceType?: string;
-  Port?: number | null;
-  MethodHint?: string;
-  Services?: Array<{ type: string; port: number | null; name?: string | null }>;
-  // Every TCP port any probe found open, accumulated across results.
-  OpenPorts?: number[];
-  // Answered PJLink's UDP search.
-  PJLink?: boolean;
-  // The check the operator picked from the suggestions; unset means the best.
-  ChosenMethod?: string;
-}
 
 /** A check the wizard hands to the monitor editor. */
 export interface DiscoveryCheckPrefill {

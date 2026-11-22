@@ -171,7 +171,7 @@ export function setupDnD() {
   // Avoid duplicate bindings
   $(document).off('dragstart.dnd dragend.dnd dragover.dnd dragenter.dnd dragleave.dnd drop.dnd');
 
-  $(document).on('dragstart.dnd', '.SHOWTRAK_PC', function (e) {
+  $(document).on('dragstart.dnd', '.SHOWTRAK_PC', function (this: HTMLElement, e) {
     if (AppMode !== 'EDIT') return;
     const uuid = $(this).attr('data-uuid');
     DnDState.dragUUID = uuid;
@@ -246,7 +246,7 @@ export function setupDnD() {
     }
   });
 
-  $(document).on('dragover.dnd', '.group-drop-zone', function (e) {
+  $(document).on('dragover.dnd', '.group-drop-zone', function (this: HTMLElement, e) {
     if (AppMode !== 'EDIT') return;
     e.preventDefault();
     const container = this;
@@ -260,7 +260,7 @@ export function setupDnD() {
     positionGhostMarker(container, mouseX, mouseY);
   });
 
-  $(document).on('dragleave.dnd', '.group-drop-zone', function (e) {
+  $(document).on('dragleave.dnd', '.group-drop-zone', function (this: HTMLElement, e) {
     if (AppMode !== 'EDIT') return;
     if (!this.contains((e.originalEvent as DragEvent).relatedTarget as Node | null)) {
       $(this).removeClass('dnd-over');
@@ -269,7 +269,7 @@ export function setupDnD() {
     }
   });
 
-  $(document).on('drop.dnd', '.group-drop-zone', async function (e) {
+  $(document).on('drop.dnd', '.group-drop-zone', async function (this: HTMLElement, e) {
     if (AppMode !== 'EDIT') return;
     e.preventDefault();
     const targetGroupId = normalizeGroupId($(this).attr('data-groupid'));

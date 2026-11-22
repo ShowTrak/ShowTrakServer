@@ -6,6 +6,7 @@ import type {
   MonitoringCheckView,
   MonitoringMethodView,
 } from '@showtrak/protocol';
+import { ArrayOrEmpty } from './guards';
 
 export interface TargetActionMethod {
   Method: string;
@@ -26,7 +27,7 @@ export function GroupTargetActionMethods(
   Methods: readonly Pick<MonitoringMethodView, 'ID' | 'Name' | 'Actions'>[]
 ): TargetActionMethod[] {
   const Out = new Map<string, TargetActionMethod>();
-  for (const Check of Array.isArray(Checks) ? Checks : []) {
+  for (const Check of ArrayOrEmpty(Checks)) {
     if (!Check || !Check.Method) continue;
     const Existing = Out.get(Check.Method);
     if (Existing) {

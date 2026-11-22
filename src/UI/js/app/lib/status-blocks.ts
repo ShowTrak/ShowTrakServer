@@ -7,6 +7,7 @@
 import type { FreeKioskMetricSample, HistorySample } from '@showtrak/protocol';
 import { MONITOR_HISTORY_BLOCK_COUNT, MONITOR_HISTORY_WINDOW_MS } from './history-window';
 import { ExpandMetricSeries } from './metric-series';
+import { ArrayOrEmpty } from './guards';
 
 // Per-state sample tallies inside a single timeline block.
 export interface StatusStateCounts {
@@ -168,12 +169,7 @@ export function FreeKioskMetricStatusSamples(
   Samples: readonly FreeKioskMetricSample[] | null | undefined,
   Now?: number
 ): HistorySample[] {
-  const Series =
-    Now == null
-      ? Array.isArray(Samples)
-        ? Samples
-        : []
-      : ExpandMetricSeries(Samples, { now: Now });
+  const Series = Now == null ? ArrayOrEmpty(Samples) : ExpandMetricSeries(Samples, { now: Now });
   return Series.map((Sample) =>
     Sample.ok
       ? { ts: Sample.ts, online: true, degraded: Sample.breach, latencyMs: null }

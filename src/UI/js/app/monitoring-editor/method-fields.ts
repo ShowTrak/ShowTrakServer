@@ -14,6 +14,7 @@
 import type { MonitoringSettingField, MonitoringSettingOptions } from '@showtrak/protocol';
 import { MonitoringMethodsCache, setMonitoringMethodsCache } from '../state';
 import { Safe } from '../utils';
+import { IsArray } from '../lib/guards';
 
 // Called after an edit that this module makes on the user's behalf (adding or
 // removing a list chip), so the editor can pull the value into its working
@@ -487,8 +488,9 @@ export function ApplyMonitoringConditionalVisibility(HostSelector = MONITORING_F
     const $wrap = $(this);
     let Conditions: Array<{ Key?: string; Equals?: unknown; In?: unknown[] }> = [];
     try {
-      const Parsed = JSON.parse($wrap.attr('data-visible-when') || '[]');
-      if (Array.isArray(Parsed)) Conditions = Parsed;
+      const Parsed: unknown = JSON.parse($wrap.attr('data-visible-when') || '[]');
+      // The attribute is this editor's own markup (the field's VisibleWhen).
+      if (IsArray(Parsed)) Conditions = Parsed as typeof Conditions;
     } catch {
       // A malformed attribute should leave the field visible rather than hide a
       // control the operator needs with no way to get it back.
@@ -671,7 +673,9 @@ function FindMonitoringListPick($list: JQuery, Value: string): JQuery | null {
   if (!Key) return null;
   let Found: JQuery | null = null;
   $list.find('.monitoring-list-pick').each(function () {
-    const Keys = [String($(this).val() || ''), ...JSON.parse($(this).attr('data-aliases') || '[]')];
+    // The aliases are this editor's own markup: a JSON array of strings.
+    const Aliases = JSON.parse($(this).attr('data-aliases') || '[]') as unknown[];
+    const Keys = [String($(this).val() || ''), ...Aliases];
     if (Keys.some((K) => MatchKey(K) === Key)) {
       Found = $(this);
       return false;

@@ -23,6 +23,7 @@ import {
   OpenFreeKioskTerminalHistory,
   OpenMonitoringTargetHistory,
 } from './monitoring-history-modal';
+import { IsArray } from './lib/guards';
 
 const PAGE_SIZE = 200;
 // A list left open through a busy evening keeps growing at the top; past this
@@ -80,7 +81,7 @@ class AuditLogPanel {
     });
     this.$root.on('change', '.audit-log-category, .audit-log-type', () => void this.Reload());
     this.$root.on('click', '.audit-log-more', () => void this.LoadOlder());
-    this.$root.on('click', 'button.audit-entity', function () {
+    this.$root.on('click', 'button.audit-entity', function (this: HTMLElement) {
       void OpenAuditEntity(
         String(this.getAttribute('data-audit-entity-type') || ''),
         String(this.getAttribute('data-audit-entity-id') || '')
@@ -172,10 +173,11 @@ class AuditLogPanel {
 
   // New entries, as the server writes them.
   Append(Incoming: readonly AuditLogEntry[]) {
-    if (!this.Active || !Array.isArray(Incoming) || !Incoming.length) return;
+    if (!this.Active || !IsArray(Incoming) || !Incoming.length) return;
+    const Entries: readonly AuditLogEntry[] = Incoming;
     const Query = this.Query();
     if (!Query) return;
-    const Matching = Incoming.filter((Entry) => AuditEntryMatches(Entry, Query));
+    const Matching = Entries.filter((Entry) => AuditEntryMatches(Entry, Query));
     if (!Matching.length) return;
     const Scroller = this.Options.ScrollParent();
     const List = this.$root.find('.audit-log-list').get(0) as HTMLElement | undefined;

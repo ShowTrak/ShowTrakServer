@@ -9,6 +9,7 @@ import type {
   AuditSegment,
 } from '@showtrak/protocol';
 import { Safe } from '../utils';
+import { ArrayOrEmpty } from './guards';
 
 const ENTITY_TYPE_LABELS: Record<AuditEntityType, string> = {
   client: 'Client',
@@ -103,7 +104,7 @@ export function FormatAuditTimestamp(Timestamp: number): string {
 }
 
 export function AuditSummaryHtml(Segments: readonly AuditSegment[]): string {
-  return (Array.isArray(Segments) ? Segments : [])
+  return ArrayOrEmpty(Segments)
     .map((Segment) => {
       const Text = Safe(Segment && Segment.T);
       if (!Segment || !Segment.H) return Text;
@@ -113,7 +114,9 @@ export function AuditSummaryHtml(Segments: readonly AuditSegment[]): string {
 }
 
 export function AuditSummaryText(Segments: readonly AuditSegment[]): string {
-  return (Array.isArray(Segments) ? Segments : []).map((Segment) => Segment.T).join('');
+  return ArrayOrEmpty(Segments)
+    .map((Segment) => Segment.T)
+    .join('');
 }
 
 export interface AuditRowOptions {

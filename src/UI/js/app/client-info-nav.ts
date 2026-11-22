@@ -44,7 +44,7 @@ function EnsureClientInfoNav() {
   const $nav = $('#CLIENT_INFO_NAV');
   if (!$nav.length) return;
   if (!$nav.data('bound')) {
-    $nav.on('click', '.settings-nav-item', function () {
+    $nav.on('click', '.settings-nav-item', function (this: HTMLElement) {
       const Key = this.getAttribute('data-client-info-tab-target');
       if (Key === ActiveTab) return;
       ActiveTab = ResolveClientInfoTab(Key, Kind, Surface);

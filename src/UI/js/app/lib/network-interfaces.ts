@@ -84,7 +84,7 @@ function ParseIPv6(Text: string): bigint | null {
   const Explicit = Head.length + Rest.length + Tail.length;
   if (Halves.length === 1 ? Explicit !== 8 : Explicit > 7) return null;
   const Words: number[] = [];
-  for (const Group of [...Head, ...new Array(8 - Explicit).fill('0'), ...Rest]) {
+  for (const Group of [...Head, ...new Array<string>(8 - Explicit).fill('0'), ...Rest]) {
     if (!/^[0-9a-f]{1,4}$/i.test(Group)) return null;
     Words.push(parseInt(Group, 16));
   }

@@ -7,10 +7,12 @@
 import type {
   GroupView,
   AlertRuleActionView,
+  ScriptExecutionView,
   UpdateManagerStatus,
   UpdateReleaseOption,
 } from '@showtrak/protocol';
 import type {
+  DiscoveredDevice,
   MonitoringEditorStateShape,
   MonitorHistorySeriesEntry,
   MonitorHistoryModalContextShape,
@@ -116,7 +118,7 @@ export function setNetworkDiscoveryScanning(value: boolean): void {
   NetworkDiscoveryScanning = value;
 }
 
-export let NetworkDiscoveryResults = new Map();
+export let NetworkDiscoveryResults = new Map<string, DiscoveredDevice>();
 export function setNetworkDiscoveryResults(value: typeof NetworkDiscoveryResults): void {
   NetworkDiscoveryResults = value;
 }
@@ -131,7 +133,7 @@ export function setNetworkDiscoveryProgress(value: typeof NetworkDiscoveryProgre
 }
 
 // --- Update manager ---
-export let UpdateManagerClientProgress = new Map();
+export let UpdateManagerClientProgress = new Map<string, ScriptExecutionView>();
 export function setUpdateManagerClientProgress(value: typeof UpdateManagerClientProgress): void {
   UpdateManagerClientProgress = value;
 }
@@ -167,7 +169,7 @@ export function setUpdateManagerDownloadInProgress(value: boolean): void {
 }
 
 // --- Settings + client-info modal bookkeeping ---
-export const SettingDebounceTimers = new Map();
+export const SettingDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 // Track which client is open in the Client Info modal for live updates.
 export let ClientInfoOpenUUID: string | null = null;

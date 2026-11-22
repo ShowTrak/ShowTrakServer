@@ -500,7 +500,7 @@ export async function Init() {
         .trim()
         .toLowerCase();
       if (!id || !NetworkDiscoveryResults.has(id)) return;
-      const selected = NetworkDiscoveryResults.get(id);
+      const selected = NetworkDiscoveryResults.get(id)!;
       await StopNetworkDiscoveryScan();
       // A port-probe result is named by its IP, so prefer the hostname then.
       const Nickname =

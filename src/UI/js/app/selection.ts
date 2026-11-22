@@ -239,7 +239,7 @@ export function ToggleSelection(UUID: string | undefined) {
 export function SelectByGroup(GroupID: string | number | undefined) {
   if (!GroupSelectableUUIDCache.has(`${GroupID}`)) return;
   // While the list is searched, the group is the rows of it that are showing.
-  const UUIDs: string[] = GroupSelectableUUIDCache.get(`${GroupID}`).filter(
+  const UUIDs: string[] = GroupSelectableUUIDCache.get(`${GroupID}`)!.filter(
     (UUID: string) => !IsHiddenByListSearch(UUID)
   );
 

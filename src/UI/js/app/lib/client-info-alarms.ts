@@ -15,6 +15,7 @@
 // clients only have Status to show an alarm on.
 import { FreeKioskSectionTab } from './client-info-tabs';
 import type { ClientInfoTabKey } from './client-info-tabs';
+import { ArrayOrEmpty } from './guards';
 
 export const CLIENT_WARNING_TABS: Readonly<Record<string, ClientInfoTabKey>> = {
   // USB_WARNINGS
@@ -110,7 +111,7 @@ export function FreeKioskAlarmTabs(
   Alarms: readonly FreeKioskAlarmLike[] | null | undefined,
   Metrics: readonly FreeKioskMetricLike[] | null | undefined
 ): ClientInfoTabKey[] {
-  const List = Array.isArray(Alarms) ? Alarms : [];
+  const List = ArrayOrEmpty(Alarms);
   if (List.length === 0) return [];
   const SectionByKey = new Map((Metrics || []).map((Metric) => [Metric.Key, Metric.Section]));
   const Tabs = new Set<ClientInfoTabKey>(['status']);

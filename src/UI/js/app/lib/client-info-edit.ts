@@ -9,6 +9,7 @@
 // its own any more (the Add flows for monitors, dummies and FreeKiosk terminals
 // aside, which create rather than edit).
 import type { ClientInfoKind } from './client-info-tabs';
+import { ArrayOrEmpty } from './guards';
 
 const EDITABLE_CLIENT_INFO_KINDS: readonly ClientInfoKind[] = [
   'client',
@@ -97,10 +98,10 @@ export function CollectClientMacCandidates(
   Interfaces: readonly ReportedInterface[] | null | undefined
 ): MacCandidate[] {
   const Seen = new Map<string, MacCandidate>();
-  for (const Interface of Array.isArray(Interfaces) ? Interfaces : []) {
+  for (const Interface of ArrayOrEmpty(Interfaces)) {
     if (!Interface) continue;
     const Name = Interface.name ? String(Interface.name) : null;
-    for (const Address of Array.isArray(Interface.addresses) ? Interface.addresses : []) {
+    for (const Address of ArrayOrEmpty(Interface.addresses)) {
       if (!Address || Address.internal) continue;
       const Mac = NormalizeMac(Address.mac);
       if (!Mac || Mac === ZERO_MAC || Seen.has(Mac)) continue;
@@ -116,7 +117,7 @@ export function MissingMacAddresses(
   Existing: ReadonlyArray<{ MacAddress?: unknown }> | null | undefined
 ): string[] {
   const OnFile = new Set(
-    (Array.isArray(Existing) ? Existing : [])
+    ArrayOrEmpty(Existing)
       .map((Entry) => NormalizeMac(Entry && Entry.MacAddress))
       .filter((Mac): Mac is string => !!Mac)
   );

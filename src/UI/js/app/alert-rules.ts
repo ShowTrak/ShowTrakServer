@@ -963,7 +963,7 @@ export async function OpenAlertRuleManager() {
   // asset is later deleted (used for the missing-asset warning text).
   $('#ALERT_ACTION_EDITOR_SETTINGS')
     .off('change.alertAudioAsset')
-    .on('change.alertAudioAsset', '[data-key="AssetID"]', function () {
+    .on('change.alertAudioAsset', '[data-key="AssetID"]', function (this: HTMLElement) {
       const AssetID = ($(this).val() || '').toString();
       const Asset = (AudioAssetsCache || []).find((A) => A.ID === AssetID);
       $('#ALERT_ACTION_EDITOR_SETTINGS [data-key="AssetLabel"]').val(Asset ? Asset.Label : '');

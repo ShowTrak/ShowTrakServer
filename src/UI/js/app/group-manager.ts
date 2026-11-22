@@ -733,7 +733,7 @@ export async function OpenGroupManager(Relaunching = false) {
 
   $('#GROUP_MANAGER_GROUP_LIST')
     .off('dragstart.groupmanager dragend.groupmanager', '.GROUP_MANAGER_GROUP_ITEM')
-    .on('dragstart.groupmanager', '.GROUP_MANAGER_GROUP_ITEM', function (Event) {
+    .on('dragstart.groupmanager', '.GROUP_MANAGER_GROUP_ITEM', function (this: HTMLElement, Event) {
       this.classList.add('dragging');
       this.dataset.dragged = '';
       try {
@@ -744,7 +744,7 @@ export async function OpenGroupManager(Relaunching = false) {
         // Some platforms require setData; ignore failures.
       }
     })
-    .on('dragend.groupmanager', '.GROUP_MANAGER_GROUP_ITEM', async function () {
+    .on('dragend.groupmanager', '.GROUP_MANAGER_GROUP_ITEM', async function (this: HTMLElement) {
       this.classList.remove('dragging');
       this.dataset.dragged = '1';
       await PersistGroupManagerOrder();
@@ -756,7 +756,7 @@ export async function OpenGroupManager(Relaunching = false) {
     .on(
       'click',
       '.GROUP_MANAGER_GROUP_ITEM:not(.GROUP_MANAGER_GROUP_ITEM_DEFAULT)',
-      async function () {
+      async function (this: HTMLElement) {
         if (this.dataset.dragged === '1') {
           this.dataset.dragged = '';
           return;

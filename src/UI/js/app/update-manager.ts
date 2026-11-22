@@ -32,6 +32,7 @@ import {
   setUpdateManagerSelectedReleaseTag,
 } from './state';
 import type { ClientView, ScriptExecutionView } from '@showtrak/protocol';
+import { ArrayOrEmpty } from './lib/guards';
 
 // The script name the server gives a client-update execution. Its progress is
 // shown per client in the Update Manager, never in the script executions panel.
@@ -363,7 +364,7 @@ export function BuildUpdateManagerListModel(
   SelectedClients: ReadonlySet<unknown>,
   FindExecution: (UUID: string) => ScriptExecutionView | null = FindClientExecutionForUpdate
 ): UpdateManagerListModel {
-  const Clients = Array.isArray(ClientsIn) ? ClientsIn.filter(Boolean) : [];
+  const Clients = ArrayOrEmpty(ClientsIn).filter(Boolean);
   if (!Clients.length) {
     return {
       EmptyHtml: '<div class="text-muted small">No clients found.</div>',

@@ -142,7 +142,7 @@ function EnsureBound(): void {
     if (Event.target === $Modal[0]) UnmountDummyInfoEditor();
   });
 
-  $('#DUMMY_INFO_SETTINGS_SECTION').on('input change', '.di-draft', function () {
+  $('#DUMMY_INFO_SETTINGS_SECTION').on('input change', '.di-draft', function (this: HTMLElement) {
     if (this.id === 'DUMMY_INFO_INTERVAL') {
       $('#DUMMY_INFO_INTERVAL_LABEL').text(FormatInterval($(this).val()));
     }

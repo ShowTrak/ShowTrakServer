@@ -14,6 +14,7 @@
 // code that depends on it.
 import type { FreeKioskMetricSample } from '@showtrak/protocol';
 import { MONITOR_HISTORY_BLOCK_COUNT, MONITOR_HISTORY_WINDOW_MS } from './history-window';
+import { ArrayOrEmpty } from './guards';
 
 export interface ExpandMetricSeriesOptions {
   now?: number;
@@ -37,7 +38,7 @@ export function ExpandMetricSeries(
   Samples: readonly FreeKioskMetricSample[] | null | undefined,
   Options: ExpandMetricSeriesOptions = {}
 ): FreeKioskMetricSample[] {
-  const Sorted = (Array.isArray(Samples) ? Samples : [])
+  const Sorted = ArrayOrEmpty(Samples)
     .filter((Sample) => Sample && Number.isFinite(Number(Sample.ts)))
     .slice()
     .sort((a, b) => a.ts - b.ts);

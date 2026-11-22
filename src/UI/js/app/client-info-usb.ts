@@ -200,31 +200,35 @@ export function BindClientInfoUSBHandlers(
 ): void {
   $(USB_LIST)
     .off('.client-usb')
-    .on('click.client-usb', '.SHOWTRAK_TOGGLE_CRITICAL_USB_DEVICE', async function () {
-      try {
-        const UUID = GetUUID();
-        const Id = ReadIdentity(this);
-        if (!UUID || (Id.Mode === 'serial' && !Id.SerialNumber)) return;
-        const IsCritical = String($(this).attr('data-critical') || '0') === '1';
-        const [Err] = !IsCritical
-          ? await Mark(UUID, Id)
-          : Id.Mode === 'serial'
-            ? await window.API.RemoveClientUSBDeviceCritical(UUID, Id.SerialNumber)
-            : await window.API.RemoveClientUSBNameCritical(UUID, {
-                ManufacturerName: Id.ManufacturerName,
-                ProductName: Id.ProductName,
-              });
-        if (Err) return void Notify(String(Err), 'error');
-        await Notify(
-          IsCritical ? 'USB device no longer monitored.' : 'USB device is now monitored.',
-          'success',
-          1400
-        );
-        await Refresh();
-      } catch (err) {
-        HandleNonFatalError('ClientInfo:ToggleCriticalUSB', err);
+    .on(
+      'click.client-usb',
+      '.SHOWTRAK_TOGGLE_CRITICAL_USB_DEVICE',
+      async function (this: HTMLElement) {
+        try {
+          const UUID = GetUUID();
+          const Id = ReadIdentity(this);
+          if (!UUID || (Id.Mode === 'serial' && !Id.SerialNumber)) return;
+          const IsCritical = String($(this).attr('data-critical') || '0') === '1';
+          const [Err] = !IsCritical
+            ? await Mark(UUID, Id)
+            : Id.Mode === 'serial'
+              ? await window.API.RemoveClientUSBDeviceCritical(UUID, Id.SerialNumber)
+              : await window.API.RemoveClientUSBNameCritical(UUID, {
+                  ManufacturerName: Id.ManufacturerName,
+                  ProductName: Id.ProductName,
+                });
+          if (Err) return void Notify(String(Err), 'error');
+          await Notify(
+            IsCritical ? 'USB device no longer monitored.' : 'USB device is now monitored.',
+            'success',
+            1400
+          );
+          await Refresh();
+        } catch (err) {
+          HandleNonFatalError('ClientInfo:ToggleCriticalUSB', err);
+        }
       }
-    })
+    )
     // Conditions save as they are ticked.
     .on('change.client-usb', '.SHOWTRAK_USB_CONDITIONS input', function () {
       const UUID = GetUUID();

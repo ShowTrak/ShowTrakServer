@@ -265,7 +265,7 @@ function EnsureBound(): void {
     .toggleClass('d-none', !!Capabilities.isWeb)
     .on('click', () => void OpenVariableManagerFromClient());
   $('#CLIENT_INFO_VARIABLES_LIST')
-    .on('click', '.field-reset-btn', function () {
+    .on('click', '.field-reset-btn', function (this: HTMLElement) {
       ResetVariable(this);
     })
     .on('input', '.ci-variable', function () {

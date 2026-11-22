@@ -955,14 +955,16 @@ function BuildSettingsNav() {
   ApplySettingsTab();
 
   // Namespaced so repeated rebuilds replace rather than stack the handlers.
-  $nav.off('click.settingstabs').on('click.settingstabs', '.settings-nav-item', function () {
-    const Key = this.getAttribute('data-nav-target');
-    if (Key === ActiveSettingsTab) return;
-    ActiveSettingsTab = Key;
-    ApplySettingsTab();
-    // A new pane starts at its top, not wherever the last one was scrolled to.
-    $content.scrollTop(0);
-  });
+  $nav
+    .off('click.settingstabs')
+    .on('click.settingstabs', '.settings-nav-item', function (this: HTMLElement) {
+      const Key = this.getAttribute('data-nav-target');
+      if (Key === ActiveSettingsTab) return;
+      ActiveSettingsTab = Key;
+      ApplySettingsTab();
+      // A new pane starts at its top, not wherever the last one was scrolled to.
+      $content.scrollTop(0);
+    });
   $('#SHOWTRAK_MODAL_SETTINGS')
     .off('show.bs.modal.settingstabs')
     .on('show.bs.modal.settingstabs', ResetSettingsTab);

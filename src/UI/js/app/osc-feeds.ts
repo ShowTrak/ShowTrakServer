@@ -48,6 +48,7 @@ import { RefreshClientInfoTags, RefreshClientInfoVariables } from './client-info
 import { RefreshMonitorInfoEditor, RefreshMonitorInfoTags } from './monitor-info-edit';
 import { RefreshDummyInfoEditor, RefreshDummyInfoTags } from './dummy-info-edit';
 import { RefreshFreeKioskInfoEditor, RefreshFreeKioskInfoTags } from './freekiosk-info-edit';
+import { IsArray } from './lib/guards';
 
 /** One line rendered in the OSC/HTTP debug terminal. */
 interface OscHttpDebugEntry {
@@ -451,7 +452,7 @@ function RequestFrame(Callback: () => void): void {
 }
 
 export function HandleClientPatches(Patches: readonly ClientPatch[]): void {
-  if (!Array.isArray(Patches)) return;
+  if (!IsArray(Patches)) return;
   for (const Patch of Patches) {
     try {
       ApplyLiveClientPatch(Patch);

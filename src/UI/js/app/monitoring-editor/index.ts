@@ -1198,7 +1198,7 @@ export async function OpenMonitoringTargetEditor(
     })
     // Leaving a required field marks it touched so tabbing past an empty required
     // input reveals the red outline, matching common form behaviour.
-    .on('focusout.moncheck', '[data-required]', function () {
+    .on('focusout.moncheck', '[data-required]', function (this: HTMLElement) {
       $(this).addClass('mon-touched');
       ValidateMonitoringField(this);
     })
@@ -1213,10 +1213,14 @@ export async function OpenMonitoringTargetEditor(
     })
     // Device checklist filter: display only, so it must not reach the [data-key]
     // handler above (it would commit on every keystroke).
-    .on('input.moncheck change.moncheck', '.monitoring-list-pick-filter', function (e) {
-      e.stopPropagation();
-      FilterMonitoringListPicks($(this));
-    })
+    .on(
+      'input.moncheck change.moncheck',
+      '.monitoring-list-pick-filter',
+      function (this: HTMLElement, e) {
+        e.stopPropagation();
+        FilterMonitoringListPicks($(this));
+      }
+    )
     .on('click.moncheck', '.monitoring-list-chip-remove', function () {
       $(this).closest('.monitoring-list-chip').remove();
       ApplyMonitoringConditionalVisibility();

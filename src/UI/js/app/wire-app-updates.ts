@@ -13,6 +13,7 @@ import { HandleNonFatalError } from './utils';
 import { CloseAllModals } from './modals';
 import { openModal } from './lib/modal';
 import { renderMarkdownSafe, sanitizeUpdateNotesHtml } from './lib/markdown';
+import { IsArray, IsObject } from './lib/guards';
 
 const MODAL_ID = 'SHOWTRAK_MODAL_APP_UPDATE';
 
@@ -68,13 +69,13 @@ function setVersionBadge(version: unknown) {
 }
 
 // electron-updater ships release notes in different shapes across platforms.
-function extractNotes(info: AppUpdateStatus['info']) {
+function extractNotes(info: AppUpdateStatus['info']): unknown {
   if (!info) return '';
   const raw = info.releaseNotes || info.notes || info.body || '';
-  if (Array.isArray(raw)) {
+  if (IsArray(raw)) {
     // mac: array of releases; take the first entry's notes
     const first = raw.find(Boolean);
-    return (first && (first.releaseNotes || first.notes || first.body)) || '';
+    return (IsObject(first) && (first.releaseNotes || first.notes || first.body)) || '';
   }
   return raw || '';
 }

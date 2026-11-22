@@ -56,6 +56,7 @@ import {
   type ClientItem,
 } from './lib/client-items';
 import { RefreshListSearch } from './list-filter';
+import { IsArray } from './lib/guards';
 
 /** How often the history column is refetched while the list is showing. */
 const LIST_HISTORY_REFRESH_MS = 20 * 1000;
@@ -81,8 +82,8 @@ let ExpandedOwners: Set<string> | null = null;
 function LoadStoredSet(Key: string): Set<string> {
   const Out = new Set<string>();
   try {
-    const Stored = JSON.parse(localStorage.getItem(Key) || '[]');
-    if (Array.isArray(Stored)) for (const ID of Stored) Out.add(String(ID));
+    const Stored: unknown = JSON.parse(localStorage.getItem(Key) || '[]');
+    if (IsArray(Stored)) for (const ID of Stored) Out.add(String(ID));
   } catch {
     // Unreadable or unavailable storage: start with everything collapsed.
   }

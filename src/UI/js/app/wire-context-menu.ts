@@ -31,7 +31,7 @@ function ArmContextMenuRow($menu: JQuery, $row: JQuery) {
     const $other = $(this);
     if ($other.is($row)) return;
     $other.removeClass('context-confirm-pending');
-    const orig = $other.data('optionTitle');
+    const orig: unknown = $other.data('optionTitle');
     if (typeof orig === 'string') $other.find('.context-title').text(orig);
   });
   $row.addClass('context-confirm-pending');
@@ -68,16 +68,18 @@ function BindContextMenuKeyboard($menu: JQuery) {
     if (isChar) {
       ev.preventDefault();
       const now = Date.now();
+      const prevBuffer: unknown = $menu.data('typeaheadBuffer');
+      const prevTime: unknown = $menu.data('typeaheadTime');
       const buf = NextTypeaheadBuffer(
-        ($menu.data('typeaheadBuffer') || '').toString(),
-        $menu.data('typeaheadTime') || 0,
+        String(prevBuffer || ''),
+        typeof prevTime === 'number' ? prevTime : 0,
         key,
         now
       );
       $menu.data('typeaheadBuffer', buf);
       $menu.data('typeaheadTime', now);
-      const prevTimer = $menu.data('typeaheadTimer');
-      if (prevTimer) {
+      const prevTimer: unknown = $menu.data('typeaheadTimer');
+      if (typeof prevTimer === 'number' && prevTimer) {
         try {
           clearTimeout(prevTimer);
         } catch (err) {
@@ -167,8 +169,8 @@ function BindContextMenuKeyboard($menu: JQuery) {
     .on('mouseenter', 'a.SHOWTRAK_CONTEXTMENU_BUTTON', function () {
       const $a = $(this);
       if ($a.attr('aria-disabled') === 'true') return;
-      const prevTimer = $menu.data('typeaheadTimer');
-      if (prevTimer) {
+      const prevTimer: unknown = $menu.data('typeaheadTimer');
+      if (typeof prevTimer === 'number' && prevTimer) {
         try {
           clearTimeout(prevTimer);
         } catch (err) {
@@ -451,7 +453,7 @@ export function wireContextMenu() {
     { capture: true, passive: true }
   );
   const longPress = wireTouchLongPress();
-  $(document).on('contextmenu', 'html', async function (e) {
+  $(document).on('contextmenu', 'html', async function (this: HTMLElement, e) {
     e.preventDefault();
     // A platform-fired contextmenu (originalEvent present; our synthetic
     // triggers have none) that duplicates a touch long-press we already

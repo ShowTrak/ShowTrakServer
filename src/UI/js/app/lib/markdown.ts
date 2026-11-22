@@ -25,7 +25,7 @@ function renderMarkdownSafe(md: unknown): string {
   text = Safe(text);
   // Extract fenced code blocks
   const codeBlocks: string[] = [];
-  text = text.replace(/```([\s\S]*?)```/g, (_m, code) => {
+  text = text.replace(/```([\s\S]*?)```/g, (_m, code: string) => {
     const idx = codeBlocks.push(code) - 1;
     return `%%CODEBLOCK_${idx}%%`;
   });
@@ -43,9 +43,9 @@ function renderMarkdownSafe(md: unknown): string {
   const inline: string[] = [];
   const stash = (html: string) => `%%INLINE${inline.push(html) - 1}%%`;
   // Inline code (after fences are removed)
-  text = text.replace(/`([^`]+)`/g, (_m, code) => stash(`<code>${code}</code>`));
+  text = text.replace(/`([^`]+)`/g, (_m, code: string) => stash(`<code>${code}</code>`));
   // Links
-  text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label, href) => {
+  text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label: string, href: string) => {
     const url = sanitizeHref(href);
     return stash(`<a href="${url}" target="_blank" rel="noopener">${label}</a>`);
   });

@@ -162,7 +162,7 @@ function EnsureBound(): void {
     if (Event.target === $Modal[0]) UnmountMonitorInfoEditor();
   });
 
-  $('#MONITOR_INFO_SETTINGS_SECTION').on('input change', '.mi-draft', function () {
+  $('#MONITOR_INFO_SETTINGS_SECTION').on('input change', '.mi-draft', function (this: HTMLElement) {
     if (!Editing) return;
     if (this.id === 'MONITOR_INFO_INTERVAL') {
       $('#MONITOR_INFO_INTERVAL_LABEL').text(FormatInterval(ParseMonitorInterval($(this).val())));
@@ -171,12 +171,12 @@ function EnsureBound(): void {
   });
 
   const $List = $('#MONITOR_INFO_CHECK_LIST');
-  $List.on('click', '.monitor-settings-check', function () {
+  $List.on('click', '.monitor-settings-check', function (this: HTMLElement) {
     if (!Editing || DraggedRow) return;
     const CheckID = Number(this.getAttribute('data-checkid'));
     if (Number.isFinite(CheckID)) void OpenCheck({ CheckID });
   });
-  $List.on('keydown', '.monitor-settings-check', function (Event) {
+  $List.on('keydown', '.monitor-settings-check', function (this: HTMLElement, Event) {
     if (!Editing || (Event.key !== 'Enter' && Event.key !== ' ')) return;
     Event.preventDefault();
     const CheckID = Number(this.getAttribute('data-checkid'));
@@ -352,7 +352,7 @@ function RenderedCheckOrder(): number[] {
 // Drag a row up or down the list: the rows move live under the pointer, and the
 // new order saves on drop. Edit mode only; rows are not draggable otherwise.
 function BindCheckDragging($List: JQuery<HTMLElement>): void {
-  $List.on('dragstart', '.monitor-settings-check', function (Event) {
+  $List.on('dragstart', '.monitor-settings-check', function (this: HTMLElement, Event) {
     if (!Editing) return;
     DraggedRow = this;
     const Transfer = (Event.originalEvent as DragEvent).dataTransfer;
@@ -388,7 +388,7 @@ function BindCheckDragging($List: JQuery<HTMLElement>): void {
     if (DraggedRow) Event.preventDefault();
   });
 
-  $List.on('dragend', '.monitor-settings-check', function () {
+  $List.on('dragend', '.monitor-settings-check', function (this: HTMLElement) {
     this.classList.remove('is-dragging');
     if (!DraggedRow || !Mounted) {
       DraggedRow = null;

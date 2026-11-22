@@ -274,26 +274,30 @@ export function BindClientInfoAudioHandlers(
 
   $List
     .off('.client-audio')
-    .on('click.client-audio', '.SHOWTRAK_TOGGLE_CRITICAL_AUDIO', async function () {
-      try {
-        const UUID = GetUUID();
-        const EndpointID = Endpoint(this);
-        if (!UUID || !EndpointID) return;
-        const IsCritical = String($(this).attr('data-critical') || '0') === '1';
-        const [Err] = IsCritical
-          ? await window.API.RemoveClientAudioDeviceCritical(UUID, EndpointID)
-          : await window.API.MarkClientAudioDeviceCritical(UUID, { EndpointID });
-        if (Err) return void Notify(String(Err), 'error');
-        await Notify(
-          IsCritical ? 'Audio device no longer monitored.' : 'Audio device is now monitored.',
-          'success',
-          1400
-        );
-        await Refresh();
-      } catch (err) {
-        HandleNonFatalError('ClientInfo:ToggleCriticalAudio', err);
+    .on(
+      'click.client-audio',
+      '.SHOWTRAK_TOGGLE_CRITICAL_AUDIO',
+      async function (this: HTMLElement) {
+        try {
+          const UUID = GetUUID();
+          const EndpointID = Endpoint(this);
+          if (!UUID || !EndpointID) return;
+          const IsCritical = String($(this).attr('data-critical') || '0') === '1';
+          const [Err] = IsCritical
+            ? await window.API.RemoveClientAudioDeviceCritical(UUID, EndpointID)
+            : await window.API.MarkClientAudioDeviceCritical(UUID, { EndpointID });
+          if (Err) return void Notify(String(Err), 'error');
+          await Notify(
+            IsCritical ? 'Audio device no longer monitored.' : 'Audio device is now monitored.',
+            'success',
+            1400
+          );
+          await Refresh();
+        } catch (err) {
+          HandleNonFatalError('ClientInfo:ToggleCriticalAudio', err);
+        }
       }
-    })
+    )
     // Conditions save as they change: a tick, or a level bound once typed.
     .on('change.client-audio', '.SHOWTRAK_AUDIO_CONDITIONS input', function () {
       const UUID = GetUUID();
@@ -352,7 +356,7 @@ export function BindClientInfoAudioHandlers(
       $(this).siblings('.SHOWTRAK_AUDIO_LEVEL_VALUE').text(`${Level}%`);
     })
     // `change` fires once, on release: one request per gesture, not one per pixel.
-    .on('change.client-audio', '.SHOWTRAK_AUDIO_LEVEL', async function () {
+    .on('change.client-audio', '.SHOWTRAK_AUDIO_LEVEL', async function (this: HTMLElement) {
       const $Slider = $(this);
       $Slider.removeAttr('data-dragging');
       try {
@@ -371,7 +375,7 @@ export function BindClientInfoAudioHandlers(
         HandleNonFatalError('ClientInfo:SetAudioLevel', err);
       }
     })
-    .on('click.client-audio', '.SHOWTRAK_AUDIO_MUTE', async function () {
+    .on('click.client-audio', '.SHOWTRAK_AUDIO_MUTE', async function (this: HTMLElement) {
       try {
         const UUID = GetUUID();
         const EndpointID = Endpoint(this);
