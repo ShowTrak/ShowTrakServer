@@ -43,7 +43,7 @@
 import { BuildBaseUrl, WithPath, RequestJson, IsObject, TimeoutOf } from './_videoproc-http-shared';
 import { WithProbeAgents, type ProbeAgents } from './_probe-agents';
 import type { JsonResponse } from './_videoproc-http-shared';
-import { Card, Esc, Pill, Rows, Row, TextRow, Note, FormatLatency } from './debug';
+import { Card, Esc, Pill, Rows, Row, TextRow, Note, FormatLatency, HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type {
   MonitoringResult,
@@ -652,20 +652,13 @@ async function Probe(
 
 // --- Debug -------------------------------------------------------------------
 
-function StatePill(Result: MonitoringResult): string {
-  const Reachable = !!(Result && Result.Success === true);
-  if (Reachable && !Result.Degraded) return Pill('success', 'Online');
-  if (Reachable) return Pill('warning', 'Degraded');
-  return Pill('danger', 'Offline');
-}
-
 function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Config = ParseConfig(Target);
   const Reachable = !!(Result && Result.Success === true);
   // The API key is a credential and is never shown.
   const Head = Rows([
     TextRow('Controller', `${Config.Address || '-'}:${Config.Port}${Config.BasePath}`),
-    Row('Status', StatePill(Result)),
+    Row('Status', HealthPill(Result, 'Online', false)),
     Result && Result.Version ? TextRow('Network version', String(Result.Version)) : null,
     Reachable && Result.SiteName ? TextRow('Site', String(Result.SiteName)) : null,
     Reachable

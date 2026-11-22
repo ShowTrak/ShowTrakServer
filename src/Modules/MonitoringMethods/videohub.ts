@@ -43,7 +43,6 @@
 import { Manager as CacheManager } from '../CacheManager';
 import { RunTcpSession, type TcpSession } from './_tcp-session';
 import {
-  BmdStatePill,
   IsRefusal,
   MonoRow,
   ParseFields,
@@ -55,7 +54,7 @@ import {
   TimeoutSetting,
   type BmdBlock,
 } from './_blackmagic-shared';
-import { Card, Esc, FormatLatency, Note, Pill, Row, Rows, TextRow } from './debug';
+import { Card, Esc, FormatLatency, Note, Pill, Row, Rows, TextRow, HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
@@ -643,7 +642,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     Reachable && Result.ProtocolVersion
       ? TextRow('Protocol', String(Result.ProtocolVersion))
       : null,
-    Row('Status', BmdStatePill(Result, 'Healthy')),
+    Row('Status', HealthPill(Result, 'Healthy', false)),
     Reachable && Result.DegradedReason ? TextRow('Reason', String(Result.DegradedReason)) : null,
     Reachable
       ? Row('Reply time', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)

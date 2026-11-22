@@ -70,7 +70,7 @@ import {
   type ServerInfo,
 } from './_natnet-shared';
 import { ErrorMessage } from './_tcp-session';
-import { Card, Esc, FormatLatency, Note, Pill, Row, Rows, TextRow } from './debug';
+import { Card, Esc, FormatLatency, Note, Pill, Row, Rows, TextRow, HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
@@ -981,13 +981,6 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   };
 }
 
-function StatePill(Result: MonitoringResult): string {
-  const Reachable = !!(Result && Result.Success === true);
-  if (Reachable && !Result.Degraded) return Pill('success', 'Online');
-  if (Reachable) return Pill('warning', Result.DegradedReason || 'Degraded');
-  return Pill('danger', 'Offline');
-}
-
 const RIGID_BODY_BADGES: Record<RigidBodyState, [string, string]> = {
   tracked: ['success', 'Tracked'],
   'not-tracked': ['warning', 'Not tracked'],
@@ -1022,7 +1015,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     TextRow('Host', `${Config.Address || '-'}:${Config.Port}`),
     App ? TextRow('Application', App) : null,
     Reachable && Result.NatNetVersion ? TextRow('NatNet', Result.NatNetVersion) : null,
-    Row('Status', StatePill(Result)),
+    Row('Status', HealthPill(Result)),
     Reachable
       ? Row('Reply time', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)
       : TextRow('Error', (Result && Result.Error) || 'Failed to reach Motive'),

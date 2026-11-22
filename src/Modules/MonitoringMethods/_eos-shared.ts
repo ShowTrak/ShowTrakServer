@@ -27,7 +27,7 @@
 import { Manager as CacheManager } from '../CacheManager';
 import { EncodeOscTcp, DecodeOscStream, type OscFraming } from './_osc-shared';
 import { ErrorMessage, RunTcpSession } from './_tcp-session';
-import { Esc, Pill, Rows, TextRow, Row, Note, FormatLatency } from './debug';
+import { Esc, Rows, TextRow, Row, Note, FormatLatency } from './debug';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
 export const DEFAULT_EOS_PORT = 3032;
@@ -297,14 +297,6 @@ export function EosSnapshotExtras(Snapshot: EosSnapshot): Record<string, unknown
     CuelistCount: Snapshot.CuelistCount,
     PatchCount: Snapshot.PatchCount,
   };
-}
-
-export function EosStatePill(Result: MonitoringResult, OnlineText: string): string {
-  const Reachable = !!(Result && Result.Success === true);
-  const Degraded = !!(Result && Result.Degraded);
-  if (Reachable && !Degraded) return Pill('success', OnlineText || 'Online');
-  if (Reachable) return Pill('warning', (Result && Result.DegradedReason) || 'Degraded');
-  return Pill('danger', 'Offline');
 }
 
 // Render the shared debug-panel head (Host / identity / Status / reply time or

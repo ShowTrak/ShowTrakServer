@@ -15,7 +15,7 @@
 //      "value"` (or an `ERR <reason>` line, captured per-variable rather than
 //      thrown).
 //   4. `LOGOUT` and closes cleanly.
-import { Esc, Pill, Rows, TextRow, Row, Note, FormatLatency } from './debug';
+import { Esc, Rows, TextRow, Row, Note, FormatLatency } from './debug';
 import { ReplyQueue, RunTcpSession } from './_tcp-session';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
@@ -465,16 +465,6 @@ export async function RunNutProbe(
   }
 
   return { Ctx: { Config, Probe } };
-}
-
-// A status pill coloured from a result: green (online), amber (degraded,
-// showing the reason), or red (offline).
-export function StatePill(Result: MonitoringResult, OnlineText: string): string {
-  const Reachable = !!(Result && Result.Success === true);
-  const Degraded = !!(Result && Result.Degraded);
-  if (Reachable && !Degraded) return Pill('success', OnlineText || 'Online');
-  if (Reachable) return Pill('warning', (Result && Result.DegradedReason) || 'Degraded');
-  return Pill('danger', 'Offline');
 }
 
 // Render the debug panel head (Host / UPS / Status / reply time or error) shared

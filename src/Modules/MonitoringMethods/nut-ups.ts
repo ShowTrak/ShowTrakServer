@@ -28,10 +28,10 @@ import {
   ParseNumber,
   ParseNutConfig,
   SendNutInstCmd,
-  StatePill,
   NutDebug,
   MonoRow,
 } from './_nut-shared';
+import { HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type {
   MonitoringActionDef,
@@ -376,7 +376,7 @@ async function RunAction(
 function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Config = ParseNutConfig(Target);
   const Reachable = !!(Result && Result.Success === true);
-  const Pill = StatePill(Result, 'Healthy');
+  const Pill = HealthPill(Result, 'Healthy');
 
   const Fmt = (Value: unknown, Suffix: string): string =>
     Value == null ? '-' : `${Value}${Suffix}`;

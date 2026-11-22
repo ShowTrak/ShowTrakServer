@@ -66,7 +66,7 @@ import {
   TimeoutOf,
   type JsonResponse,
 } from './_videoproc-http-shared';
-import { Card, Esc, FormatLatency, Note, Pill, Row, Rows, TextRow } from './debug';
+import { Card, Esc, FormatLatency, Note, Pill, Row, Rows, TextRow, HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type {
   MonitoringActionDef,
@@ -800,13 +800,6 @@ function DescribeAction(ActionID: string, Params: Record<string, unknown>): stri
 
 // --- Debug ------------------------------------------------------------------
 
-function StatePill(Result: MonitoringResult): string {
-  const Reachable = !!(Result && Result.Success === true);
-  if (Reachable && !Result.Degraded) return Pill('success', 'Healthy');
-  if (Reachable) return Pill('warning', Result.DegradedReason || 'Degraded');
-  return Pill('danger', 'Offline');
-}
-
 function Mono(Value: unknown): string {
   return `<span class="font-monospace">${Esc(Value)}</span>`;
 }
@@ -841,7 +834,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
 
   const Head = Rows([
     TextRow('Controller', `${Address || '-'}${R.FriendlyName ? ` (${R.FriendlyName})` : ''}`),
-    Row('Status', StatePill(Result)),
+    Row('Status', HealthPill(Result, 'Healthy')),
     Reachable
       ? Row('Reply time', Mono(FormatLatency(R.LatencyMs)))
       : TextRow('Error', (Result && Result.Error) || 'Failed to reach the controller'),

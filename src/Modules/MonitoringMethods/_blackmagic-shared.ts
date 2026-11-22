@@ -19,8 +19,8 @@
 // (`200 ok`, `102 invalid value`, `120 connection failed`): a header that does
 // not end in a colon is a complete message on its own. Videohub's `ACK` / `NAK`
 // look similar but ARE followed by a blank line, so the framer takes a flag.
-import { Esc, Pill, Row } from './debug';
-import type { MonitoringResult, MonitoringSettingField } from './types';
+import { Esc, Row } from './debug';
+import type { MonitoringSettingField } from './types';
 
 // The devices send CR LF; clients may send either. Dropping every CR as it is
 // received (rather than rewriting CR LF pairs) is immune to a CR and its LF
@@ -158,13 +158,6 @@ export function ResolveTimeoutMs(Value: unknown): number {
 /** Snapshot cache TTL: long enough to share one session between sibling checks in a tick. */
 export function ResolveSnapshotTtlMs(TimeoutMs: number): number {
   return Math.max(300, Math.min(1500, (TimeoutMs / 2) | 0));
-}
-
-export function BmdStatePill(Result: MonitoringResult, HealthyText: string): string {
-  const Reachable = !!(Result && Result.Success === true);
-  if (Reachable && !Result.Degraded) return Pill('success', HealthyText);
-  if (Reachable) return Pill('warning', 'Degraded');
-  return Pill('danger', 'Offline');
 }
 
 export function MonoRow(Label: string, Value: unknown): string {

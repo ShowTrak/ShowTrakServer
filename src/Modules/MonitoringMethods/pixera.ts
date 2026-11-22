@@ -31,7 +31,7 @@
 // burst; replies are matched by id. The configured Timeout bounds the WHOLE
 // probe. A reply to getApiRevision is the fingerprint.
 import { RunTcpSession, type TcpSession } from './_tcp-session';
-import { Card, FormatLatency, Note, Pill, Row, Rows, TextRow } from './debug';
+import { Card, FormatLatency, Note, Pill, Row, Rows, TextRow, HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
@@ -544,13 +544,6 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   };
 }
 
-function StatePill(Result: MonitoringResult): string {
-  const Reachable = !!(Result && Result.Success === true);
-  if (Reachable && !Result.Degraded) return Pill('success', 'Online');
-  if (Reachable) return Pill('warning', Result.DegradedReason || 'Degraded');
-  return Pill('danger', 'Offline');
-}
-
 function TransportPill(Transport: unknown): string {
   if (Transport === 'play') return Pill('success', 'Playing');
   if (Transport === 'pause') return Pill('warning', 'Paused');
@@ -580,7 +573,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
               : '')
         )
       : null,
-    Row('Status', StatePill(Result)),
+    Row('Status', HealthPill(Result)),
     Reachable
       ? Row('Reply time', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)
       : TextRow('Error', (Result && Result.Error) || 'Failed to reach PIXERA'),

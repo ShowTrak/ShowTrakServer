@@ -38,7 +38,7 @@
 //   the table, or no IGMP rows at all) = Degraded, or Offline when the operator
 //   chooses.
 //   Degraded = a querier other than the expected address.
-import { Card, Esc, Pill, Rows, Row, TextRow, Note, FormatLatency } from './debug';
+import { Card, Esc, Pill, Rows, Row, TextRow, Note, FormatLatency, HealthPill } from './debug';
 import { DEFAULT_PORT, type SnmpSession } from './_snmp-ups-shared';
 import {
   SNMP_VERSION_FIELDS,
@@ -527,13 +527,6 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
 
 // --- Debug -------------------------------------------------------------------
 
-function StatePill(Result: MonitoringResult): string {
-  const Reachable = !!(Result && Result.Success === true);
-  if (Reachable && !Result.Degraded) return Pill('success', 'Online');
-  if (Reachable) return Pill('warning', 'Degraded');
-  return Pill('danger', 'Offline');
-}
-
 function FormatTicks(Ticks: number | null): string {
   if (Ticks == null || !Number.isFinite(Ticks)) return '-';
   const Seconds = Math.floor(Ticks / 100);
@@ -567,7 +560,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Head = Rows([
     TextRow('Host', `${Config.Address || '-'}:${Config.Port}`),
     Row('SNMP', `<span class="font-monospace">${Esc(Identity)}</span>`),
-    Row('Status', StatePill(Result)),
+    Row('Status', HealthPill(Result, 'Online', false)),
     MibLabel ? TextRow('MIB', MibLabel) : null,
     Answered
       ? Row('Reply time', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)

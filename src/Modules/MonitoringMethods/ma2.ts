@@ -10,12 +10,11 @@ import {
   ParseMa2Config,
   RunMa2Probe,
   Ma2SnapshotExtras,
-  Ma2StatePill,
   Ma2DebugHead,
   LOGIN_STATE_LABELS,
   type Ma2Snapshot,
 } from './_ma2-shared';
-import { TextRow } from './debug';
+import { TextRow, HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
@@ -180,7 +179,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     }
   }
 
-  return Ma2DebugHead(Config, Result, Ma2StatePill(Result, 'Online'), ExtraRows);
+  return Ma2DebugHead(Config, Result, HealthPill(Result), ExtraRows);
 }
 
 export const Name = 'grandMA2';

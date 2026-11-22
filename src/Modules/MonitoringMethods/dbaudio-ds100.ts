@@ -59,7 +59,7 @@ import dns from 'dns';
 import net from 'net';
 import { EncodeOscMessage, ParseOscPacket, type OscArg, type OscMessage } from './_osc-shared';
 import { ErrorMessage } from './_tcp-session';
-import { Card, FormatLatency, Note, Pill, Row, Rows, TextRow } from './debug';
+import { Card, FormatLatency, Note, Pill, Row, Rows, TextRow, HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS, MONITORING_INTEREST_TTL_MS } from '../Config/constants';
 import type {
   MonitoringActionDef,
@@ -1143,13 +1143,6 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   };
 }
 
-function StatePill(Result: MonitoringResult): string {
-  const Reachable = !!(Result && Result.Success === true);
-  if (Reachable && !Result.Degraded) return Pill('success', 'Online');
-  if (Reachable) return Pill('warning', Result.DegradedReason || 'Degraded');
-  return Pill('danger', 'Offline');
-}
-
 function Present(Value: unknown): boolean {
   return Value != null && String(Value).trim() !== '';
 }
@@ -1173,7 +1166,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     ),
     Reachable && Identity ? TextRow('Device', Identity) : null,
     Reachable && Present(Result.Firmware) ? TextRow('Firmware', String(Result.Firmware)) : null,
-    Row('Status', StatePill(Result)),
+    Row('Status', HealthPill(Result)),
     Reachable
       ? Row('Reply time', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)
       : TextRow('Error', (Result && Result.Error) || 'Failed to reach the DS100'),

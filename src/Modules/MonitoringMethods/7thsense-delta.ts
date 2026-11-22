@@ -67,7 +67,7 @@ import {
   ResolveTimeoutMs,
   TimeoutSetting,
 } from './_blackmagic-shared';
-import { Card, Esc, FormatLatency, Note, Pill, Row, Rows, TextRow } from './debug';
+import { Card, Esc, FormatLatency, Note, Pill, Row, Rows, TextRow, HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 import { CachedLookup } from './_dns-cache';
@@ -1113,13 +1113,6 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
 
 // --- Debug --------------------------------------------------------------------------------
 
-function StatePill(Result: MonitoringResult): string {
-  const Reachable = !!(Result && Result.Success === true);
-  if (Reachable && !Result.Degraded) return Pill('success', 'Healthy');
-  if (Reachable) return Pill('warning', 'Degraded');
-  return Pill('danger', 'Offline');
-}
-
 function ModePill(Mode: unknown): string {
   const Text = typeof Mode === 'string' && Mode ? Mode : '';
   if (!Text) return Pill('muted', 'Unknown');
@@ -1153,7 +1146,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
 
   const Head = Rows([
     TextRow('Host', `${Config.Address || '-'}:${Config.Port}`),
-    Row('Status', StatePill(Result)),
+    Row('Status', HealthPill(Result, 'Healthy', false)),
     Reachable && Result.DegradedReason ? TextRow('Reason', String(Result.DegradedReason)) : null,
     Reachable
       ? Row('Reply time', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)

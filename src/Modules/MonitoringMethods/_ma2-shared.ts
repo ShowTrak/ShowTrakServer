@@ -19,7 +19,7 @@
 // from several independent open-source grandMA2 telnet clients.
 import { Manager as CacheManager } from '../CacheManager';
 import { RunTcpSession, type TcpSession } from './_tcp-session';
-import { Esc, Pill, Rows, TextRow, Row, Note, FormatLatency } from './debug';
+import { Esc, Rows, TextRow, Row, Note, FormatLatency } from './debug';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
 export const DEFAULT_MA2_PORT = 30000;
@@ -338,14 +338,6 @@ export const LOGIN_STATE_LABELS: Record<Ma2LoginState, string> = {
   timeout: 'Login timed out',
   error: 'Login error',
 };
-
-export function Ma2StatePill(Result: MonitoringResult, OnlineText: string): string {
-  const Reachable = !!(Result && Result.Success === true);
-  const Degraded = !!(Result && Result.Degraded);
-  if (Reachable && !Degraded) return Pill('success', OnlineText || 'Online');
-  if (Reachable) return Pill('warning', (Result && Result.DegradedReason) || 'Degraded');
-  return Pill('danger', 'Offline');
-}
 
 export function Ma2DebugHead(
   Config: Ma2Config,

@@ -9,12 +9,11 @@ import {
   ParseEosConfig,
   RunEosProbe,
   EosSnapshotExtras,
-  EosStatePill,
   EosDebugHead,
   MonoRow,
   type EosSnapshot,
 } from './_eos-shared';
-import { TextRow } from './debug';
+import { TextRow, HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
@@ -180,7 +179,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     }
   }
 
-  return EosDebugHead(Config, Result, EosStatePill(Result, 'Online'), ExtraRows);
+  return EosDebugHead(Config, Result, HealthPill(Result), ExtraRows);
 }
 
 export const Name = 'ETC Eos';

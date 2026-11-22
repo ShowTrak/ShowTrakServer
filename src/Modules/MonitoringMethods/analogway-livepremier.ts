@@ -56,7 +56,7 @@ import {
   type JsonRequest,
   type JsonResponse,
 } from './_videoproc-http-shared';
-import { Card, Esc, FormatLatency, Note, Pill, Row, Rows, TextRow } from './debug';
+import { Card, Esc, FormatLatency, Note, Pill, Row, Rows, TextRow, HealthPill } from './debug';
 import { createHash } from 'crypto';
 import { DEFAULT_MONITORING_INTERVAL_MS, MONITORING_INTEREST_TTL_MS } from '../Config/constants';
 import type {
@@ -610,13 +610,6 @@ function DescribeAction(ActionID: string, Params: Record<string, unknown>): stri
 
 // --- Debug ------------------------------------------------------------------
 
-function StatePill(Result: MonitoringResult): string {
-  const Reachable = !!(Result && Result.Success === true);
-  if (Reachable && !Result.Degraded) return Pill('success', 'Healthy');
-  if (Reachable) return Pill('warning', Result.DegradedReason || 'Degraded');
-  return Pill('danger', 'Offline');
-}
-
 function InputPill(I: LivePremierInput): string {
   if (I.Error) return Pill('danger', I.Error);
   if (!I.Found) return Pill('danger', 'Not found');
@@ -637,7 +630,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
       'Unit',
       `${Address || '-'}${Result && Result.DeviceLabel ? ` (${Result.DeviceLabel})` : ''}`
     ),
-    Row('Status', StatePill(Result)),
+    Row('Status', HealthPill(Result, 'Healthy')),
     Reachable
       ? Row('Reply time', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)
       : TextRow('Error', (Result && Result.Error) || 'Failed to reach the unit'),

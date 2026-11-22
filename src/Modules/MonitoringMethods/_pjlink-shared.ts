@@ -25,7 +25,7 @@
 import crypto from 'crypto';
 import { Manager as CacheManager } from '../CacheManager';
 import { ReplyQueue, RunTcpSession } from './_tcp-session';
-import { Esc, Pill, Rows, TextRow, Row, Note, FormatLatency } from './debug';
+import { Esc, Rows, TextRow, Row, Note, FormatLatency } from './debug';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
 export const DEFAULT_PJLINK_PORT = 4352;
@@ -744,16 +744,6 @@ export function SnapshotExtras(Snapshot: PJLinkSnapshot): Record<string, unknown
     Manufacturer: Snapshot.Manufacturer,
     Model: Snapshot.Model,
   };
-}
-
-// A status pill coloured from a result: green (online), amber (degraded,
-// showing the reason), or red (offline).
-export function PJLinkStatePill(Result: MonitoringResult, OnlineText: string): string {
-  const Reachable = !!(Result && Result.Success === true);
-  const Degraded = !!(Result && Result.Degraded);
-  if (Reachable && !Degraded) return Pill('success', OnlineText || 'Online');
-  if (Reachable) return Pill('warning', (Result && Result.DegradedReason) || 'Degraded');
-  return Pill('danger', 'Offline');
 }
 
 // Render the debug panel head (Host / Projector identity / Status / reply time

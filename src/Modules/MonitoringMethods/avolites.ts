@@ -8,11 +8,10 @@ import {
   ParseAvolitesConfig,
   RunAvolitesProbe,
   AvolitesSnapshotExtras,
-  AvolitesStatePill,
   AvolitesDebugHead,
   type TitanSnapshot,
 } from './_avolites-shared';
-import { TextRow } from './debug';
+import { TextRow, HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
@@ -151,7 +150,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     }
   }
 
-  return AvolitesDebugHead(Config, Result, AvolitesStatePill(Result, 'Online'), ExtraRows);
+  return AvolitesDebugHead(Config, Result, HealthPill(Result), ExtraRows);
 }
 
 export const Name = 'Avolites Titan';

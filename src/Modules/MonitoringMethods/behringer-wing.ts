@@ -48,7 +48,7 @@ import dgram from 'dgram';
 import net from 'net';
 import { EncodeOscMessage, ParseOscPacket, type OscArg, type OscMessage } from './_osc-shared';
 import { ErrorMessage } from './_tcp-session';
-import { Card, FormatLatency, Note, Pill, Row, Rows, TextRow } from './debug';
+import { Card, FormatLatency, Note, Pill, Row, Rows, TextRow, HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type {
   MonitoringActionDef,
@@ -1218,13 +1218,6 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   };
 }
 
-function StatePill(Result: MonitoringResult): string {
-  const Reachable = !!(Result && Result.Success === true);
-  if (Reachable && !Result.Degraded) return Pill('success', 'Online');
-  if (Reachable) return Pill('warning', Result.DegradedReason || 'Degraded');
-  return Pill('danger', 'Offline');
-}
-
 function Aes50Pill(State: string | null): string {
   if (State == null) return Pill('muted', 'No reply');
   const Upper = State.toUpperCase();
@@ -1251,7 +1244,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     Reachable && Result.Serial ? TextRow('Serial', Result.Serial) : null,
     Reachable && Result.Firmware ? TextRow('Firmware', Result.Firmware) : null,
     Reachable && Result.ReportedIp ? TextRow('Reported IP', Result.ReportedIp) : null,
-    Row('Status', StatePill(Result)),
+    Row('Status', HealthPill(Result)),
     Reachable
       ? Row('Reply time', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)
       : TextRow('Error', (Result && Result.Error) || 'Failed to reach the console'),

@@ -59,7 +59,7 @@ import {
   TimeoutOf,
 } from './_videoproc-http-shared';
 import type { URL } from 'url';
-import { Card, FormatLatency, Note, Pill, Row, Rows, TextRow } from './debug';
+import { Card, FormatLatency, Note, Pill, Row, Rows, TextRow, HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type {
   MonitoringActionDef,
@@ -684,13 +684,6 @@ function DescribeAction(ActionID: string, Params: Record<string, unknown>): stri
 
 // --- Debug ------------------------------------------------------------------
 
-function StatePill(Result: MonitoringResult): string {
-  const Reachable = !!(Result && Result.Success === true);
-  if (Reachable && !Result.Degraded) return Pill('success', 'Healthy');
-  if (Reachable) return Pill('warning', Result.DegradedReason || 'Degraded');
-  return Pill('danger', 'Offline');
-}
-
 function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Address = Target && Target.Address ? String(Target.Address).trim() : '';
   const Reachable = !!(Result && Result.Success === true);
@@ -699,7 +692,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
 
   const Head = Rows([
     TextRow('Processor', `${Address || '-'}${R.SystemName ? ` (${R.SystemName})` : ''}`),
-    Row('Status', StatePill(Result)),
+    Row('Status', HealthPill(Result, 'Healthy')),
     Reachable
       ? Row('Reply time', `<span class="font-monospace">${FormatLatency(R.LatencyMs)}</span>`)
       : TextRow('Error', (Result && Result.Error) || 'Failed to reach Event Master'),

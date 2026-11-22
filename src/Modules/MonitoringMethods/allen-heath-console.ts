@@ -53,7 +53,7 @@
 // "LR Mute" as 00/00, which is Input 1 in its own mute table; the table value
 // 00/44 (also used by Companion's SQ module) is used here.
 import { ErrorMessage, RunTcpSession, type TcpSession } from './_tcp-session';
-import { Card, FormatLatency, Note, Pill, Row, Rows, TextRow } from './debug';
+import { Card, FormatLatency, Note, Pill, Row, Rows, TextRow, HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type {
   MonitoringActionDef,
@@ -929,13 +929,6 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   };
 }
 
-function StatePill(Result: MonitoringResult): string {
-  const Reachable = !!(Result && Result.Success === true);
-  if (Reachable && !Result.Degraded) return Pill('success', 'Online');
-  if (Reachable) return Pill('warning', Result.DegradedReason || 'Degraded');
-  return Pill('danger', 'Offline');
-}
-
 function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Config = ParseConfig(Target);
   const Options = ParseHealthOptions(Target);
@@ -948,7 +941,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
       'Console',
       `${Family}, MIDI channel ${Config.BaseChannel >= 0 ? Config.BaseChannel + 1 : '-'}`
     ),
-    Row('Status', StatePill(Result)),
+    Row('Status', HealthPill(Result)),
     Reachable
       ? Row('Reply time', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)
       : TextRow('Error', (Result && Result.Error) || 'Failed to reach the console'),

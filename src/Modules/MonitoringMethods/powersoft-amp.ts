@@ -63,7 +63,7 @@
 import dgram from 'dgram';
 import net from 'net';
 import { ErrorMessage } from './_tcp-session';
-import { Card, Esc, FormatLatency, Note, Pill, Row, Rows, TextRow } from './debug';
+import { Card, Esc, FormatLatency, Note, Pill, Row, Rows, TextRow, HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type {
   MonitoringActionDef,
@@ -985,13 +985,6 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   };
 }
 
-function StatePill(Result: MonitoringResult): string {
-  const Reachable = !!(Result && Result.Success === true);
-  if (Reachable && !Result.Degraded) return Pill('success', 'Online');
-  if (Reachable) return Pill('warning', Result.DegradedReason || 'Degraded');
-  return Pill('danger', 'Offline');
-}
-
 function ChannelBadge(C: PowersoftChannel): string {
   const Problems = [...(C.Faults || [])];
   if (C.Clip) Problems.push('input clip');
@@ -1014,7 +1007,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     TextRow('Host', `${Config.Address || '-'}:${Config.Port}`),
     Identity ? TextRow('Amplifier', Identity) : null,
     Reachable && Result.Serial ? TextRow('Serial', Result.Serial) : null,
-    Row('Status', StatePill(Result)),
+    Row('Status', HealthPill(Result)),
     Reachable
       ? Row('Reply time', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)
       : TextRow('Error', (Result && Result.Error) || 'Failed to reach the amplifier'),

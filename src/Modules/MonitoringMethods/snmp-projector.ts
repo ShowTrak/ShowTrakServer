@@ -8,7 +8,7 @@
 // device doesn't answer is shown as "not reported", never a failure. See
 // ./_snmp-projector-profiles for the per-brand tables and their provenance.
 import snmp from 'net-snmp';
-import { Esc, Pill, Rows, Row, TextRow, Note, FormatLatency } from './debug';
+import { Esc, Pill, Rows, Row, TextRow, Note, FormatLatency, HealthPill } from './debug';
 import {
   IDENTITY_OIDS,
   GetProfile,
@@ -349,14 +349,6 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   }
 }
 
-function StatePill(Result: MonitoringResult): string {
-  const Reachable = !!(Result && Result.Success === true);
-  const Degraded = !!(Result && Result.Degraded);
-  if (Reachable && !Degraded) return Pill('success', 'Online');
-  if (Reachable) return Pill('warning', (Result && Result.DegradedReason) || 'Degraded');
-  return Pill('danger', 'Offline');
-}
-
 function FormatUptime(Ticks: unknown): string {
   const N = Number(Ticks);
   if (!Number.isFinite(N)) return '-';
@@ -393,7 +385,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     TextRow('Host', `${Config.Address || '-'}:${Config.Port}`),
     IdentityRow('SNMP', `v${Config.Version} · ${Config.Community}`),
     Row('Profile', ProfileValue),
-    Row('Status', StatePill(Result)),
+    Row('Status', HealthPill(Result)),
     Reachable
       ? Row('Reply time', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)
       : TextRow('Error', (Result && Result.Error) || 'No SNMP reply'),

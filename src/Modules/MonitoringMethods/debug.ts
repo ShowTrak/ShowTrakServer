@@ -3,6 +3,7 @@
 // originate from an external system (DNS records, QLab workspace names, HTTP
 // bodies, error text, ...) MUST be passed through Esc() before being placed in
 // the markup; the resulting HTML is injected into the renderer via innerHTML.
+import type { MonitoringResult } from './types';
 export function Esc(Value: unknown): string {
   return String(Value == null ? '' : Value)
     .replace(/&/g, '&amp;')
@@ -28,6 +29,22 @@ export function Pill(Kind: string, Text: unknown): string {
 // A single label/value row. `ValueHtml` is treated as pre-built (already-safe)
 // HTML so callers can embed pills; plain string values must be escaped by the
 // caller before being passed in.
+/**
+ * The Status pill of a health check's debug panel: "Offline" when the device did
+ * not answer, a warning when it answered but is degraded (reading the reason,
+ * unless ShowReason is off), and HealthyText otherwise.
+ */
+export function HealthPill(
+  Result: MonitoringResult,
+  HealthyText = 'Online',
+  ShowReason = true
+): string {
+  const Reachable = !!(Result && Result.Success === true);
+  if (Reachable && !Result.Degraded) return Pill('success', HealthyText);
+  if (Reachable) return Pill('warning', (ShowReason && Result.DegradedReason) || 'Degraded');
+  return Pill('danger', 'Offline');
+}
+
 export function Row(Label: unknown, ValueHtml: string): string {
   return (
     '<div class="d-flex justify-content-between align-items-center gap-3 py-1 monitoring-debug-row">' +

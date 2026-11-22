@@ -62,13 +62,12 @@ import crypto from 'crypto';
 import http from 'http';
 import { Manager as CacheManager } from '../CacheManager';
 import {
-  BmdStatePill,
   MonoRow,
   ResolveSnapshotTtlMs,
   ResolveTimeoutMs,
   TimeoutSetting,
 } from './_blackmagic-shared';
-import { Card, Esc, FormatLatency, Note, Pill, Row, Rows, TextRow } from './debug';
+import { Card, Esc, FormatLatency, Note, Pill, Row, Rows, TextRow, HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type {
   MonitoringActionDef,
@@ -1149,7 +1148,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Head = Rows([
     TextRow('Host', `${Config.Address || '-'}:${Config.Port}`),
     Reachable && Result.SystemName ? TextRow('Name', String(Result.SystemName)) : null,
-    Row('Status', BmdStatePill(Result, 'Healthy')),
+    Row('Status', HealthPill(Result, 'Healthy', false)),
     Reachable && Result.DegradedReason ? TextRow('Reason', String(Result.DegradedReason)) : null,
     Reachable
       ? Row('Reply time', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)

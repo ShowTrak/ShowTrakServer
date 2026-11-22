@@ -18,7 +18,7 @@
 // by the console-health and show-loaded checks.
 import { Manager as CacheManager } from '../CacheManager';
 import { PerformHttpRequest } from './_http-shared';
-import { Pill, Rows, TextRow, Row, Note, FormatLatency, Esc } from './debug';
+import { Rows, TextRow, Row, Note, FormatLatency, Esc } from './debug';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
 export const DEFAULT_AVOLITES_PORT = 4430;
@@ -222,14 +222,6 @@ export function AvolitesSnapshotExtras(Snapshot: TitanSnapshot): Record<string, 
     ShowName: Snapshot.ShowName,
     Status: Snapshot.Status,
   };
-}
-
-export function AvolitesStatePill(Result: MonitoringResult, OnlineText: string): string {
-  const Reachable = !!(Result && Result.Success === true);
-  const Degraded = !!(Result && Result.Degraded);
-  if (Reachable && !Degraded) return Pill('success', OnlineText || 'Online');
-  if (Reachable) return Pill('warning', (Result && Result.DegradedReason) || 'Degraded');
-  return Pill('danger', 'Offline');
 }
 
 export function AvolitesDebugHead(

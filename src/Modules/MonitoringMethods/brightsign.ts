@@ -41,7 +41,6 @@ import {
   EvaluateVideo,
   SubResult,
   FormatUptime,
-  StatePill,
   BrightSignDebug,
   MonoRow,
   INFO_PATH,
@@ -49,6 +48,7 @@ import {
   PowerSavePath,
   type VideoState,
 } from './_brightsign-shared';
+import { HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type {
   MonitoringActionDef,
@@ -327,7 +327,7 @@ async function RunAction(
 function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Config = ParseBrightSignConfig(Target);
   const Reachable = !!(Result && Result.Success === true);
-  const Pill = StatePill(Result, 'Healthy');
+  const Pill = HealthPill(Result, 'Healthy');
 
   return BrightSignDebug(Config, Result, Pill, [
     Reachable && Result.Model

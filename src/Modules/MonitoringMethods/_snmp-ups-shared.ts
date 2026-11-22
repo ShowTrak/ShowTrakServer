@@ -9,7 +9,7 @@
 // RMCARD, Tripp Lite, ...), so one method works across that whole range; it is
 // not tied to any single vendor's proprietary MIB.
 import snmp from 'net-snmp';
-import { Esc, Pill, Rows, Row, TextRow, Note, FormatLatency } from './debug';
+import { Esc, HealthPill, Rows, Row, TextRow, Note, FormatLatency } from './debug';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
 export const DEFAULT_PORT = 161;
@@ -379,14 +379,6 @@ export function ParseThresholds(Cfg: Record<string, unknown>): HealthThresholds 
 
 // --- Shared debug rendering -------------------------------------------------
 
-export function StatePill(Result: MonitoringResult): string {
-  const Reachable = !!(Result && Result.Success === true);
-  const Degraded = !!(Result && Result.Degraded);
-  if (Reachable && !Degraded) return Pill('success', 'Healthy');
-  if (Reachable) return Pill('warning', (Result && Result.DegradedReason) || 'Degraded');
-  return Pill('danger', 'Offline');
-}
-
 function MonoRow(Label: string, Value: unknown): string {
   return Row(Label, `<span class="font-monospace">${Esc(String(Value))}</span>`);
 }
@@ -407,7 +399,7 @@ export function UpsDebug(
   const Head = Rows([
     TextRow('Host', `${Address || '-'}:${Port}`),
     ...IdentityRows,
-    Row('Status', StatePill(Result)),
+    Row('Status', HealthPill(Result, 'Healthy')),
     Reachable
       ? Row('Reply time', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)
       : TextRow('Error', (Result && Result.Error) || 'No SNMP reply'),

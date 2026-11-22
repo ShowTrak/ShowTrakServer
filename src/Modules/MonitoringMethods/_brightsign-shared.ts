@@ -27,7 +27,7 @@ import http from 'http';
 import https from 'https';
 import crypto from 'crypto';
 import { URL } from 'url';
-import { Esc, Pill, Rows, TextRow, Row, Note, FormatLatency } from './debug';
+import { Esc, Rows, TextRow, Row, Note, FormatLatency } from './debug';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 import { CachedLookup, RequestHostname } from './_dns-cache';
 
@@ -685,16 +685,6 @@ export function FormatUptime(Seconds: unknown): string {
 }
 
 // --- Shared Debug scaffolding -----------------------------------------------
-
-// A status pill coloured from a result: green (online), amber (degraded,
-// showing the reason), or red (offline).
-export function StatePill(Result: MonitoringResult, OnlineText: string): string {
-  const Reachable = !!(Result && Result.Success === true);
-  const Degraded = !!(Result && Result.Degraded);
-  if (Reachable && !Degraded) return Pill('success', OnlineText || 'Online');
-  if (Reachable) return Pill('warning', (Result && Result.DegradedReason) || 'Degraded');
-  return Pill('danger', 'Offline');
-}
 
 // Render the debug panel head (Player / Status / reply time or error) shared by
 // every BrightSign method, with method-specific rows appended.

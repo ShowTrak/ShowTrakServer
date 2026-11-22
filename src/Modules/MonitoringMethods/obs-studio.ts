@@ -42,7 +42,7 @@
 import crypto from 'crypto';
 import net from 'net';
 import { ErrorMessage } from './_tcp-session';
-import { Esc, FormatLatency, Note, Pill, Row, Rows, TextRow } from './debug';
+import { Esc, FormatLatency, Note, Pill, Row, Rows, TextRow, HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
@@ -840,13 +840,6 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   };
 }
 
-function StatePill(Result: MonitoringResult): string {
-  const Reachable = !!(Result && Result.Success === true);
-  if (Reachable && !Result.Degraded) return Pill('success', 'Online');
-  if (Reachable) return Pill('warning', Result.DegradedReason || 'Degraded');
-  return Pill('danger', 'Offline');
-}
-
 function MonoRow(Label: string, Value: string): string {
   return Row(Label, `<span class="font-monospace">${Value}</span>`);
 }
@@ -893,7 +886,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     Reachable && Result.PlatformDescription
       ? TextRow('Platform', Result.PlatformDescription)
       : null,
-    Row('Status', StatePill(Result)),
+    Row('Status', HealthPill(Result)),
     Reachable
       ? Row('Reply time', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)
       : TextRow('Error', (Result && Result.Error) || 'Failed to reach OBS'),

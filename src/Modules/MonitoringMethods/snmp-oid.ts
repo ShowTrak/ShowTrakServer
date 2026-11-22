@@ -20,7 +20,7 @@
 // Degraded = the agent answered but an OID is missing (noSuchObject,
 // noSuchInstance, endOfMibView, or a v1 noSuchName) or an assertion failed.
 import snmp from 'net-snmp';
-import { Card, Esc, Pill, Rows, Row, TextRow, Note, FormatLatency } from './debug';
+import { Card, Esc, Pill, Rows, Row, TextRow, Note, FormatLatency, HealthPill } from './debug';
 import { DEFAULT_PORT, type SnmpSession } from './_snmp-ups-shared';
 import {
   SNMP_VERSION_FIELDS,
@@ -565,14 +565,6 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
 
 // --- Debug -------------------------------------------------------------------
 
-function StatePill(Result: MonitoringResult): string {
-  const Reachable = !!(Result && Result.Success === true);
-  const Degraded = !!(Result && Result.Degraded);
-  if (Reachable && !Degraded) return Pill('success', 'Online');
-  if (Reachable) return Pill('warning', 'Degraded');
-  return Pill('danger', 'Offline');
-}
-
 function FormatTicks(Value: string | null): string {
   const N = Number(Value);
   if (!Number.isFinite(N)) return '';
@@ -605,7 +597,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   const Head = Rows([
     TextRow('Host', `${Config.Address || '-'}:${Config.Port}`),
     Row('SNMP', `<span class="font-monospace">${Esc(Identity)}</span>`),
-    Row('Status', StatePill(Result)),
+    Row('Status', HealthPill(Result, 'Online', false)),
     Reachable
       ? Row('Reply time', `<span class="font-monospace">${FormatLatency(Result.LatencyMs)}</span>`)
       : TextRow('Error', (Result && Result.Error) || 'No SNMP reply'),

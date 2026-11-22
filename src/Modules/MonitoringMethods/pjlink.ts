@@ -20,14 +20,13 @@ import {
   InputLabel,
   InvalidateProjectorSnapshot,
   SendProjectorCommand,
-  PJLinkStatePill,
   PJLinkDebugHead,
   MonoRow,
   type ErstStatus,
   type LampReading,
   type PJLinkSnapshot,
 } from './_pjlink-shared';
-import { Pill, Row, TextRow } from './debug';
+import { Pill, Row, TextRow, HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type {
   MonitoringActionDef,
@@ -485,7 +484,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     }
   }
 
-  return PJLinkDebugHead(Config, Result, PJLinkStatePill(Result, 'Healthy'), ExtraRows);
+  return PJLinkDebugHead(Config, Result, HealthPill(Result, 'Healthy'), ExtraRows);
 }
 
 export const Name = 'Projector Health (PJLink)';

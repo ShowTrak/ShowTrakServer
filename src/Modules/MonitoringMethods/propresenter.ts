@@ -53,7 +53,7 @@ import {
   TimeoutOf,
   type JsonResponse,
 } from './_videoproc-http-shared';
-import { Card, Esc, FormatLatency, Note, Pill, Row, Rows, TextRow } from './debug';
+import { Card, Esc, FormatLatency, Note, Pill, Row, Rows, TextRow, HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type {
   MonitoringActionDef,
@@ -663,13 +663,6 @@ function DescribeAction(ActionID: string, Params: Record<string, unknown>): stri
 
 // --- Debug ------------------------------------------------------------------
 
-function StatePill(Result: MonitoringResult): string {
-  const Reachable = !!(Result && Result.Success === true);
-  if (Reachable && !Result.Degraded) return Pill('success', 'Healthy');
-  if (Reachable) return Pill('warning', 'Degraded');
-  return Pill('danger', 'Offline');
-}
-
 function OnOffPill(Value: unknown): string {
   if (Value === true) return Pill('success', 'On');
   if (Value === false) return Pill('warning', 'Off');
@@ -704,7 +697,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     Reachable && (R.Platform || R.OsVersion)
       ? TextRow('System', [R.Platform, R.OsVersion].filter(Boolean).join(' '))
       : null,
-    Row('Status', StatePill(Result)),
+    Row('Status', HealthPill(Result, 'Healthy', false)),
     Reachable && R.DegradedReason ? TextRow('Reason', String(R.DegradedReason)) : null,
     Reachable
       ? Row('Reply time', `<span class="font-monospace">${FormatLatency(R.LatencyMs)}</span>`)
