@@ -2,7 +2,7 @@ import os from 'os';
 import net from 'net';
 import dgram from 'dgram';
 import { CreateLogger } from '../Logger';
-import type { Result } from '../../types/result';
+import type { Result } from '@showtrak/protocol';
 
 const Logger = CreateLogger('WOLManager');
 

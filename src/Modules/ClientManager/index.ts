@@ -34,7 +34,6 @@ import { Manager as UUIDManager } from '../UUID';
 import { Manager as VariableManager } from '../VariableManager';
 import * as SlugService from '../Slug';
 import { Ok, Fail } from '../Utils';
-import type { Result } from '../../types/result';
 import { Client } from './client';
 import type { ClientMacAddress } from './client';
 import {
@@ -89,6 +88,7 @@ import type {
   CriticalUSBDevice,
   CriticalUSBName,
   USBDevice,
+  Result,
 } from '@showtrak/protocol';
 import type {
   CriticalUSBDevicePayloadResult,

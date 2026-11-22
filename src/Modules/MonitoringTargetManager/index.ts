@@ -10,13 +10,13 @@ import { Ok, Fail } from '../Utils';
 import { IsArray } from '../Utils/guards';
 import * as SlugService from '../Slug';
 import { createGroupOrdering } from '../Shared/group-ordering';
-import type { Result } from '../../types/result';
 import type { TxRun } from '../DB';
 import type {
   MonitoringActionOutcome,
   MonitoringActionSummary,
   MonitoringCheckDebug,
   MonitoringTargetView,
+  Result,
 } from '@showtrak/protocol';
 import type { MonitoringTargetRow } from '../DB/rows';
 import type { AuditChange } from '@showtrak/protocol';

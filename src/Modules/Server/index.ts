@@ -13,7 +13,7 @@ import {
   INTEGRATED_EVENT_DEFAULT_TIMEOUT_MS,
   INTEGRATED_EVENT_TIMEOUT_GRACE_MS,
 } from '../Config/constants';
-import type { ClientToServerEvents, ServerToClientEvents } from '@showtrak/protocol';
+import type { ClientToServerEvents, ServerToClientEvents, Result } from '@showtrak/protocol';
 import { Manager as AppDataManager } from '../AppData';
 import {
   Manager as ScriptExecutionManager,
@@ -36,7 +36,6 @@ import { SetupWebUiNamespace } from './webui-namespace';
 import { SetupSdkNamespace } from './sdk-namespace';
 import { SendAudioLevel, type AudioControlIO } from './audio-control';
 import type { AudioLevelRequest } from '@showtrak/protocol';
-import type { Result } from '../../types/result';
 import { Manager as IdentifyManager } from '../IdentifyManager';
 import { RunWithAuditSource } from '../AuditLog/source';
 import { DIST_ROOT } from '../Config/dist-root';

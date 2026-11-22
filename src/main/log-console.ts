@@ -12,13 +12,8 @@
 // logs in bursts, and one message per line would flood a slow web link.
 
 import { LEVEL_RANK } from '@showtrak/protocol/runtime';
-import type { LogConsoleSnapshot } from '@showtrak/protocol';
-import {
-  GetLogFeedBacklog,
-  SetLogFeedLevel,
-  SubscribeToLogFeed,
-  type LogFeedEntry,
-} from '../Modules/Logger';
+import type { LogConsoleEntry, LogConsoleSnapshot } from '@showtrak/protocol';
+import { GetLogFeedBacklog, SetLogFeedLevel, SubscribeToLogFeed } from '../Modules/Logger';
 
 const FLUSH_INTERVAL_MS = 250;
 // Lines held between flushes, by count and by characters. Only reached if a
@@ -33,11 +28,11 @@ export type { LogConsoleSnapshot };
 
 interface Viewer {
   Level: string;
-  Send: (Entries: LogFeedEntry[]) => void;
+  Send: (Entries: LogConsoleEntry[]) => void;
 }
 
 const Viewers = new Map<string, Viewer>();
-let Pending: LogFeedEntry[] = [];
+let Pending: LogConsoleEntry[] = [];
 let PendingChars = 0;
 let Unsubscribe: (() => void) | null = null;
 let FlushTimer: ReturnType<typeof setInterval> | null = null;
@@ -51,7 +46,7 @@ function Rank(Level: string): number {
   return LEVEL_RANK[Level] ?? LEVEL_RANK[DEFAULT_LEVEL] ?? 2;
 }
 
-function Wants(Viewer: Viewer, Entry: LogFeedEntry): boolean {
+function Wants(Viewer: Viewer, Entry: LogConsoleEntry): boolean {
   return Rank(Entry.Level) <= Rank(Viewer.Level);
 }
 
@@ -122,7 +117,7 @@ function Sync(): void {
 export function OpenLogConsole(
   Key: string,
   Level: unknown,
-  Send: (Entries: LogFeedEntry[]) => void
+  Send: (Entries: LogConsoleEntry[]) => void
 ): LogConsoleSnapshot {
   const Viewer: Viewer = { Level: NormaliseLevel(Level), Send };
   Viewers.set(Key, Viewer);

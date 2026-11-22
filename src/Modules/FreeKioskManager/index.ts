@@ -34,7 +34,6 @@ import {
   RecordGroupMove,
   Seconds,
 } from '../Shared/audit-names';
-import type { Result } from '../../types/result';
 import type { FreeKioskCamera, FreeKioskImage } from '../FreeKiosk/types';
 
 import {
@@ -53,7 +52,7 @@ import {
 } from './normalize';
 import { FreeKioskTerminal } from './terminal';
 import type { FreeKioskTerminalSnapshot } from './terminal';
-import type { FreeKioskCommandOutcome, FreeKioskCommandSummary } from '@showtrak/protocol';
+import type { FreeKioskCommandOutcome, FreeKioskCommandSummary, Result } from '@showtrak/protocol';
 
 const Logger = CreateLogger('FreeKiosk');
 const TerminalsRepo = CreateFreeKioskTerminalsRepository(DB);

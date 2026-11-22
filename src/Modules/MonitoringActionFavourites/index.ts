@@ -16,8 +16,7 @@ import { CreateMonitoringActionFavouritesRepository } from '../DB/repositories/m
 import { Manager as BroadcastManager } from '../Broadcast';
 import { Manager as MonitoringMethods, stableStringify } from '../MonitoringMethods';
 import { Ok, Fail } from '../Utils';
-import type { Result } from '../../types/result';
-import type { MonitoringActionFavouriteView } from '@showtrak/protocol';
+import type { MonitoringActionFavouriteView, Result } from '@showtrak/protocol';
 import { RecordEdit } from '../AuditLog/edits';
 import { Line, Value } from '../AuditLog/message';
 import { AuditStep } from '../Shared/audit-names';

@@ -19,7 +19,6 @@ import { CreateClientsRepository } from '../DB/repositories/clients';
 import { Manager as BroadcastManager } from '../Broadcast';
 import { CLIENT_STARTUP_GRACE_MS } from '../Config/constants';
 import { Ok, Fail } from '../Utils';
-import type { Result } from '../../types/result';
 import {
   AsRecord,
   normalizeSerialNumber,
@@ -55,6 +54,7 @@ import type {
   PowerStatusSnapshot,
   RunningApplicationsCapabilities,
   TemperaturesSnapshot,
+  Result,
 } from '@showtrak/protocol';
 import {
   EmptyAudioView,

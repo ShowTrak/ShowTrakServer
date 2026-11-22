@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import type { Result } from '../../types/result';
+import type { Result } from '@showtrak/protocol';
 import { CreateLogger } from '../Logger';
 import { CreateBonjourErrorHandler } from '@showtrak/protocol/runtime';
 

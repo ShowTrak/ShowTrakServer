@@ -1,11 +1,11 @@
 // Small shared utilities: an async wait helper plus the `[Err, Data]`
 // result-tuple constructors (`Ok`/`Fail`) used by every ShowTrak manager.
-// See src/types/result.ts for the Result<T> contract.
+// The Result<T> contract is @showtrak/protocol's (shared/src/app.d.ts).
 //
 // Exported as named functions; the CommonJS shape stays `{ Wait, Ok, Fail }`
 // so `const { Wait } = require('../Utils')` continues to work unchanged.
 import fs from 'fs';
-import type { Result } from '../../types/result';
+import type { Result } from '@showtrak/protocol';
 
 export function Wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

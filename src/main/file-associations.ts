@@ -20,20 +20,17 @@
 import path from 'path';
 import fs from 'fs';
 import { spawnSync } from 'child_process';
+import type { ShowFileRequest, ShowFileRequestSource } from '@showtrak/protocol';
 
 export const SHOW_FILE_EXTENSION = 'showtrak';
 
 // --- Requests ----------------------------------------------------------------
 
-// Launch: the file started ShowTrak Server, so it replaces the last session's
-// show without asking (unless that has unsaved changes). Running: the operator
-// opened a file while a show was already up, which asks first.
-export type ShowFileRequestSource = 'Launch' | 'Running';
-
-export interface ShowFileRequest {
-  FilePath: string;
-  Source: ShowFileRequestSource;
-}
+// A request is the protocol's ShowFileRequest. Its Source, Launch: the file
+// started ShowTrak Server, so it replaces the last session's show without asking
+// (unless that has unsaved changes). Running: the operator opened a file while a
+// show was already up, which asks first.
+export type { ShowFileRequest, ShowFileRequestSource };
 
 // Only the latest request counts: one show is open at a time, so opening
 // several files at once ends up on the last one anyway.

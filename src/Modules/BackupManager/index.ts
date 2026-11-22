@@ -9,12 +9,13 @@ import { Config } from '../Config';
 import { CompareVersions } from '../Utils';
 import { IsObject } from '../Utils/guards';
 import { CreateShowFileInfoRepository } from '../DB/repositories/show-file-info';
-import type { ShowFileOpenOutcome, ShowFileUpgrade } from '@showtrak/protocol';
+import type { ResultTuple, ShowFileOpenOutcome, ShowFileUpgrade } from '@showtrak/protocol';
 
 const Logger = CreateLogger('BackupManager');
 const ShowFileInfo = CreateShowFileInfoRepository(DB);
 
-type BackupResult<T> = [string | null, T | null];
+// Results are the protocol's ResultTuple: the show-file IPC handlers answer
+// with them as they are.
 
 // ShowFileUpgrade (from the protocol) is a show file last saved by an older
 // ShowTrak Server, waiting on the operator to agree to upgrade it. FileVersion
@@ -104,7 +105,7 @@ const Manager = {
   // would be upgraded by this version writing to it.
   async InspectFile(
     FilePath: string
-  ): Promise<BackupResult<{ NeedsUpgrade: boolean; FileVersion: string | null }>> {
+  ): Promise<ResultTuple<{ NeedsUpgrade: boolean; FileVersion: string | null }>> {
     const [Err, Info] = await DB.ReadFileInfo(FilePath);
     if (Err || !Info) return [ErrorMessage(Err), null];
     const FileVersion = Info.SavedWithVersion;
@@ -116,7 +117,7 @@ const Manager = {
   // Copy a show file, untouched, into the Backups folder before anything is
   // written to it. The copy is named after the original and the version that
   // last saved it, e.g. "Main Stage (v3.28.0) 2026-10-26 14-03-12.ShowTrak".
-  async BackupFile(FilePath: string, FileVersion: string | null): Promise<BackupResult<string>> {
+  async BackupFile(FilePath: string, FileVersion: string | null): Promise<ResultTuple<string>> {
     try {
       const Dir = AppDataManager.GetBackupsDirectory();
       if (!fs.existsSync(Dir)) fs.mkdirSync(Dir, { recursive: true });
@@ -140,7 +141,7 @@ const Manager = {
   // "Open" from the UI. A file saved by this version (or a newer one) opens
   // straight away. An older one is left untouched and held as the pending
   // upgrade until the operator answers with AcceptUpgrade or DeclineUpgrade.
-  async RequestOpen(FilePath: string): Promise<BackupResult<ShowFileOpenOutcome>> {
+  async RequestOpen(FilePath: string): Promise<ResultTuple<ShowFileOpenOutcome>> {
     if (!fs.existsSync(FilePath)) {
       Logger.error('ShowTrak file does not exist:', FilePath);
       return ['ShowTrak file does not exist', null];
@@ -162,7 +163,7 @@ const Manager = {
   // Server updates it was last saved by an older version, so it is held as the
   // pending upgrade until the operator answers. Returns that upgrade, or null
   // when there is nothing to ask.
-  async CheckCurrentFile(): Promise<BackupResult<ShowFileUpgrade | null>> {
+  async CheckCurrentFile(): Promise<ResultTuple<ShowFileUpgrade | null>> {
     if (PendingUpgrade) return [null, PendingUpgrade];
     const FilePath = CurrentFilePath;
     if (!FilePath || !fs.existsSync(FilePath)) return [null, null];
@@ -185,7 +186,7 @@ const Manager = {
   // file already open from last session, the working data (which may hold
   // changes not yet saved) is kept as it is and the file is upgraded on its
   // next save.
-  async AcceptUpgrade(): Promise<BackupResult<{ FilePath: string; BackupPath: string }>> {
+  async AcceptUpgrade(): Promise<ResultTuple<{ FilePath: string; BackupPath: string }>> {
     const Upgrade = PendingUpgrade;
     if (!Upgrade) return ['No show file upgrade is waiting for confirmation', null];
     if (!fs.existsSync(Upgrade.FilePath)) {
@@ -207,7 +208,7 @@ const Manager = {
   // The operator declined: the older file is left exactly as it is and the
   // working data is cleared with no show file open, ready for a new show to
   // be created in its place.
-  async DeclineUpgrade(): Promise<BackupResult<string>> {
+  async DeclineUpgrade(): Promise<ResultTuple<string>> {
     if (!PendingUpgrade) return ['No show file upgrade is waiting for confirmation', null];
     PendingUpgrade = null;
     const [Err] = await DB.ResetToEmpty();
@@ -228,7 +229,7 @@ const Manager = {
   // that can no longer be saved back to its origin). Returns { Missing } where
   // Missing indicates the previously open file was gone, and FilePath where it
   // was expected.
-  async EnsureCurrentFileExists(): Promise<BackupResult<{ Missing: boolean; FilePath?: string }>> {
+  async EnsureCurrentFileExists(): Promise<ResultTuple<{ Missing: boolean; FilePath?: string }>> {
     if (!CurrentFilePath) return [null, { Missing: false }];
     if (fs.existsSync(CurrentFilePath)) return [null, { Missing: false }];
     const MissingPath = CurrentFilePath;
@@ -267,7 +268,7 @@ const Manager = {
   // is never overwritten unseen: the pending upgrade, or the file left open
   // last session before its upgrade is confirmed, is refused; any other older
   // show file (one replaced by Save As, say) is backed up first.
-  async Save(Path: string): Promise<BackupResult<string>> {
+  async Save(Path: string): Promise<ResultTuple<string>> {
     Logger.log('Saving ShowTrak file to:', Path);
     if (PendingUpgrade && IsSamePath(Path, PendingUpgrade.FilePath)) {
       return ['Confirm the show file upgrade before saving', null];
@@ -305,7 +306,7 @@ const Manager = {
   // DB layer validates the file, swaps it in, and re-applies schema migrations.
   // A full re-hydration of in-memory caches/UI is then triggered. The UI goes
   // through RequestOpen, which asks before an older file is upgraded.
-  async Open(Path: string): Promise<BackupResult<string>> {
+  async Open(Path: string): Promise<ResultTuple<string>> {
     Logger.log('Opening ShowTrak file from:', Path);
     if (!fs.existsSync(Path)) {
       Logger.error('ShowTrak file does not exist:', Path);
@@ -324,7 +325,7 @@ const Manager = {
 
   // "New": reset the working database to an empty show and save it straight
   // away to Path, so a new show always has a file behind it.
-  async New(Path: string): Promise<BackupResult<string>> {
+  async New(Path: string): Promise<ResultTuple<string>> {
     Logger.log('Creating new ShowTrak show at:', Path);
     const [Err] = await DB.ResetToEmpty();
     if (Err) {
@@ -343,4 +344,4 @@ const Manager = {
 };
 
 export { Manager };
-export type { ShowFileOpenOutcome as OpenOutcome, ShowFileUpgrade };
+export type { ShowFileOpenOutcome, ShowFileUpgrade };

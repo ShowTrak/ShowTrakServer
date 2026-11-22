@@ -5,7 +5,7 @@
 // - Emits 'SettingsUpdated' and optional per-setting events on change
 import { CreateLogger } from '../Logger';
 import { DefaultSettings, Groups } from './DefaultSettings';
-import type { SettingDefinition, SettingGroup, SettingValue } from './DefaultSettings';
+import type { Setting, SettingDefinition, SettingGroup, SettingValue } from '@showtrak/protocol';
 import type { SettingRow } from '../DB/rows';
 import { Manager as BroadcastManager } from '../Broadcast';
 import { Manager as DB } from '../DB';
@@ -34,24 +34,8 @@ function StoreFor(Setting: { Scope?: SettingDefinition['Scope'] | null }) {
   return Setting.Scope === 'INSTALL' ? InstallSettingsStore : SettingsRepo;
 }
 
-// Runtime, cached representation of a single setting.
-interface Setting {
-  Group: string;
-  Key: string;
-  Title: string;
-  Description: string;
-  Type: SettingDefinition['Type'];
-  Value: SettingValue;
-  isDefault: boolean;
-  DefaultValue: SettingValue;
-  OnUpdateEvent: string | null;
-  Options: string[] | null;
-  Min: number | null;
-  Max: number | null;
-  Unit: string | null;
-  Scope: SettingDefinition['Scope'] | null;
-  ShowWhen: string[] | null;
-}
+// The runtime, cached representation of a single setting is the protocol's
+// Setting: it is what the renderer receives (GetSettings, UpdateSettings).
 
 interface SettingsManagerShape {
   Initialized: boolean;

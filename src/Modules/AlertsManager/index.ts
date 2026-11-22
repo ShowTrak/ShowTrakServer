@@ -12,8 +12,7 @@ import {
   HISTORY_RETENTION_MS,
   HISTORY_RETENTION_SWEEP_INTERVAL_MS,
 } from '../Config/constants';
-import type { Result } from '../../types/result';
-import type { AlertTriggerType, MonitoringCheckView, TagView } from '@showtrak/protocol';
+import type { AlertTriggerType, MonitoringCheckView, TagView, Result } from '@showtrak/protocol';
 import { IsArray, IsObject } from '../Utils/guards';
 import type { AlertRuleWriteRow } from '../DB/repositories/alert-rules';
 

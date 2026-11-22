@@ -18,10 +18,12 @@ import {
   ResolveDefaultLevel,
   SerializeArg,
   StripAnsi,
+  type LoggerConfigureOptions,
 } from '@showtrak/protocol/runtime';
 import { Manager as AppDataManager } from '../AppData';
 
 import pc from 'picocolors';
+import type { LogConsoleEntry } from '@showtrak/protocol';
 
 const fsp = fs.promises;
 
@@ -180,16 +182,8 @@ const stripAnsi = StripAnsi;
 // console or the file. With no console watching, FeedLevel is null and nothing
 // below the active level is serialised, so the feed costs nothing extra.
 
-export interface LogFeedEntry {
-  Seq: number;
-  Time: number;
-  Level: string;
-  Type: string;
-  Alias: string;
-  Message: string;
-}
-
-type LogFeedListener = (Entry: LogFeedEntry) => void;
+// Each line is the protocol's LogConsoleEntry: the console shows it as it is.
+type LogFeedListener = (Entry: LogConsoleEntry) => void;
 
 // The ring is bounded by lines AND characters, whichever is hit first, so a run
 // of maximum-length lines cannot hold more than a few MB.
@@ -199,7 +193,7 @@ const FEED_RING_MAX_CHARS = 1_000_000;
 // otherwise be shipped whole to every viewer. The file keeps the full line.
 const FEED_MAX_MESSAGE_LENGTH = 20000;
 
-const FeedRing: LogFeedEntry[] = [];
+const FeedRing: LogConsoleEntry[] = [];
 let FeedRingChars = 0;
 const FeedListeners = new Set<LogFeedListener>();
 // Seeded from the clock so a restarted server keeps counting upward: a Web UI
@@ -219,7 +213,7 @@ function pushFeed(alias: string, type: string, levelKey: string, msg: string): v
     const Extra = Message.length - FEED_MAX_MESSAGE_LENGTH;
     Message = `${Message.slice(0, FEED_MAX_MESSAGE_LENGTH)}... (${Extra} more characters in the log file)`;
   }
-  const Entry: LogFeedEntry = {
+  const Entry: LogConsoleEntry = {
     Seq: ++FeedSeq,
     Time: Date.now(),
     Level: levelKey,
@@ -253,7 +247,7 @@ export function SubscribeToLogFeed(Listener: LogFeedListener): () => void {
 }
 
 /** The recent lines held in memory, oldest first. */
-export function GetLogFeedBacklog(): LogFeedEntry[] {
+export function GetLogFeedBacklog(): LogConsoleEntry[] {
   return FeedRing.slice();
 }
 
@@ -335,12 +329,6 @@ class Logger {
 
 export function CreateLogger(Alias: string): Logger {
   return new Logger(Alias);
-}
-
-interface LoggerConfigureOptions {
-  level?: string;
-  toConsole?: boolean;
-  toFile?: boolean;
 }
 
 export function configure(options: LoggerConfigureOptions = {}): void {

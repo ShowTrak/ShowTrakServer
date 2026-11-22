@@ -9,12 +9,11 @@
 import path from 'path';
 import fs from 'fs';
 import { CompareVersions as compareVersions } from '../Modules/Utils';
+import type { SquirrelPackage } from '@showtrak/protocol';
 
-export interface SquirrelPackage {
-  fileName: string;
-  version: string;
-  size: number;
-}
+// Each manifest line is the protocol's SquirrelPackage (ShowTrak Timers reads the
+// same manifests the same way).
+export type { SquirrelPackage };
 
 // Squirrel package names end in `-<version>-full.nupkg` or `-<version>-delta.nupkg`.
 const PACKAGE_NAME = /^.+?-(\d+(?:\.\d+)*(?:-[0-9A-Za-z.]+)?)-(?:full|delta)\.nupkg$/i;

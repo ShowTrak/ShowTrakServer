@@ -22,7 +22,7 @@
 // This removes the repeated try/catch + tuple boilerplate that was copy-pasted
 // across the RPC.handle registrations in src/main.ts. Behavior is identical to
 // the original inline handlers; only the wrapping is shared.
-import type { Result } from '../../types/result';
+import type { Result } from '@showtrak/protocol';
 
 // Convert a thrown validation error into the renderer's [message, fallback]
 // contract.

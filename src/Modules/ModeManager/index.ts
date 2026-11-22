@@ -2,9 +2,9 @@ import { EventEmitter } from 'events';
 import { RecordEdit } from '../AuditLog/edits';
 import { Line, Value } from '../AuditLog/message';
 import { AuditStep } from '../Shared/audit-names';
+import type { AppMode } from '@showtrak/protocol';
 
 // In-memory application mode. Always defaults to SHOW on boot.
-type AppMode = 'SHOW' | 'EDIT';
 let Mode: AppMode = 'SHOW';
 
 const Emitter = new EventEmitter();

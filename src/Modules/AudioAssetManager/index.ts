@@ -8,7 +8,7 @@ import { Manager as AppData } from '../AppData';
 import { Manager as UUID } from '../UUID';
 import { Ok, Fail } from '../Utils';
 import { IsArray } from '../Utils/guards';
-import type { Result } from '../../types/result';
+import type { Result } from '@showtrak/protocol';
 import { RecordEdit, RecordUpdate, type EditInput } from '../AuditLog/edits';
 import { Line, Value } from '../AuditLog/message';
 import { DiffFields, Snapshot } from '../AuditLog/diff';

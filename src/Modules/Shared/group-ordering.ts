@@ -8,7 +8,7 @@
 //
 // Behavior is identical to the original inline implementations.
 import { Ok, Fail } from '../Utils';
-import type { Result } from '../../types/result';
+import type { Result } from '@showtrak/protocol';
 import type { DBManager } from '../DB';
 
 export interface GroupOrderingEntity {

@@ -8,7 +8,7 @@ import { CreateDummyClientsRepository } from '../DB/repositories/dummy-clients';
 import { Manager as BroadcastManager } from '../Broadcast';
 import { Ok, Fail } from '../Utils';
 import { createGroupOrdering } from '../Shared/group-ordering';
-import type { Result } from '../../types/result';
+import type { Result } from '@showtrak/protocol';
 
 import {
   MIN_INTERVAL_MS,

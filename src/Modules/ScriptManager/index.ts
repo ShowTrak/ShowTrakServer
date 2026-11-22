@@ -15,7 +15,6 @@ import { Manager as BroadcastManager } from '../Broadcast';
 import { Ok, Fail } from '../Utils';
 import { IsArray } from '../Utils/guards';
 import { SCRIPT_EXECUTION_DEFAULT_TIMEOUT_MS } from '../Config/constants';
-import type { Result } from '../../types/result';
 import { RecordEdit, RecordUpdate } from '../AuditLog/edits';
 import { Entity, Line } from '../AuditLog/message';
 import { AuditBefore, AuditStep, ColourName, DiffSettings, Seconds } from '../Shared/audit-names';
@@ -29,7 +28,7 @@ import {
   ResolveConfirmationLevel,
 } from './schema';
 import type { NormalizedScriptConfig, ConsoleFilterConfig, ConfirmationLevel } from './schema';
-import type { ScriptFileEntry } from '@showtrak/protocol';
+import type { ScriptFileEntry, Result } from '@showtrak/protocol';
 
 const Logger = CreateLogger('ScriptManager');
 

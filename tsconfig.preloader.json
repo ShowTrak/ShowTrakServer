@@ -5,7 +5,7 @@
 // It is kept out of tsconfig.renderer.json on purpose: that program declares the
 // main window's `window.API` (src/UI/types/global.d.ts), while the splash window
 // has its own, much smaller bridge (src/bridge_preloader.ts, typed by
-// src/types/preloader-api.ts).
+// @showtrak/protocol's PreloaderAPI).
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {

@@ -18,9 +18,14 @@ import { Manager as SettingsManager } from '../SettingsManager';
 import { Manager as ClientManager } from '../ClientManager';
 import { Ok, Fail } from '../Utils';
 import { HISTORY_RETENTION_MS } from '../Config/constants';
-import type { Result } from '../../types/result';
 import type { FogTaskRow } from '../DB/rows';
-import type { FogStatusView, FogHostView, FogTaskTypeView, FogTaskView } from '@showtrak/protocol';
+import type {
+  FogStatusView,
+  FogHostView,
+  FogTaskTypeView,
+  FogTaskView,
+  Result,
+} from '@showtrak/protocol';
 import { RecordAction, RecordEdit, type EditInput } from '../AuditLog/edits';
 import { Line, Value, type SummaryPart } from '../AuditLog/message';
 import { AuditBefore, AuditStep } from '../Shared/audit-names';

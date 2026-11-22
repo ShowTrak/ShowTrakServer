@@ -20,7 +20,7 @@
 //     every button press failing with an unexplained error.
 import http from 'http';
 import { Ok, Fail } from '../Utils';
-import type { Result } from '../../types/result';
+import type { Result } from '@showtrak/protocol';
 import type {
   FreeKioskCamera,
   FreeKioskCommandResult,

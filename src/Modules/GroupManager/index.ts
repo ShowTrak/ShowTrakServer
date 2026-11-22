@@ -8,7 +8,7 @@ import { Manager as BroadcastManager } from '../Broadcast';
 import * as SlugService from '../Slug';
 import { SCRIPT_COLOURS } from '../ScriptManager/schema';
 import { Ok, Fail } from '../Utils';
-import type { Result } from '../../types/result';
+import type { Result } from '@showtrak/protocol';
 import type { GroupRow } from '../DB/rows';
 import { RecordEdit, RecordUpdate } from '../AuditLog/edits';
 import { Entity, Line } from '../AuditLog/message';

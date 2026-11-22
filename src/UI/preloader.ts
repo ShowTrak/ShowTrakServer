@@ -5,7 +5,7 @@
 // path the page loads, and typechecked on its own by tsconfig.preloader.json:
 // this window's `window.API` is the splash bridge (src/bridge_preloader.ts), not
 // the main window's, so it must not share the renderer's global declarations.
-import type { PreloaderAPI } from '../types/preloader-api';
+import type { PreloaderAPI } from '@showtrak/protocol';
 
 declare global {
   interface Window {

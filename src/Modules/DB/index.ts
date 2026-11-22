@@ -5,6 +5,7 @@ import { AsyncLocalStorage } from 'async_hooks';
 import { CreateLogger } from '../Logger';
 import { DB_PENDING_OPERATION_TIMEOUT_MS } from '../Config/constants';
 import { Manager as AppDataManager } from '../AppData';
+import type { ShowFileInfo } from '@showtrak/protocol';
 
 const Logger = CreateLogger('DB');
 
@@ -135,12 +136,10 @@ interface CompactOptions {
   MinFreeBytes?: number;
 }
 
-// What a .ShowTrak file records about itself in its ShowFileInfo table. Both
-// are null for a file saved before the table existed.
-interface ShowFileInfo {
-  CreatedWithVersion: string | null;
-  SavedWithVersion: string | null;
-}
+// What a .ShowTrak file records about itself in its ShowFileInfo table is the
+// protocol's ShowFileInfo (a persisted format later releases read). Both stamps
+// are null for a file saved before the table existed; this server writes no
+// SchemaVersion (ShowTrak Timers' files carry one).
 
 const Manager = {} as DBManager;
 

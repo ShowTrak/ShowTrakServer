@@ -7,7 +7,7 @@ import { CreateConditionSaveQueue } from './lib/condition-save-queue';
 import type {
   ClientView,
   RunningApplicationViewItem,
-  RunningApplicationsStatus,
+  RunningApplicationsViewStatus,
 } from '@showtrak/protocol';
 import { HandleNonFatalError, Safe } from './utils';
 import { ClearRenderKeys, RenderKeyIs, SetRenderKey } from './lib/render-key';
@@ -108,7 +108,7 @@ export function BuildApplicationsHtml(Client: ClientView): string {
   const Apps = Array.isArray(Client?.RunningApplications?.Items)
     ? Client.RunningApplications.Items
     : [];
-  const Status: Partial<RunningApplicationsStatus> = Client?.RunningApplications?.Status || {};
+  const Status: Partial<RunningApplicationsViewStatus> = Client?.RunningApplications?.Status || {};
   const State = typeof Status.State === 'string' ? Status.State.trim().toLowerCase() : 'unknown';
   const Message =
     typeof Status.Message === 'string' && Status.Message.trim() ? Status.Message.trim() : null;

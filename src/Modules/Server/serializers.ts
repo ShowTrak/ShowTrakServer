@@ -7,7 +7,7 @@ import type {
   USBCapabilities,
   GroupView,
   Vitals,
-  RunningApplicationsSnapshot,
+  RunningApplicationsView,
   ClientResourceAlarm,
   ClientSystemChecks,
   PowerStatusSnapshot,
@@ -53,8 +53,7 @@ interface PublicClientSource {
   Unassigned?: unknown;
   Degraded?: unknown;
   Initialising?: unknown;
-  // Loose for the same reason as Vitals: the internal view carries a nullable
-  // SampledAt and augmented items the wire snapshot type doesn't model.
+  // Loose like Vitals: the projection passes the entity's view through as it is.
   RunningApplications?: unknown;
   USBDeviceList?: unknown;
   CriticalUSBDevices?: unknown;
@@ -117,7 +116,7 @@ function FormatClientVersionLabel(c: PublicClientSource): string {
 // unchanged field from a changed one. Frozen, so no consumer can alter the
 // value every other projection shares; the wire output is identical.
 const NONE = Object.freeze([]) as unknown as never[];
-const NO_APPLICATIONS = Object.freeze({ Items: NONE }) as unknown as RunningApplicationsSnapshot;
+const NO_APPLICATIONS = Object.freeze({ Items: NONE }) as unknown as RunningApplicationsView;
 const EMPTY_AUDIO_VIEW = Object.freeze(EmptyAudioView()) as AudioDevicesView;
 const EMPTY_NETWORK_VIEW = Object.freeze(EmptyNetworkStatusView()) as NetworkStatusView;
 const EMPTY_STORAGE_VIEW = Object.freeze(EmptyStorageView()) as StorageStatusView;
@@ -168,7 +167,7 @@ const ToPublicClient = (c: PublicClientSource): ClientView => ({
   Identifying: !!c.Identifying,
   Unassigned: !!c.Unassigned,
   RunningApplications:
-    (c.RunningApplications as RunningApplicationsSnapshot | undefined) ?? NO_APPLICATIONS,
+    (c.RunningApplications as RunningApplicationsView | undefined) ?? NO_APPLICATIONS,
   CriticalApplications: Array.isArray(c.CriticalApplications) ? c.CriticalApplications : NONE,
   MissingCriticalApplications: Array.isArray(c.MissingCriticalApplications)
     ? c.MissingCriticalApplications

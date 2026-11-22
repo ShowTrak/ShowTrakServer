@@ -16,45 +16,26 @@ import {
   MIN_OFFLINE_GRACE_SECONDS,
   MAX_OFFLINE_GRACE_SECONDS,
 } from '../ClientManager/offline-grace';
+import type { SettingDefinition, SettingGroup } from '@showtrak/protocol';
 
-// PASSWORD behaves exactly like STRING everywhere on the backend; it only tells the
-// settings renderer to mask the field. Used for secrets that would otherwise sit in
-// plain sight in the settings modal.
-export type SettingType = 'BOOLEAN' | 'INTEGER' | 'STRING' | 'PASSWORD' | 'OPTION' | 'SLIDER';
-export type SettingValue = boolean | number | string;
-
-export interface SettingDefinition {
-  Group: string;
-  Key: string;
-  Title: string;
-  Description: string;
-  Type: SettingType;
-  DefaultValue: SettingValue;
-  Min?: number;
-  Max?: number;
-  Options?: string[];
-  // Optional unit label shown alongside numeric/slider values in the UI (e.g. '%', 'ms').
-  Unit?: string;
-  OnUpdateEvent?: string;
-  // 'INSTALL' stores the value with this installation of ShowTrak (see
-  // install-settings.ts) instead of in the open show file, so it does not change
-  // when a different show is opened. Omitted means per show file.
-  Scope?: 'INSTALL';
-  // Progressive disclosure: Preferences shows this setting only while every
-  // BOOLEAN setting named here is on. Purely presentational: a hidden setting
-  // keeps its value, and the backend still reads the parent toggle itself.
-  ShowWhen?: string[];
-}
-
-export interface SettingGroup {
-  Name: string;
-  Title: string;
-  // As SettingDefinition.ShowWhen, for a whole group (and its Preferences tab).
-  ShowWhen?: string[];
-  // Renders inside the named group's Preferences tab, under its own heading,
-  // rather than as a tab of its own. The parent must come first in Groups.
-  Parent?: string;
-}
+// The settings table is the protocol's settings framework (shared with ShowTrak
+// Timers): SettingDefinition entries in SettingGroup groups. Notes on how this
+// server reads them:
+//
+//   Type 'PASSWORD'  Behaves exactly like STRING everywhere on the backend; it
+//                    only tells the settings renderer to mask the field. Used
+//                    for secrets that would otherwise sit in plain sight in the
+//                    settings modal.
+//   Scope 'INSTALL'  Stores the value with this installation of ShowTrak (see
+//                    install-settings.ts) instead of in the open show file, so
+//                    it does not change when a different show is opened.
+//                    Omitted means per show file.
+//   ShowWhen         Progressive disclosure, purely presentational: a hidden
+//                    setting keeps its value, and the backend still reads the
+//                    parent toggle itself.
+//   Parent           A group with a Parent renders inside that group's
+//                    Preferences tab, under its own heading, rather than as a
+//                    tab of its own. The parent must come first in Groups.
 
 export const DefaultSettings: SettingDefinition[] = [
   // Machine settings are stored with this installation (Scope: 'INSTALL'),
