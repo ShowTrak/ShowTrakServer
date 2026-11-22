@@ -9,24 +9,16 @@ import { Config } from '../Config';
 import { CompareVersions } from '../Utils';
 import { IsObject } from '../Utils/guards';
 import { CreateShowFileInfoRepository } from '../DB/repositories/show-file-info';
+import type { ShowFileOpenOutcome, ShowFileUpgrade } from '@showtrak/protocol';
 
 const Logger = CreateLogger('BackupManager');
 const ShowFileInfo = CreateShowFileInfoRepository(DB);
 
 type BackupResult<T> = [string | null, T | null];
 
-// A show file last saved by an older ShowTrak Server, waiting on the operator
-// to agree to upgrade it. FileVersion is null for a file saved before versions
-// were stamped into show files.
-interface ShowFileUpgrade {
-  FilePath: string;
-  FileName: string;
-  FileVersion: string | null;
-  CurrentVersion: string;
-}
-
-type OpenOutcome =
-  { Status: 'Opened'; FilePath: string } | { Status: 'UpgradeRequired'; Upgrade: ShowFileUpgrade };
+// ShowFileUpgrade (from the protocol) is a show file last saved by an older
+// ShowTrak Server, waiting on the operator to agree to upgrade it. FileVersion
+// is null for a file saved before versions were stamped into show files.
 
 // The DB layer's error slot is opaque (Error or string); flatten it for the
 // renderer-facing [message, null] tuples.
@@ -148,7 +140,7 @@ const Manager = {
   // "Open" from the UI. A file saved by this version (or a newer one) opens
   // straight away. An older one is left untouched and held as the pending
   // upgrade until the operator answers with AcceptUpgrade or DeclineUpgrade.
-  async RequestOpen(FilePath: string): Promise<BackupResult<OpenOutcome>> {
+  async RequestOpen(FilePath: string): Promise<BackupResult<ShowFileOpenOutcome>> {
     if (!fs.existsSync(FilePath)) {
       Logger.error('ShowTrak file does not exist:', FilePath);
       return ['ShowTrak file does not exist', null];
@@ -351,4 +343,4 @@ const Manager = {
 };
 
 export { Manager };
-export type { OpenOutcome, ShowFileUpgrade };
+export type { ShowFileOpenOutcome as OpenOutcome, ShowFileUpgrade };

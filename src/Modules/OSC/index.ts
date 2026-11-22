@@ -1,5 +1,6 @@
 import { CreateLogger } from '../Logger';
 import type { ClientManagerType } from '../ClientManager';
+import type { OSCRouteValue } from '@showtrak/protocol';
 import { OSC_PORT } from '../Config/constants';
 import { Manager as Broadcast } from '../Broadcast';
 import { RunWithAuditSource } from '../AuditLog/source';
@@ -189,15 +190,10 @@ type OSCGroup = NonNullable<Awaited<ReturnType<typeof GroupManager.Get>>[1]>;
 type OSCClient = NonNullable<Awaited<ReturnType<ClientManagerType['GetAll']>>[1]>[number];
 type OSCTag = NonNullable<Awaited<ReturnType<typeof TagManager.GetBySlug>>>;
 
-// One accepted value for a route's placeholder(s), as listed in the OSC/API
-// reference, e.g. `pjlink/power.on` for a check action, `reboot` for a
-// FreeKiosk command. Plain data so it survives the JSON clone that pushes the
-// route list to the renderer.
-interface OSCRouteValue {
-  Value: string;
-  Label: string;
-  Note?: string;
-}
+// An OSCRouteValue (from the protocol) is one accepted value for a route's
+// placeholder(s), as listed in the OSC/API reference, e.g. `pjlink/power.on`
+// for a check action, `reboot` for a FreeKiosk command. Plain data so it
+// survives the JSON clone that pushes the route list to the renderer.
 
 interface OSCRouteValueList {
   /** The placeholder(s) the entries fill, e.g. `Method/ActionID`. */

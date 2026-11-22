@@ -1,4 +1,16 @@
 // Shared types for the MonitoringMethods family.
+//
+// The parts of a method's definition that reach the renderer and the SDK as
+// they are (its info panel, discovery signature, setting visibility and option
+// lists) are the protocol's own types, re-exported below with the notes on how
+// a method fills them in.
+import type {
+  MonitoringActionOptions,
+  MonitoringMethodDiscovery,
+  MonitoringMethodInfo,
+  MonitoringSettingOptions,
+  MonitoringSettingVisibleWhen,
+} from '@showtrak/protocol';
 
 export interface MonitoringResult {
   Success: boolean;
@@ -22,11 +34,7 @@ export interface MonitoringTargetLike {
 // gates cannot be written as an equality: the FreeKiosk alarm schema hides its
 // threshold input whenever the chosen operator is one of the value-less edge
 // detectors, which is a set test, not a comparison against one value.
-export interface MonitoringSettingVisibleWhen {
-  Key: string;
-  Equals?: unknown;
-  In?: unknown[];
-}
+export type { MonitoringSettingVisibleWhen };
 
 export interface MonitoringSettingField {
   Key: string;
@@ -82,14 +90,10 @@ export interface MonitoringSettingField {
 
 // Editor-facing "how to set this up" help, shown in a panel below the method
 // picker. Purely informational; never affects probe behaviour. All fields are
-// treated as plain text by the renderer (escaped before display).
-export interface MonitoringMethodInfo {
-  Summary: string;
-  Setup?: string[];
-  // External references (protocol specs, vendor docs, API references). Rendered
-  // as buttons at the bottom of the info panel that open in the default browser.
-  Links?: Array<{ Label: string; Url: string }>;
-}
+// treated as plain text by the renderer (escaped before display). Links are
+// external references (protocol specs, vendor docs, API references), rendered as
+// buttons at the bottom of the info panel that open in the default browser.
+export type { MonitoringMethodInfo };
 
 // --- Controllable actions ----------------------------------------------------
 //
@@ -139,7 +143,7 @@ export interface MonitoringActionResult {
  * Derived from the check's most recent result so a method can offer what THIS
  * device reported (a projector's actual input sources) instead of free text.
  */
-export type MonitoringActionOptions = Record<string, Array<{ value: string; label: string }>>;
+export type { MonitoringActionOptions };
 
 /**
  * Per-check choices for a FromDevice 'list' setting, keyed by the setting's Key:
@@ -148,10 +152,7 @@ export type MonitoringActionOptions = Record<string, Array<{ value: string; labe
  * line (model, state); `aliases` are other stored values that mean the same item
  * (a device's name, where the value is its MAC address).
  */
-export type MonitoringSettingOptions = Record<
-  string,
-  Array<{ value: string; label: string; detail?: string; aliases?: string[] }>
->;
+export type { MonitoringSettingOptions };
 
 // --- Live levels ----------------------------------------------------------------
 //
@@ -208,29 +209,25 @@ export interface MonitoringTileWidget {
 // pick from the whole catalogue. Purely declarative: the scan gathers evidence
 // (open TCP ports, mDNS service types, PJLink replies) and the renderer matches
 // it against these, so a method gains discovery without touching the scanner.
-export interface MonitoringMethodDiscovery {
-  // How sure a match makes us. 'high' for a port or service only this kind of
-  // device uses; 'low' for one many devices share (80, 8080, telnet).
-  Confidence: 'high' | 'medium' | 'low';
-  // Any of these TCP ports open is a match. Every port listed across the
-  // catalogue is probed on each live host, so keep generic ports out unless
-  // the confidence says so.
-  TcpPorts?: number[];
-  // mDNS service types, `_type._proto` (e.g. '_qlab._tcp'). Case-insensitive.
-  ServiceTypes?: string[];
-  // Matches a projector that answered PJLink's UDP search.
-  PJLink?: boolean;
-  // Setting filled with the port the match was made on.
-  PortSetting?: string;
-  // Setting filled with the matching mDNS service's instance name, for methods
-  // that find their device by name rather than address (Dante, NDI).
-  NameSetting?: string;
-  // Settings implied by which port, or which service type, matched: the HTTP
-  // method serves both protocols, so port 443 means `Protocol: 'https'`.
-  // Keyed by port number / service type.
-  PortSettings?: Record<string, Record<string, unknown>>;
-  ServiceSettings?: Record<string, Record<string, unknown>>;
-}
+//
+//   Confidence       How sure a match makes us. 'high' for a port or service
+//                    only this kind of device uses; 'low' for one many devices
+//                    share (80, 8080, telnet).
+//   TcpPorts         Any of these TCP ports open is a match. Every port listed
+//                    across the catalogue is probed on each live host, so keep
+//                    generic ports out unless the confidence says so.
+//   ServiceTypes     mDNS service types, `_type._proto` (e.g. '_qlab._tcp').
+//                    Case-insensitive.
+//   PJLink           Matches a projector that answered PJLink's UDP search.
+//   PortSetting      Setting filled with the port the match was made on.
+//   NameSetting      Setting filled with the matching mDNS service's instance
+//                    name, for methods that find their device by name rather
+//                    than address (Dante, NDI).
+//   PortSettings,    Settings implied by which port, or which service type,
+//   ServiceSettings  matched, keyed by port number / service type: the HTTP
+//                    method serves both protocols, so port 443 means
+//                    `Protocol: 'https'`.
+export type { MonitoringMethodDiscovery };
 
 export interface MonitoringMethod {
   ID: string;

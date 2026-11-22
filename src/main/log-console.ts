@@ -12,6 +12,7 @@
 // logs in bursts, and one message per line would flood a slow web link.
 
 import { LEVEL_RANK } from '@showtrak/protocol/runtime';
+import type { LogConsoleSnapshot } from '@showtrak/protocol';
 import {
   GetLogFeedBacklog,
   SetLogFeedLevel,
@@ -27,10 +28,8 @@ const MAX_PENDING = 2000;
 const MAX_PENDING_CHARS = 2_000_000;
 const DEFAULT_LEVEL = 'info';
 
-export interface LogConsoleSnapshot {
-  Level: string;
-  Entries: LogFeedEntry[];
-}
+// What a viewer opening the console receives (from the protocol).
+export type { LogConsoleSnapshot };
 
 interface Viewer {
   Level: string;

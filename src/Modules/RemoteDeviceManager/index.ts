@@ -30,6 +30,7 @@ import { Manager as UUIDManager } from '../UUID';
 import { Ok, Fail } from '../Utils';
 import type { Result } from '../../types/result';
 import type { RemoteDeviceRow } from '../DB/rows';
+import type { RemoteDeviceView } from '@showtrak/protocol';
 import { RecordEdit } from '../AuditLog/edits';
 import { Device, Line } from '../AuditLog/message';
 import { AuditBefore, AuditStep } from '../Shared/audit-names';
@@ -58,14 +59,8 @@ const MAX_DEVICE_NAME_LENGTH = 64;
 /** Platforms a pairing device may declare. Advisory: used only for the icon. */
 const KNOWN_PLATFORMS = new Set(['ios', 'android']);
 
-/** A paired device as the settings pane sees it. Never carries the token. */
-export interface RemoteDeviceView {
-  DeviceID: string;
-  DeviceName: string;
-  Platform: string | null;
-  PairedAt: number;
-  LastSeenAt: number | null;
-}
+/** A paired device as the settings pane sees it (from the protocol). Never carries the token. */
+export type { RemoteDeviceView };
 
 /** The one and only time a caller sees a plaintext device token. */
 export interface PairingResult {

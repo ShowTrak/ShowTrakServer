@@ -17,21 +17,11 @@ import { MONITORING_HISTORY_MAX_AGE_MS } from './monitoring-history';
 import { FREEKIOSK_METRICS, RoundTo } from '../Modules/FreeKiosk/metrics';
 import { ParseAlarmSettings } from '../Modules/FreeKiosk/alarms';
 import { IsArray, IsObject } from '../Modules/Utils/guards';
+import type { FreeKioskMetricSample, FreeKioskMetricSeries } from '@showtrak/protocol';
 
-/** One point of one metric's series. */
-export interface FreeKioskMetricSample {
-  ts: number;
-  /** The terminal answered AND this metric had a reading. */
-  ok: boolean;
-  n: number | null;
-  s: string | null;
-  breach: boolean;
-}
-
-export interface FreeKioskMetricSeries {
-  MetricKey: string;
-  Samples: FreeKioskMetricSample[];
-}
+// One point of one metric's series (FreeKioskMetricSample, from the protocol):
+// `ok` is whether the terminal answered AND this metric had a reading.
+export type { FreeKioskMetricSample, FreeKioskMetricSeries };
 
 /**
  * Per-series backstop. The window plus flat-run compression already keep a

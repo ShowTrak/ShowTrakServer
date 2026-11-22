@@ -5,6 +5,7 @@
 // through exported helpers.
 import { HISTORY_RETENTION_MS } from '../Modules/Config/constants';
 import { IsArray, IsObject } from '../Modules/Utils/guards';
+import type { HistorySample } from '@showtrak/protocol';
 
 const MONITORING_HISTORY_MAX_AGE_MS = HISTORY_RETENTION_MS;
 // Readings closer together than this collapse into one: a burst of updates for
@@ -32,14 +33,9 @@ const ENTITY_CLIENT = 'client';
 
 // ---- Types ---------------------------------------------------------------
 
-// A single stored status sample. `latencyMs` is null for entities (dummy/real
-// clients, applications, USB devices, displays) that report no latency.
-interface HistorySample {
-  ts: number;
-  online: boolean;
-  degraded: boolean;
-  latencyMs: number | null;
-}
+// A single stored status sample is the protocol's HistorySample, as the
+// renderer receives it. `latencyMs` is null for entities (dummy/real clients,
+// applications, USB devices, displays) that report no latency.
 
 // The loose `{ online, degraded, latencyMs }` shape callers hand in before it is
 // normalized into a HistorySample; fields are validated/coerced at record time.

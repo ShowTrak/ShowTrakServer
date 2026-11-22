@@ -29,18 +29,14 @@ import {
   ResolveConfirmationLevel,
 } from './schema';
 import type { NormalizedScriptConfig, ConsoleFilterConfig, ConfirmationLevel } from './schema';
+import type { ScriptFileEntry } from '@showtrak/protocol';
 
 const Logger = CreateLogger('ScriptManager');
 
 // A per-platform launch/argument map ({ Windows, macOS, Linux }).
 type PlatformMap = Record<string, string>;
 
-// One entry in a script folder's file listing.
-interface ScriptFileEntry {
-  Path: string;
-  Type: 'file' | 'directory';
-  Checksum?: string | null;
-}
+// A ScriptFileEntry (from the protocol) is one entry in a script folder's file listing.
 
 // The editable projection of a script surfaced to the Script Manager UI.
 interface ScriptEditable {

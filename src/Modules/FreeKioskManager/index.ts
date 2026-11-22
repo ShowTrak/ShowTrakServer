@@ -53,6 +53,7 @@ import {
 } from './normalize';
 import { FreeKioskTerminal } from './terminal';
 import type { FreeKioskTerminalSnapshot } from './terminal';
+import type { FreeKioskCommandOutcome, FreeKioskCommandSummary } from '@showtrak/protocol';
 
 const Logger = CreateLogger('FreeKiosk');
 const TerminalsRepo = CreateFreeKioskTerminalsRepository(DB);
@@ -89,18 +90,8 @@ function GenerateUUID(): string {
   return (require('crypto') as typeof import('crypto')).randomUUID();
 }
 
-export interface FreeKioskCommandOutcome {
-  UUID: string;
-  Success: boolean;
-  Error: string | null;
-}
-
-export interface FreeKioskCommandSummary {
-  Total: number;
-  Succeeded: number;
-  Failed: number;
-  Results: FreeKioskCommandOutcome[];
-}
+// A command's result per terminal, and across a batch (from the protocol).
+export type { FreeKioskCommandOutcome, FreeKioskCommandSummary };
 
 function Summarize(Results: FreeKioskCommandOutcome[]): FreeKioskCommandSummary {
   const Succeeded = Results.filter((Result) => Result.Success).length;

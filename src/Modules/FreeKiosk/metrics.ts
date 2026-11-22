@@ -22,23 +22,23 @@
 // into /api/status is carried separately in Path.
 import type { MonitoringSettingField } from '../MonitoringMethods/types';
 import type { FreeKioskStatus } from './types';
+import type {
+  FreeKioskChartKind,
+  FreeKioskDisplayMode,
+  FreeKioskMetricFormat,
+  FreeKioskMetricSection,
+  FreeKioskMetricType,
+  FreeKioskOperator,
+} from '@showtrak/protocol';
 
-export type FreeKioskMetricType = 'number' | 'boolean' | 'enum' | 'string';
-export type FreeKioskChartKind = 'line' | 'blocks' | 'none';
-export type FreeKioskMetricFormat = 'duration' | 'dbm' | 'url' | 'megabytes' | 'raw';
-
-export type FreeKioskMetricSection =
-  | 'Battery'
-  | 'Screen'
-  | 'Content'
-  | 'Audio'
-  | 'Device'
-  | 'Network'
-  | 'Rotation'
-  | 'Sensors'
-  | 'Storage'
-  | 'Memory'
-  | 'Poll';
+// The catalogue's vocabularies are the protocol's: the renderer and the SDK
+// read this catalogue as it is sent.
+export type {
+  FreeKioskChartKind,
+  FreeKioskMetricFormat,
+  FreeKioskMetricSection,
+  FreeKioskMetricType,
+};
 
 // Section render order for the editor accordion and the view modal.
 export const FREEKIOSK_SECTIONS: readonly FreeKioskMetricSection[] = Object.freeze([
@@ -168,7 +168,7 @@ export function IsMetricGroupEnabled(Settings: unknown, Section: string): boolea
  * reports a URL indefinitely: a reading that looks current, is not, and cannot
  * be told apart from a real one by looking at it.
  */
-export type FreeKioskDisplayMode = 'webview' | 'external_app' | 'media_player';
+export type { FreeKioskDisplayMode };
 
 export const FREEKIOSK_DISPLAY_MODES: readonly {
   Value: FreeKioskDisplayMode;
@@ -267,17 +267,7 @@ export function IsMetricMonitored(Settings: unknown, MetricKey: string): boolean
  * Each metric lists its operators in the order an expectation is most often
  * stated, so the picker opens on the natural one.
  */
-export type FreeKioskOperator =
-  | 'below'
-  | 'above'
-  | 'outside'
-  | 'inside'
-  | 'is'
-  | 'isNot'
-  | 'contains'
-  | 'notContains'
-  | 'changes'
-  | 'decreases';
+export type { FreeKioskOperator };
 
 // Operators that judge this poll against the previous one and therefore take no
 // threshold value. The alarm schema hides the value inputs for these.
