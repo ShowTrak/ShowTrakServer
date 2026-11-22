@@ -4,7 +4,7 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "rootDir": "./src/UI",
+    "rootDir": "./src",
     "noEmit": true,
     "types": ["jquery"],
     "paths": {
@@ -12,5 +12,5 @@
       "@showtrak/protocol/*": ["./shared/src/*"]
     }
   },
-  "include": ["src/UI/js/app/**/*", "src/UI/types/**/*"]
+  "include": ["src/UI/js/app/**/*", "src/UI/types/**/*", "src/common/**/*"]
 }

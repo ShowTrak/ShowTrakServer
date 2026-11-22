@@ -9,7 +9,7 @@
     "clean": "node -e \"for (const d of ['dist','dist-test']) require('node:fs').rmSync(d,{recursive:true,force:true})\"",
     "build:ts": "tsc -p tsconfig.json",
     "build:main": "node scripts/build-main.js",
-    "typecheck:renderer": "tsc -p tsconfig.renderer.json && tsc -p tsconfig.preloader.json && tsc -p tsconfig.service-worker.json",
+    "typecheck:renderer": "tsc -p tsconfig.renderer.json && tsc -p tsconfig.common.json && tsc -p tsconfig.preloader.json && tsc -p tsconfig.service-worker.json",
     "build:renderer": "node scripts/build-renderer.js",
     "build:test-renderer": "tsc -p tsconfig.renderer.test.json",
     "build:css": "node scripts/build-css.js",
@@ -29,7 +29,7 @@
     "pretest": "npm run build && npm run build:test-renderer",
     "test": "node scripts/run-isolated-tests.js",
     "pretest:coverage": "npm run build && npm run build:test-renderer",
-    "test:coverage": "c8 --all --include=dist/Modules/**/*.js --include=dist/main/**/*.js --include=dist-test/UI/js/app/**/*.js --reporter=text --reporter=text-summary --reporter=lcov node scripts/run-isolated-tests.js",
+    "test:coverage": "c8 --all --include=dist/Modules/**/*.js --include=dist/main/**/*.js --include=dist/common/**/*.js --include=dist-test/UI/js/app/**/*.js --reporter=text --reporter=text-summary --reporter=lcov node scripts/run-isolated-tests.js",
     "prepare": "husky",
     "postinstall": "npm run build:shared && node scripts/copy-bootstrap-icons.js",
     "build:shared": "tsc -p shared/tsconfig.build.json"

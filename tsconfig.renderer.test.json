@@ -30,5 +30,5 @@
       "@showtrak/protocol/*": ["./shared/src/*"]
     }
   },
-  "include": ["src/UI/js/app/**/*", "src/UI/types/**/*"]
+  "include": ["src/UI/js/app/**/*", "src/UI/types/**/*", "src/common/**/*"]
 }

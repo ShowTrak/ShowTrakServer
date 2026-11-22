@@ -98,6 +98,7 @@ export default defineConfig([
       parserOptions: {
         project: [
           './tsconfig.json',
+          './tsconfig.common.json',
           './tsconfig.renderer.json',
           './tsconfig.preloader.json',
           './tsconfig.service-worker.json',
@@ -116,6 +117,25 @@ export default defineConfig([
       '@typescript-eslint/no-unsafe-member-access': 'error',
       '@typescript-eslint/no-unsafe-return': 'error',
       '@typescript-eslint/no-unsafe-unary-minus': 'error',
+    },
+  },
+  {
+    // src/common is compiled into both the main process and the renderer, so
+    // it imports neither Node, the DOM, nor either side's own modules
+    // (tsconfig.common.json checks the globals it uses).
+    files: ['src/common/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '^(?!\\./)',
+              message: 'src/common only imports its own modules (it runs in both processes).',
+            },
+          ],
+        },
+      ],
     },
   },
   {

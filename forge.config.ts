@@ -97,7 +97,7 @@ const config: ForgeConfig = {
       // The main process ships as one bundle, dist/main.bundle.js, loaded by
       // dist/boot.js (scripts/build-main.js). The per-file tsc output it was
       // built from is for the test suite and is never loaded by the app.
-      /^\/dist\/(Modules|main|types)($|\/)/,
+      /^\/dist\/(Modules|main|types|common)($|\/)/,
       /^\/dist\/(entry|main)\.js$/,
       // Source maps are debug-only; strip from release builds.
       /\.map$/,

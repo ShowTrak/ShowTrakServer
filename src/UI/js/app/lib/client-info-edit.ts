@@ -10,6 +10,7 @@
 // aside, which create rather than edit).
 import type { ClientInfoKind } from './client-info-tabs';
 import { ArrayOrEmpty } from './guards';
+import { NormalizeMacAddress, ZERO_MAC } from '../../../../common/mac-address';
 
 const EDITABLE_CLIENT_INFO_KINDS: readonly ClientInfoKind[] = [
   'client',
@@ -61,18 +62,8 @@ export function OfflineGraceSummary(
 
 // --- Wake on LAN -----------------------------------------------------------
 
-const ZERO_MAC = '00:00:00:00:00:00';
-
-/** Upper-case colon form, or null when not a 48-bit MAC. Mirrors Modules/MacAddress. */
-export function NormalizeMac(Value: unknown): string | null {
-  if (typeof Value !== 'string' && typeof Value !== 'number') return null;
-  const Hex = String(Value)
-    .trim()
-    .replace(/[:\-.\s]/g, '')
-    .toUpperCase();
-  if (Hex.length !== 12 || /[^0-9A-F]/.test(Hex)) return null;
-  return (Hex.match(/.{2}/g) as string[]).join(':');
-}
+/** Upper-case colon form, or null when not a 48-bit MAC. */
+export const NormalizeMac = NormalizeMacAddress;
 
 export interface MacCandidate {
   MacAddress: string;

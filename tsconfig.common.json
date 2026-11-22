@@ -1,0 +1,16 @@
+// Typecheck-only program for src/common: the pure logic compiled into BOTH the
+// main process (tsconfig.json, into dist/common) and the renderer
+// (tsconfig.renderer.json, bundled by esbuild). It sees the ES library and
+// nothing else, so code that reaches for Node (Buffer, process, a node: module)
+// or the DOM (window, document) fails here rather than in whichever program
+// happens not to provide it.
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "types": []
+  },
+  "include": ["src/common/**/*.ts"]
+}

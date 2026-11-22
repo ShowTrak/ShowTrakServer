@@ -9,6 +9,9 @@ import type {
   NetworkInterfaceAddress,
   NetworkInterfaceView,
 } from '@showtrak/protocol';
+import { ParseIP, IsLinkLocalV6, FormatIPv4 } from '../../../../common/ip-address';
+
+export { ParseIP };
 
 export type NetworkFamily = 'IPv4' | 'IPv6';
 
@@ -50,64 +53,6 @@ export function NetworkSectionMessage(
 }
 
 // --- Addresses ------------------------------------------------------------------
-// A copy of the parsing in Modules/ClientManager/network.ts (the renderer is a
-// separate bundle). The server re-validates everything it is sent.
-
-function ParseIPv4(Text: string): bigint | null {
-  const Match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(Text);
-  if (!Match) return null;
-  let Value = 0n;
-  for (let Index = 1; Index <= 4; Index += 1) {
-    const Octet = Number(Match[Index]);
-    if (Octet > 255) return null;
-    Value = (Value << 8n) | BigInt(Octet);
-  }
-  return Value;
-}
-
-function ParseIPv6(Text: string): bigint | null {
-  let Body = Text;
-  let Tail: number[] = [];
-  const LastColon = Body.lastIndexOf(':');
-  if (LastColon !== -1 && Body.slice(LastColon + 1).includes('.')) {
-    const V4 = ParseIPv4(Body.slice(LastColon + 1));
-    if (V4 === null) return null;
-    Tail = [Number((V4 >> 16n) & 0xffffn), Number(V4 & 0xffffn)];
-    Body = Body.slice(0, LastColon + 1);
-    if (Body.endsWith(':') && !Body.endsWith('::')) Body = Body.slice(0, -1);
-  }
-  const Halves = Body.split('::');
-  if (Halves.length > 2) return null;
-  const Groups = (Part: string) => (Part === '' ? [] : Part.split(':'));
-  const Head = Groups(Halves[0] ?? '');
-  const Rest = Halves.length === 2 ? Groups(Halves[1] ?? '') : [];
-  const Explicit = Head.length + Rest.length + Tail.length;
-  if (Halves.length === 1 ? Explicit !== 8 : Explicit > 7) return null;
-  const Words: number[] = [];
-  for (const Group of [...Head, ...new Array<string>(8 - Explicit).fill('0'), ...Rest]) {
-    if (!/^[0-9a-f]{1,4}$/i.test(Group)) return null;
-    Words.push(parseInt(Group, 16));
-  }
-  Words.push(...Tail);
-  if (Words.length !== 8) return null;
-  return Words.reduce((Value, Word) => (Value << 16n) | BigInt(Word), 0n);
-}
-
-export function ParseIP(Value: unknown): { Family: 4 | 6; Value: bigint } | null {
-  if (typeof Value !== 'string') return null;
-  const Text = Value.trim().replace(/%.*$/, '');
-  if (!Text || Text.length > 64) return null;
-  if (Text.includes(':')) {
-    const V6 = ParseIPv6(Text);
-    return V6 === null ? null : { Family: 6, Value: V6 };
-  }
-  const V4 = ParseIPv4(Text);
-  return V4 === null ? null : { Family: 4, Value: V4 };
-}
-
-function FormatIPv4(Value: bigint): string {
-  return [24n, 16n, 8n, 0n].map((Shift) => String((Value >> Shift) & 0xffn)).join('.');
-}
 
 export function AddressFamily(Value: unknown): NetworkFamily | null {
   const Text = String(Value ?? '').toUpperCase();
@@ -127,11 +72,6 @@ export function AddressesFor(
 /** "10.0.0.5/24" when the client gave a CIDR, else the bare address. */
 export function FormatAddress(Address: NetworkInterfaceAddress): string {
   return String(Address.cidr || Address.address || '');
-}
-
-function IsLinkLocalV6(Address: unknown): boolean {
-  const Parsed = ParseIP(Address);
-  return !!Parsed && Parsed.Family === 6 && Parsed.Value >> 118n === 0x3fan;
 }
 
 /**

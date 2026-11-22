@@ -241,19 +241,25 @@ npm run format:check
 ## TypeScript
 
 All of `src/` is TypeScript; only the tests, their support code and the build
-scripts are JavaScript. `npm run typecheck` checks five programs, each with only
+scripts are JavaScript. `npm run typecheck` checks six programs, each with only
 the types its code can use at run time:
 
 | Program                        | Covers                                                                           |
 | ------------------------------ | -------------------------------------------------------------------------------- |
 | `tsconfig.json`                | The main process and its modules (`src/` but the renderer and Web UI)            |
 | `tsconfig.renderer.json`       | The renderer shared by the desktop and the Web UI (`src/UI/js/app`): DOM, jQuery |
+| `tsconfig.common.json`         | `src/common`, compiled into both of the above: the ES library only               |
 | `tsconfig.preloader.json`      | The splash window's page script: the DOM only                                    |
 | `tsconfig.service-worker.json` | The Web UI's offline-splash service worker: the WebWorker library only           |
 | `tsconfig.tooling.json`        | `forge.config.ts` and `eslint.config.ts`                                         |
 
 `tsconfig.renderer.test.json` compiles the renderer again, as CommonJS modules in
 `dist-test/`, for the tests to load; `npm test` builds it.
+
+Logic that both processes need (parsing an IP or MAC address, matching a scope,
+comparing client versions, formatting a size) lives once in `src/common` and is
+imported by each side, rather than copied into the renderer. It may import only
+its own modules, and uses neither Node nor the DOM.
 
 ESLint lints these programs with type information. Explicit `any` is an error,
 and the `no-unsafe-*` rules reject any value typed `any` that is used unchecked
