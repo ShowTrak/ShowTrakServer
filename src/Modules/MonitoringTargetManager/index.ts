@@ -17,15 +17,12 @@ import type {
   MonitoringCheckDebug,
   MonitoringTargetView,
   Result,
+  MonitorLiveLevelChange,
+  MonitorLiveLevelResult,
 } from '@showtrak/protocol';
 import type { MonitoringTargetRow } from '../DB/rows';
 import type { AuditChange } from '@showtrak/protocol';
-import type {
-  LiveLevelChange,
-  MonitoringActionResult,
-  MonitoringSettingField,
-  MonitoringTargetLike,
-} from '../MonitoringMethods/types';
+import type { MonitoringSettingField, MonitoringTargetLike } from '../MonitoringMethods/types';
 import { RecordAction, RecordEdit, RecordUpdate } from '../AuditLog/edits';
 import { Entity, Line, Value } from '../AuditLog/message';
 import { DiffFields, FormatValue, type FieldSpec } from '../AuditLog/diff';
@@ -642,9 +639,9 @@ const Manager = {
     TargetID: number,
     CheckID: number,
     ChannelID: string,
-    Change: LiveLevelChange,
+    Change: MonitorLiveLevelChange,
     Final: boolean
-  ): Promise<MonitoringActionResult> {
+  ): Promise<MonitorLiveLevelResult> {
     const Target = TargetList.find((T) => Number(T.TargetID) === Number(TargetID));
     const Check = Target && Target.Checks.find((C) => Number(C.CheckID) === Number(CheckID));
     if (!Target || !Check) return { Success: false, Error: 'Monitoring check not found' };

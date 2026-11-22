@@ -13,16 +13,16 @@ import {
   MAX_UPTIME_DAYS,
 } from '../ClientManager/system-checks';
 import { MAX_FREE_GB, MAX_FREE_PERCENT } from '../ClientManager/storage';
+import type { IPCValidationManager } from './index';
 import type {
-  ClientSystemCheckPayloadResult,
-  AudioLevelRequestResult,
-  CriticalAudioDevicePayloadResult,
-  CriticalNetworkInterfacePayloadResult,
-  CriticalStorageVolumePayloadResult,
-  CriticalDisplayPayloadResult,
-  CriticalUSBConditionOptionsResult,
-  IPCValidationManager,
-} from './index';
+  ClientSystemCheckPayload,
+  AudioLevelRequest,
+  CriticalAudioDevicePayload,
+  CriticalNetworkInterfacePayload,
+  CriticalStorageVolumePayload,
+  CriticalDisplayPayload,
+  CriticalUSBConditionOptions,
+} from '@showtrak/protocol';
 
 // Minimum delay (seconds) enforced before a run-on-launch script fires. The
 // delay doubles as the abort-window countdown shown on the client, so it must
@@ -176,7 +176,7 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
   // The conditions a USB mark request may set. Requests from before conditions
   // existed carry none of them, which keeps every condition as it is.
   const USBConditionOptions = (value: Record<string, unknown>) => {
-    const out: CriticalUSBConditionOptionsResult = {};
+    const out: CriticalUSBConditionOptions = {};
     for (const key of [
       'RequirePresent',
       'CheckLocation',
@@ -262,7 +262,7 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
     if (!isPlainObject(value)) {
       fail('Monitored display payload must be an object');
     }
-    const out: CriticalDisplayPayloadResult = {
+    const out: CriticalDisplayPayload = {
       DisplayID: Manager.DisplayID(value.DisplayID),
     };
     for (const key of [
@@ -296,7 +296,7 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
 
   Manager.CriticalAudioDevicePayload = (value: unknown) => {
     if (!isPlainObject(value)) fail('Monitored audio device payload must be an object');
-    const out: CriticalAudioDevicePayloadResult = {
+    const out: CriticalAudioDevicePayload = {
       EndpointID: Manager.AudioEndpointID(value.EndpointID),
     };
     const Has = (key: string) =>
@@ -327,7 +327,7 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
 
   Manager.AudioLevelRequest = (value: unknown) => {
     if (!isPlainObject(value)) fail('Audio level request must be an object');
-    const out: AudioLevelRequestResult = { EndpointID: Manager.AudioEndpointID(value.EndpointID) };
+    const out: AudioLevelRequest = { EndpointID: Manager.AudioEndpointID(value.EndpointID) };
     if (value.Volume !== undefined && value.Volume !== null) {
       const level = OptionalLevel(value.Volume, 'Volume');
       if (level !== null) out.Volume = level;
@@ -357,7 +357,7 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
 
   Manager.CriticalNetworkInterfacePayload = (value: unknown) => {
     if (!isPlainObject(value)) fail('Monitored network interface payload must be an object');
-    const out: CriticalNetworkInterfacePayloadResult = {
+    const out: CriticalNetworkInterfacePayload = {
       Name: Manager.NetworkInterfaceName(value.Name),
     };
     const Has = (key: string) =>
@@ -394,7 +394,7 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
   // null to stop guarding it; the yes/no conditions are booleans.
   Manager.CriticalStorageVolumePayload = (value: unknown) => {
     if (!isPlainObject(value)) fail('Monitored volume payload must be an object');
-    const out: CriticalStorageVolumePayloadResult = {
+    const out: CriticalStorageVolumePayload = {
       MountPoint: Manager.StorageMountPoint(value.MountPoint),
     };
     const Has = (key: string) =>
@@ -428,7 +428,7 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
   Manager.ClientSystemCheckPayload = (value: unknown) => {
     if (!isPlainObject(value)) fail('System check payload must be an object');
     const Key = Manager.SystemCheckKey(value.Key);
-    const out: ClientSystemCheckPayloadResult = { Key };
+    const out: ClientSystemCheckPayload = { Key };
     const Allowed: Record<string, string[]> = {
       cpu: ['MaxPercent', 'SustainSeconds'],
       ram: ['MaxPercent', 'SustainSeconds'],
@@ -483,7 +483,7 @@ export = function registerClientValidators(Manager: IPCValidationManager): void 
           if (State !== null && State !== 'nominal' && State !== 'fair' && State !== 'serious') {
             fail('MaxThermalState must be nominal, fair or serious');
           }
-          out.MaxThermalState = State as ClientSystemCheckPayloadResult['MaxThermalState'];
+          out.MaxThermalState = State as ClientSystemCheckPayload['MaxThermalState'];
           break;
         }
       }

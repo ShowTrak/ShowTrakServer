@@ -22,11 +22,12 @@ import {
 } from '../../Modules/FreeKiosk/metrics';
 import { FREEKIOSK_COMMANDS } from '../../Modules/FreeKiosk/commands';
 import { getFreeKioskMetricHistory } from '../freekiosk-history';
+import type { FreeKioskCommandDef, FreeKioskMetricCatalog } from '@showtrak/protocol';
 
 function register(): void {
   // The metric registry, delivered rather than mirrored: the renderer cannot
   // import from src/Modules, and a hand-kept copy of ~60 metrics would drift.
-  RPC.handle('FreeKiosk:GetMetrics', async () => {
+  RPC.handle('FreeKiosk:GetMetrics', async (): Promise<FreeKioskMetricCatalog> => {
     return {
       Metrics: FREEKIOSK_METRICS.map((Metric) => ({
         Key: Metric.Key,
@@ -60,7 +61,9 @@ function register(): void {
     };
   });
 
-  RPC.handle('FreeKiosk:GetCommands', async () => FREEKIOSK_COMMANDS.slice());
+  RPC.handle('FreeKiosk:GetCommands', async (): Promise<FreeKioskCommandDef[]> =>
+    FREEKIOSK_COMMANDS.slice()
+  );
 
   RPC.handle('GetAllFreeKioskTerminals', async () => {
     const [Err, List] = await FreeKioskManager.GetAll();

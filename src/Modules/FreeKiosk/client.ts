@@ -20,14 +20,12 @@
 //     every button press failing with an unexplained error.
 import http from 'http';
 import { Ok, Fail } from '../Utils';
-import type { Result } from '@showtrak/protocol';
+import type { FreeKioskCameraInfo, FreeKioskCaptureResult, Result } from '@showtrak/protocol';
 import type {
-  FreeKioskCamera,
   FreeKioskCommandResult,
   FreeKioskConnection,
   FreeKioskEnvelope,
   FreeKioskFailureKind,
-  FreeKioskImage,
   FreeKioskStatus,
 } from './types';
 
@@ -337,7 +335,12 @@ export async function GetStatus(
   return Ok({ Status: Data as FreeKioskStatus, LatencyMs: Response.LatencyMs });
 }
 
-export interface FreeKioskCommandOutcome {
+/**
+ * What the device answered to one command. Not the protocol's
+ * FreeKioskCommandOutcome, which is the per-terminal line of a fanned-out
+ * command's summary that FreeKioskManager builds from this.
+ */
+export interface FreeKioskCommandReply {
   Result: FreeKioskCommandResult;
   LatencyMs: number;
   /** The device took the command and dropped the connection carrying it out. */
@@ -356,7 +359,7 @@ export async function SendCommand(
   Path: string,
   Body?: Record<string, unknown> | null,
   ExpectDisconnect = false
-): Promise<Result<FreeKioskCommandOutcome>> {
+): Promise<Result<FreeKioskCommandReply>> {
   const [Err, Response] = await PerformRequest(Connection, {
     Method,
     Path,
@@ -419,7 +422,7 @@ export async function FetchImage(
   Connection: FreeKioskConnection,
   Kind: 'screenshot' | 'camera',
   Options: FreeKioskCaptureOptions = {}
-): Promise<Result<FreeKioskImage>> {
+): Promise<Result<FreeKioskCaptureResult>> {
   const [Err, Response] = await PerformRequest(Connection, {
     Method: 'GET',
     Path: CapturePath(Kind, Options),
@@ -459,7 +462,7 @@ export async function FetchImage(
 /** List the device's cameras, so the UI only offers ones that exist. */
 export async function GetCameraList(
   Connection: FreeKioskConnection
-): Promise<Result<FreeKioskCamera[]>> {
+): Promise<Result<FreeKioskCameraInfo[]>> {
   const [Err, Response] = await PerformRequest(Connection, {
     Method: 'GET',
     Path: '/api/camera/list',
@@ -474,7 +477,7 @@ export async function GetCameraList(
 
   const Data = (Envelope && Envelope.data) as { cameras?: unknown } | undefined;
   const Raw = Data && Array.isArray(Data.cameras) ? Data.cameras : [];
-  const Cameras: FreeKioskCamera[] = [];
+  const Cameras: FreeKioskCameraInfo[] = [];
   for (const Entry of Raw) {
     if (!Entry || typeof Entry !== 'object') continue;
     const Record_ = Entry as Record<string, unknown>;

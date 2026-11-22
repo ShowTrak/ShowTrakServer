@@ -55,6 +55,11 @@ import type {
   RunningApplicationsCapabilities,
   TemperaturesSnapshot,
   Result,
+  ClientMacAddressView,
+  RunningApplicationItem,
+  RunningApplicationsView,
+  RunningApplicationsViewStatus,
+  RunningApplicationViewItem,
 } from '@showtrak/protocol';
 import {
   EmptyAudioView,
@@ -119,14 +124,8 @@ const Logger = CreateLogger('ClientManager');
 
 const ClientsRepo = CreateClientsRepository(DB);
 
-// One MAC a client is known by, as carried in RAM and serialized to the UI.
-export interface ClientMacAddress {
-  MacAddress: string;
-  Source: 'Reported' | 'Manual';
-  InterfaceName: string | null;
-  FirstSeen: number;
-  LastSeen: number;
-}
+// One MAC a client is known by, as carried in RAM and serialized to the UI, is
+// the protocol's ClientMacAddressView.
 
 // Normalize a reported interface list into the shape carried in RAM. Shared by
 // the full-list setter and the delta applier so both paths store identical
@@ -165,7 +164,7 @@ function normalizeNetworkInterfaces(Interfaces: unknown): NormalizedNetworkInter
 // the snapshot setter and the delta applier: the stored signature is derived
 // from this order, so the two paths must sort identically or an applied delta
 // would look like a change to the very next full snapshot.
-function sortRunningApplications(Items: DedupedRunningApplication[]): DedupedRunningApplication[] {
+function sortRunningApplications(Items: RunningApplicationItem[]): RunningApplicationItem[] {
   return Items.sort((left, right) => {
     if (right.Count !== left.Count) return right.Count - left.Count;
     return left.Name.localeCompare(right.Name);
@@ -177,7 +176,7 @@ function sortRunningApplications(Items: DedupedRunningApplication[]): DedupedRun
 function runningApplicationsSignature(
   TotalCount: number,
   Truncated: boolean,
-  Items: DedupedRunningApplication[]
+  Items: RunningApplicationItem[]
 ): string {
   return `${TotalCount}|${Truncated ? '1' : '0'}|${Items.map(
     (Entry) => `${Entry.Name}:${Entry.Count}${Entry.Responding === false ? ':hung' : ''}`
@@ -231,20 +230,22 @@ function ReportSignature(Report: unknown): string {
 // methods and mirrored (minus UUID) by the DB rows in ../DB/rows.ts.
 
 // The augmented per-entity view entries the _rebuild* methods emit for the
-// renderer: connected entities merged with their critical/missing status.
-interface RunningApplicationViewEntry {
-  Name: string;
-  Count: number;
-  Key: string | null;
-  IsRunning: boolean;
-  IsCritical: boolean;
-  Missing: boolean;
-  // Absent when the client cannot tell (see RunningApplicationItem.Responding).
-  Responding?: boolean | null;
-  IsForeground: boolean;
-  RequireForeground: boolean;
-  RequireResponding: boolean;
-}
+// renderer: connected entities merged with their critical/missing status. The
+// protocol's RunningApplicationViewItem, with every annotation always set
+// (Responding stays absent when the client cannot tell).
+type RunningApplicationViewEntry = RunningApplicationViewItem &
+  Required<
+    Pick<
+      RunningApplicationViewItem,
+      | 'Key'
+      | 'IsRunning'
+      | 'IsCritical'
+      | 'Missing'
+      | 'IsForeground'
+      | 'RequireForeground'
+      | 'RequireResponding'
+    >
+  >;
 
 // Vitals as held in RAM: the last heartbeat's payload, or empty objects before
 // the first heartbeat arrives. Kept structurally loose (the renderer reads the
@@ -253,13 +254,6 @@ interface ClientVitals {
   CPU: Record<string, unknown>;
   Ram: Record<string, unknown>;
   Uptime: Record<string, unknown>;
-}
-
-// A stored running application: the wire item, de-duplicated by name.
-interface ObservedRunningApplication {
-  Name: string;
-  Count: number;
-  Responding?: boolean | null;
 }
 
 // Network interfaces as normalized by SetNetworkInterfaces (a superset of the
@@ -280,30 +274,27 @@ interface NormalizedNetworkInterface {
 }
 
 // Running-applications status/snapshot as normalized in RAM. Distinct from the
-// wire RunningApplicationsSnapshot: Platform is always present (nullable), and
-// the *view* variant carries the augmented RunningApplicationViewEntry items.
-interface RunningAppStatus {
-  State: string;
-  Message: string | null;
-  Platform: string | null;
-}
+// wire RunningApplicationsSnapshot: Platform is always present (nullable), so
+// the status is the view's (RunningApplicationsViewStatus), and the stored
+// items are the wire items (RunningApplicationItem), de-duplicated by name.
 interface ObservedRunningApplicationsState {
   SampledAt: number | null;
   TotalCount: number;
   Truncated: boolean;
-  Items: ObservedRunningApplication[];
-  Status: RunningAppStatus;
+  Items: RunningApplicationItem[];
+  Status: RunningApplicationsViewStatus;
   // Absent (undefined) when the client cannot report the foreground at all.
   Foreground?: string | null;
   Capabilities: RunningApplicationsCapabilities | null;
 }
-interface RunningApplicationsView {
+// The view, serialized as ClientView.RunningApplications: the protocol's
+// RunningApplicationsView with everything but Foreground always set.
+interface ClientRunningApplicationsView extends RunningApplicationsView {
   SampledAt: number | null;
   TotalCount: number;
   Truncated: boolean;
   Items: RunningApplicationViewEntry[];
-  Status: RunningAppStatus;
-  Foreground?: string | null;
+  Status: RunningApplicationsViewStatus;
   Capabilities: RunningApplicationsCapabilities | null;
 }
 
@@ -311,14 +302,6 @@ interface RunningApplicationsView {
 // dirty-tracking for telemetry-driven writes (heartbeat/system-info).
 interface PersistOptions {
   markUnsaved?: boolean;
-}
-
-// The de-duplicated `{ Name, Count }` pair tracked while diffing running-app
-// snapshots (both the previous-by-key map and the freshly de-duped map).
-interface DedupedRunningApplication {
-  Name: string;
-  Count: number;
-  Responding?: boolean | null;
 }
 
 // Seed accepted by the constructor: a persisted `ClientRow` (mirrored in
@@ -335,7 +318,7 @@ interface ClientConstructorInput {
   GroupID?: number | null;
   Weight?: number | null;
   MacAddress?: string | null;
-  MacAddresses?: ClientMacAddress[];
+  MacAddresses?: ClientMacAddressView[];
   RunOnLaunchScriptID?: string | null;
   RunOnLaunchDelaySeconds?: number | null;
   OfflineGraceSeconds?: number | null;
@@ -379,7 +362,7 @@ class Client {
   // Every MAC this client is known by, newest-last. Backed by the
   // ClientMacAddresses table and hydrated on load; see AddMacAddress /
   // RemoveMacAddress / IngestReportedMacAddresses.
-  MacAddresses: ClientMacAddress[];
+  MacAddresses: ClientMacAddressView[];
   Version: string | null;
   IP: string | null;
   RunOnLaunchScriptID: string | null;
@@ -525,7 +508,7 @@ class Client {
   CriticalApplicationKeys: string[];
   MissingCriticalApplications: RunningApplicationViewEntry[];
   ObservedRunningApplications: ObservedRunningApplicationsState;
-  RunningApplications: RunningApplicationsView;
+  RunningApplications: ClientRunningApplicationsView;
   RunningApplicationsSignature: string | null;
   ObservedRunningApplicationsSignature: string | null;
 
@@ -1951,7 +1934,7 @@ class Client {
       }
     }
 
-    const Deduped = new Map<string, DedupedRunningApplication>();
+    const Deduped = new Map<string, RunningApplicationItem>();
 
     for (const Raw of RawItems) {
       const Entry = AsRecord(Raw);
@@ -2043,8 +2026,8 @@ class Client {
   }
 
   // The stored applications keyed by their case-insensitive name.
-  _observedApplicationsByKey(): Map<string, DedupedRunningApplication> {
-    const ByKey = new Map<string, DedupedRunningApplication>();
+  _observedApplicationsByKey(): Map<string, RunningApplicationItem> {
+    const ByKey = new Map<string, RunningApplicationItem>();
     for (const Entry of Array.isArray(this.ObservedRunningApplications?.Items)
       ? this.ObservedRunningApplications.Items
       : []) {
@@ -2084,7 +2067,7 @@ class Client {
    * critical application losing (or regaining) the foreground it must hold.
    */
   _emitApplicationTransitions(
-    PreviousByKey: Map<string, DedupedRunningApplication>,
+    PreviousByKey: Map<string, RunningApplicationItem>,
     PreviousFaults: ReturnType<Client['_applicationFaults']>,
     PreviousForeground: string | null | undefined,
     ItemsReported: boolean
@@ -2205,7 +2188,7 @@ class Client {
     const PreviousByKey = this._observedApplicationsByKey();
     const PreviousFaults = this._applicationFaults();
     const PreviousForeground = this.ObservedRunningApplications?.Foreground;
-    const byKey = new Map<string, DedupedRunningApplication>(
+    const byKey = new Map<string, RunningApplicationItem>(
       Array.from(PreviousByKey.entries()).map(([Key, Entry]) => [Key, { ...Entry }])
     );
 
@@ -2466,7 +2449,7 @@ class Client {
    *  MacAddresses index (see applyCriticalState); performs no writes; every
    *  mutation goes through Manager.AddClientMacAddress / RemoveClientMacAddress,
    *  which keep the index and the DB in step. */
-  SetMacAddresses(MacAddresses: ClientMacAddress[]) {
+  SetMacAddresses(MacAddresses: ClientMacAddressView[]) {
     this.MacAddresses = (Array.isArray(MacAddresses) ? MacAddresses : [])
       .slice()
       .sort((A, B) => A.FirstSeen - B.FirstSeen || A.MacAddress.localeCompare(B.MacAddress));

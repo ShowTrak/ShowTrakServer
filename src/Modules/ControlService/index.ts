@@ -35,6 +35,7 @@ import { GetRetryTarget } from '../ScriptExecutionManager/retry';
 import { GetFreeKioskCommand } from '../FreeKiosk/commands';
 import { DescribeError } from '@showtrak/protocol/runtime';
 import { GetHandler } from '../../main/handler-registry';
+import type { FreeKioskTerminalView } from '@showtrak/protocol';
 
 const Logger = CreateLogger('ControlService');
 
@@ -178,20 +179,18 @@ function optionalValue(Value: unknown): string | null {
 // them by GroupID or scope exactly as it covers clients; other client types in
 // the same group or tag are never touched.
 
-type KioskTerminal = NonNullable<Awaited<ReturnType<typeof FreeKioskManager.GetBySlug>>>;
-
 /** The terminals a command addresses and how to name them, or why there are none. */
-type KioskTargets = [string, null, null] | [null, KioskTerminal[], string];
+type KioskTargets = [string, null, null] | [null, FreeKioskTerminalView[], string];
 
-function describeTerminals(Terminals: KioskTerminal[], Where: string): KioskTargets {
+function describeTerminals(Terminals: FreeKioskTerminalView[], Where: string): KioskTargets {
   if (!Terminals.length) return [`No FreeKiosk terminals${Where}`, null, null];
   const Noun = Terminals.length === 1 ? 'FreeKiosk terminal' : 'FreeKiosk terminals';
   return [null, Terminals, `${Terminals.length} ${Noun}${Where}`];
 }
 
-async function allTerminals(): Promise<KioskTerminal[] | null> {
+async function allTerminals(): Promise<FreeKioskTerminalView[] | null> {
   const [Err, Terminals] = await FreeKioskManager.GetAll();
-  return Err ? null : ((Terminals || []) as KioskTerminal[]);
+  return Err ? null : Terminals || [];
 }
 
 async function resolveKioskTargets(

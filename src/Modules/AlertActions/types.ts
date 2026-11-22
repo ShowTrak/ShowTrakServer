@@ -1,18 +1,9 @@
 // Shared types for the AlertActions family.
+import type { AlertActionSettingField } from '@showtrak/protocol';
 
-export interface AlertActionSettingField {
-  Key: string;
-  Label: string;
-  Type: string;
-  Default?: unknown;
-  Min?: number;
-  Max?: number;
-  Options?: unknown[];
-  Source?: string;
-  Preview?: string;
-  Hidden?: boolean;
-  [key: string]: unknown;
-}
+// An action's settings schema reaches the rule editor as it is declared
+// (GetAlertActionTypes), so each field is the protocol's.
+export type { AlertActionSettingField };
 
 export interface AlertActionResult {
   Success: boolean;

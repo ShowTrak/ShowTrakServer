@@ -80,18 +80,6 @@ interface PublicClientSource {
   CriticalStorageVolumes?: unknown;
 }
 
-// Structural view of the internal Group entity read by ToPublicGroup.
-interface PublicGroupSource {
-  GroupID: number;
-  Title: string | null;
-  Weight: number;
-  isFullWidth?: boolean;
-  ColumnSpan?: number;
-  Colour?: number | null;
-  KeyBind?: string | null;
-  Slug?: string | null;
-}
-
 function IsIntegratedClient(c: PublicClientSource): boolean {
   if (!c) return false;
   if (c.Integrated === true) return true;
@@ -203,7 +191,9 @@ const ToPublicClient = (c: PublicClientSource): ClientView => ({
   CriticalStorageVolumes: Array.isArray(c.CriticalStorageVolumes) ? c.CriticalStorageVolumes : NONE,
 });
 
-const ToPublicGroup = (g: PublicGroupSource): GroupView => ({
+// The group as the desktop renderer receives it (the group entity's own
+// GroupView), with the optional fields settled for the Web UI and the SDK.
+const ToPublicGroup = (g: GroupView): GroupView => ({
   GroupID: g.GroupID,
   Title: g.Title,
   Weight: g.Weight,

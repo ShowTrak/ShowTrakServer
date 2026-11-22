@@ -12,6 +12,7 @@ import type {
   CriticalUSBConditions,
   USBCapabilities,
   USBDeviceView,
+  CriticalUSBConditionOptions,
 } from '@showtrak/protocol';
 
 /**
@@ -90,11 +91,11 @@ export function USBDeviceSummary(Device: USBDeviceView): string {
   return Parts.join(' · ');
 }
 
-export type USBDeviceState = 'healthy' | 'issue' | 'short' | 'missing' | 'absent' | 'plain';
+export type USBDeviceBadgeState = 'healthy' | 'issue' | 'short' | 'missing' | 'absent' | 'plain';
 
 /** The badge the critical toggle shows, and what clicking it will do. */
 export function USBDeviceBadge(Device: USBDeviceView): {
-  State: USBDeviceState;
+  State: USBDeviceBadgeState;
   Label: string;
   Icon: string;
   Title: string;
@@ -149,8 +150,8 @@ export function USBDeviceBadge(Device: USBDeviceView): {
 }
 
 /** A condition a critical device can be held to, as its form field is named. */
-export type USBConditionField =
-  'RequirePresent' | 'CheckLocation' | 'CheckFirmware' | 'RequireNoError';
+// The conditions a mark request may set (the protocol's CriticalUSBConditionOptions).
+export type USBConditionField = keyof CriticalUSBConditionOptions;
 
 export const USB_CONDITION_FIELDS: USBConditionField[] = [
   'RequirePresent',
@@ -293,10 +294,8 @@ export type USBRuleFields = Record<USBConditionField, boolean>;
  * state leaves the stored default alone. The connected tick is locked on, so it
  * is never sent.
  */
-export function ParseUSBRuleFields(
-  Fields: Partial<USBRuleFields>
-): Partial<Record<USBConditionField, boolean>> {
-  const Out: Partial<Record<USBConditionField, boolean>> = {
+export function ParseUSBRuleFields(Fields: Partial<USBRuleFields>): CriticalUSBConditionOptions {
+  const Out: CriticalUSBConditionOptions = {
     CheckLocation: !!Fields.CheckLocation,
     CheckFirmware: !!Fields.CheckFirmware,
   };

@@ -20,15 +20,17 @@
 // parse as an id-plus-class selector and its conditional visibility would
 // silently never fire. Keys are therefore [A-Za-z0-9_] only, and the JSON path
 // into /api/status is carried separately in Path.
-import type { MonitoringSettingField } from '../MonitoringMethods/types';
 import type { FreeKioskStatus } from './types';
 import type {
+  FreeKioskAlarmField,
   FreeKioskChartKind,
   FreeKioskDisplayMode,
   FreeKioskMetricFormat,
+  FreeKioskMetricGroupView,
   FreeKioskMetricSection,
   FreeKioskMetricType,
   FreeKioskOperator,
+  MonitoringSettingVisibleWhen,
 } from '@showtrak/protocol';
 
 // The catalogue's vocabularies are the protocol's: the renderer and the SDK
@@ -58,7 +60,10 @@ export const FREEKIOSK_SECTIONS: readonly FreeKioskMetricSection[] = Object.free
 // ---- Monitoring groups ----------------------------------------------------
 
 /**
- * A section an operator can switch monitoring off for wholesale.
+ * A section an operator can switch monitoring off for wholesale: the protocol's
+ * FreeKioskMetricGroupView, delivered to the renderer as declared here.
+ * `DefaultOn` is whether a newly-created terminal monitors it; `Fixed` groups
+ * cannot be switched off, because ShowTrak itself depends on them.
  *
  * Turning a group off hides its alarm toggles and its charts, stops its history
  * being recorded, and force-disables any alarm already armed inside it, so a
@@ -73,17 +78,7 @@ export const FREEKIOSK_SECTIONS: readonly FreeKioskMetricSection[] = Object.free
  * request. `Fixed` and this structure are what a group that DID need its own
  * endpoint (GPS, say) would hang off.
  */
-export interface FreeKioskMetricGroup {
-  Key: FreeKioskMetricSection;
-  Label: string;
-  /** Enabled on a newly-created terminal. */
-  DefaultOn: boolean;
-  /** Cannot be switched off, because ShowTrak itself depends on it. */
-  Fixed?: boolean;
-  Note?: string;
-}
-
-export const FREEKIOSK_METRIC_GROUPS: readonly FreeKioskMetricGroup[] = Object.freeze([
+export const FREEKIOSK_METRIC_GROUPS: readonly FreeKioskMetricGroupView[] = Object.freeze([
   {
     Key: 'Content',
     Label: 'Content',
@@ -118,9 +113,8 @@ export const FREEKIOSK_METRIC_GROUPS: readonly FreeKioskMetricGroup[] = Object.f
   },
 ] as const);
 
-export const FREEKIOSK_METRIC_GROUPS_BY_KEY: ReadonlyMap<string, FreeKioskMetricGroup> = new Map(
-  FREEKIOSK_METRIC_GROUPS.map((Group) => [Group.Key, Group])
-);
+export const FREEKIOSK_METRIC_GROUPS_BY_KEY: ReadonlyMap<string, FreeKioskMetricGroupView> =
+  new Map(FREEKIOSK_METRIC_GROUPS.map((Group) => [Group.Key, Group]));
 
 /** Settings key for a group's master switch. Sections are single words, so id-safe. */
 export function GroupFieldKey(Section: string): string {
@@ -1204,8 +1198,8 @@ function ValueFieldLabel(Metric: FreeKioskMetric): string {
  */
 export function BuildFreeKioskAlarmFields(
   Metrics: readonly FreeKioskMetric[] = FREEKIOSK_METRICS
-): MonitoringSettingField[] {
-  const Fields: MonitoringSettingField[] = [];
+): FreeKioskAlarmField[] {
+  const Fields: FreeKioskAlarmField[] = [];
 
   // The group switches come first, so each lands at the head of its own section
   // once the editor buckets the list by MetricSection. Never Advanced: a switch
@@ -1260,9 +1254,7 @@ export function BuildFreeKioskAlarmFields(
     // field renderer emits as the original data-visible-when-key/-value pair.
     // Every field that existed before display modes therefore emits the same
     // bytes it did before.
-    const Gate = (
-      ...Extra: Array<{ Key: string; Equals?: unknown; In?: unknown[] }>
-    ): MonitoringSettingField['VisibleWhen'] => {
+    const Gate = (...Extra: MonitoringSettingVisibleWhen[]): FreeKioskAlarmField['VisibleWhen'] => {
       const All = [...Gates, ...Extra];
       if (!All.length) return undefined;
       return All.length === 1 ? All[0] : All;
@@ -1304,9 +1296,7 @@ export function BuildFreeKioskAlarmFields(
     }
 
     if (ValueOps.length) {
-      const Visible: Array<{ Key: string; Equals?: unknown; In?: unknown[] }> = [
-        { Key: Keys.On, Equals: true },
-      ];
+      const Visible: MonitoringSettingVisibleWhen[] = [{ Key: Keys.On, Equals: true }];
       // Only gate on the operator when there is a picker AND at least one
       // operator that would hide the input; otherwise the extra condition is
       // noise that could only ever be true.

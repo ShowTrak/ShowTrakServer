@@ -53,21 +53,9 @@ export interface FreeKioskStatus {
   [key: string]: unknown;
 }
 
-/** One camera reported by GET /api/camera/list. */
-export interface FreeKioskCamera {
-  id: string;
-  facing: string;
-  maxWidth: number;
-  maxHeight: number;
-}
-
-/** A decoded screenshot or camera capture, ready to hand to the renderer. */
-export interface FreeKioskImage {
-  DataUrl: string;
-  Bytes: number;
-  Mime: string;
-  CapturedAt: number;
-}
+// A camera from GET /api/camera/list and a decoded capture are handed to the
+// renderer as they are, so they are the protocol's FreeKioskCameraInfo and
+// FreeKioskCaptureResult.
 
 /** Connection details for one terminal, as the protocol client needs them. */
 export interface FreeKioskConnection {

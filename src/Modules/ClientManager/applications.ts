@@ -5,18 +5,15 @@
 // ApplicationName, and 0/1 condition columns) and a client-side record (Name,
 // Key and boolean conditions). Both normalise to the same entry, so the
 // manager's index and the Client always hold identical values.
+import type { CriticalApplication } from '@showtrak/protocol';
 import type { CriticalKind } from './critical-kind';
 import { AsRecord, normalizeApplicationKey, normalizeApplicationName } from './normalizers';
 
-export interface CriticalApplicationEntry {
-  Name: string;
-  Key: string;
-  Timestamp: number | null;
-  // Fault when another application holds the focused window.
-  RequireForeground: boolean;
-  // Fault when its windows stop answering the operating system.
-  RequireResponding: boolean;
-}
+// The entry is the protocol's CriticalApplication (ClientView.CriticalApplications)
+// with both conditions always set: RequireForeground faults when another
+// application holds the focused window, RequireResponding when its windows stop
+// answering the operating system.
+export type CriticalApplicationEntry = Required<CriticalApplication>;
 
 // A condition flag from either shape: a boolean, or a stored 0/1.
 function Flag(Value: unknown, WhenAbsent: boolean): boolean {

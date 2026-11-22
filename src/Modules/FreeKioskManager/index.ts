@@ -34,7 +34,6 @@ import {
   RecordGroupMove,
   Seconds,
 } from '../Shared/audit-names';
-import type { FreeKioskCamera, FreeKioskImage } from '../FreeKiosk/types';
 
 import {
   MIN_INTERVAL_MS,
@@ -51,8 +50,15 @@ import {
   ParseSettings,
 } from './normalize';
 import { FreeKioskTerminal } from './terminal';
-import type { FreeKioskTerminalSnapshot } from './terminal';
-import type { FreeKioskCommandOutcome, FreeKioskCommandSummary, Result } from '@showtrak/protocol';
+import type {
+  FreeKioskCommandOutcome,
+  FreeKioskCommandSummary,
+  Result,
+  FreeKioskCameraInfo,
+  FreeKioskCaptureResult,
+  FreeKioskTerminalEditorView,
+  FreeKioskTerminalView,
+} from '@showtrak/protocol';
 
 const Logger = CreateLogger('FreeKiosk');
 const TerminalsRepo = CreateFreeKioskTerminalsRepository(DB);
@@ -245,16 +251,16 @@ const Manager = {
     }
   },
 
-  async GetAll(): Promise<Result<FreeKioskTerminalSnapshot[]>> {
+  async GetAll(): Promise<Result<FreeKioskTerminalView[]>> {
     if (!Manager.Initialized) await Manager.Init();
     return [null, TerminalList.map((Terminal) => Terminal.ToJSON())];
   },
 
-  GetAllSync(): FreeKioskTerminalSnapshot[] {
+  GetAllSync(): FreeKioskTerminalView[] {
     return TerminalList.map((Terminal) => Terminal.ToJSON());
   },
 
-  async Get(UUID: string): Promise<[string | null, FreeKioskTerminalSnapshot | null]> {
+  async Get(UUID: string): Promise<[string | null, FreeKioskTerminalView | null]> {
     const Terminal = TerminalList.find((Entry) => Entry.UUID === UUID);
     if (!Terminal) return ['FreeKiosk terminal not found', null];
     return [null, Terminal.ToJSON()];
@@ -268,15 +274,13 @@ const Manager = {
    * exception, and it stays an exception by being a direct reply to a single
    * UUID rather than anything that gets broadcast.
    */
-  async GetForEditor(
-    UUID: string
-  ): Promise<[string | null, (FreeKioskTerminalSnapshot & { ApiKey: string | null }) | null]> {
+  async GetForEditor(UUID: string): Promise<[string | null, FreeKioskTerminalEditorView | null]> {
     const Terminal = TerminalList.find((Entry) => Entry.UUID === UUID);
     if (!Terminal) return ['FreeKiosk terminal not found', null];
     return [null, { ...Terminal.ToJSON(), ApiKey: Terminal.ApiKey }];
   },
 
-  async GetBySlug(Slug: string): Promise<FreeKioskTerminalSnapshot | null> {
+  async GetBySlug(Slug: string): Promise<FreeKioskTerminalView | null> {
     if (!Slug) return null;
     if (!Manager.Initialized) await Manager.Init();
     const Lower = String(Slug).toLowerCase();
@@ -284,7 +288,7 @@ const Manager = {
     return Found ? Found.ToJSON() : null;
   },
 
-  async Create(Payload: Record<string, unknown> = {}): Promise<Result<FreeKioskTerminalSnapshot>> {
+  async Create(Payload: Record<string, unknown> = {}): Promise<Result<FreeKioskTerminalView>> {
     if (!Manager.Initialized) await Manager.Init();
     const Now = Date.now();
     const Defaults = await Manager.GenerateDefaults();
@@ -371,7 +375,7 @@ const Manager = {
   async Update(
     UUID: string,
     Payload: Record<string, unknown> = {}
-  ): Promise<Result<FreeKioskTerminalSnapshot>> {
+  ): Promise<Result<FreeKioskTerminalView>> {
     const Terminal = TerminalList.find((Entry) => Entry.UUID === UUID);
     if (!Terminal) return Fail('FreeKiosk terminal not found');
     const Before = await AuditBefore(async () => ({
@@ -608,7 +612,7 @@ const Manager = {
     UUID: string,
     Kind: 'screenshot' | 'camera',
     Options: { Camera?: 'front' | 'back'; Quality?: number } = {}
-  ): Promise<Result<FreeKioskImage>> {
+  ): Promise<Result<FreeKioskCaptureResult>> {
     const Terminal = TerminalList.find((Entry) => Entry.UUID === UUID);
     if (!Terminal) return Fail('FreeKiosk terminal not found');
     const [Err, Image] = await FreeKioskClient.FetchImage(Terminal.Connection(), Kind, Options);
@@ -619,7 +623,7 @@ const Manager = {
     return Ok(Image);
   },
 
-  async GetCameraList(UUID: string): Promise<Result<FreeKioskCamera[]>> {
+  async GetCameraList(UUID: string): Promise<Result<FreeKioskCameraInfo[]>> {
     const Terminal = TerminalList.find((Entry) => Entry.UUID === UUID);
     if (!Terminal) return Fail('FreeKiosk terminal not found');
     return FreeKioskClient.GetCameraList(Terminal.Connection());
@@ -692,4 +696,3 @@ const GroupOrdering = createGroupOrdering({
 });
 
 export { Manager };
-export type { FreeKioskTerminalSnapshot };

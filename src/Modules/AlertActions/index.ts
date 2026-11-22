@@ -1,4 +1,5 @@
 import { CreateLogger } from '../Logger';
+import type { AlertActionType } from '@showtrak/protocol';
 import type { AlertAction, AlertActionInput, AlertActionResult, AlertContext } from './types';
 
 const Logger = CreateLogger('AlertActions');
@@ -71,7 +72,8 @@ function ReleaseOutboundSlot(): void {
   else OutboundInFlight -= 1;
 }
 
-function publicShape(Action: AlertAction) {
+// What the rule editor lists (GetAlertActionTypes).
+function publicShape(Action: AlertAction): AlertActionType {
   return {
     ID: Action.ID,
     Name: Action.Name,

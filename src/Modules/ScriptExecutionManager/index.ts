@@ -7,7 +7,12 @@ import { SCRIPT_EXECUTION_DEFAULT_TIMEOUT_MS } from '../Config/constants';
 import { Manager as BroadcastManager } from '../Broadcast';
 import { Manager as UUIDManager } from '../UUID';
 import { ExecutionLog } from './output-log';
-import type { ExecutionOutputView, ScriptOutputChunk } from '@showtrak/protocol';
+import type {
+  ExecutionOutputView,
+  ScriptExecutionTimer,
+  ScriptExecutionView,
+  ScriptOutputChunk,
+} from '@showtrak/protocol';
 
 const Logger = CreateLogger('ScriptExecutionManager');
 
@@ -25,19 +30,13 @@ interface DispatchableScript {
 import { Manager as ScriptManager } from '../ScriptManager';
 import { Manager as ClientManager } from '../ClientManager';
 
-interface ExecutionTimer {
-  Start: number;
-  End: number | null;
-  Duration: number | null;
-}
-
 interface ScriptExecution {
   Internal: boolean;
   RequestID: string;
   Status: 'Pending' | 'Failed' | 'Completed';
   Progress: number;
   StatusText: string;
-  Timer: ExecutionTimer;
+  Timer: ScriptExecutionTimer;
   Client: Client;
   Script: DispatchableScript;
   Error?: string | null;
@@ -63,26 +62,15 @@ function LogOf(Request: ScriptExecution): ExecutionLog {
   return Request.Log;
 }
 
-// The renderer-safe projection of an execution. A live ScriptExecution carries a
-// Client CLASS INSTANCE and a Node timer handle (TimeoutHandle); neither
-// survives Electron's structured-clone IPC (or the Web UI socket), so anything
-// pushed to a renderer MUST go through this plain-object projection instead of
-// the raw entry.
-interface PublicScriptExecution {
-  Internal: boolean;
-  RequestID: string;
-  Status: 'Pending' | 'Failed' | 'Completed';
-  Progress: number;
-  StatusText: string;
-  Timer: ExecutionTimer;
-  Client: { UUID: string | null; Nickname: string | null; Hostname: string | null };
-  Script: { ID: string; Name: string };
-  Error: string | null;
-}
-
+// The renderer-safe projection of an execution (the protocol's
+// ScriptExecutionView). A live ScriptExecution carries a Client CLASS INSTANCE
+// and a Node timer handle (TimeoutHandle); neither survives Electron's
+// structured-clone IPC (or the Web UI socket), so anything pushed to a renderer
+// MUST go through this plain-object projection instead of the raw entry.
+//
 // Project a live execution to its renderer-safe shape. Reads defensively because
 // the value arrives at the push boundary through the untyped broadcast bus.
-function ToPublicScriptExecution(Exec: ScriptExecution): PublicScriptExecution {
+function ToPublicScriptExecution(Exec: ScriptExecution): ScriptExecutionView {
   const C = Exec.Client;
   return {
     Internal: !!Exec.Internal,
@@ -532,4 +520,4 @@ const Manager = {
 };
 
 export { Manager, ToPublicScriptExecution, SetDispatchHandler };
-export type { PublicScriptExecution, ScriptExecution };
+export type { ScriptExecution };

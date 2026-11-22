@@ -14,6 +14,12 @@ import {
   type UpdateChannel,
 } from '@showtrak/protocol/runtime';
 import { Manager as AppDataManager } from '../AppData';
+import type {
+  UpdateDownloadProgress,
+  UpdateDownloadResult,
+  UpdateManagerStatus,
+  UpdateReleaseOption,
+} from '@showtrak/protocol';
 
 const Logger = CreateLogger('UpdateManager');
 
@@ -49,48 +55,29 @@ interface UpdateManifest {
   assets: UpdateManifestAsset[];
 }
 
+// What the renderer is handed is the protocol's (GetUpdateManagerReleases,
+// GetUpdateManagerStatus, DownloadUpdateManagerRelease and its progress push);
+// this manager always fills in what the protocol leaves optional.
+
 // A release option surfaced to the operator when choosing a version to cache.
-interface ReleaseOption {
-  tag: string;
-  name: string;
-  publishedAt: string | null;
-  prerelease: boolean;
-  // Whether the server's update channel allows this release.
+// `selectable`: whether the server's update channel allows this release.
+interface ReleaseOption extends UpdateReleaseOption {
   selectable: boolean;
 }
 
 // The public projection of a cached asset (served over the LAN feed).
-interface PublicUpdateAsset {
-  name: string;
-  size: number;
-  url: string;
-}
+type PublicUpdateAsset = UpdateManagerStatus['Assets'][number];
 
-interface UpdateStatus {
-  Ready: boolean;
-  ReleaseVersion: string | null;
-  ReleasedAt: string | null;
-  DownloadedAt: string | null;
-  Assets: PublicUpdateAsset[];
-  FeedPath: string;
+// The status; the registrar adds the server's update channel.
+interface UpdateStatus extends Omit<UpdateManagerStatus, 'Channel'> {
   Prerelease: boolean;
 }
 
-interface DownloadProgress {
-  percent: number;
-  phase: string;
-  message: string;
-}
 interface DownloadOptions {
-  onProgress?: (progress: DownloadProgress) => void;
+  onProgress?: (progress: UpdateDownloadProgress) => void;
   // The server's update channel: decides which release "latest" means and
   // whether a pre-release may be downloaded at all. Defaults to stable.
   Channel?: UpdateChannel;
-}
-interface DownloadResult {
-  ReleaseVersion: string;
-  FeedPath: string;
-  AssetCount: number;
 }
 
 // Minimal Express surface used by RegisterRoutes (avoids a hard express dep).
@@ -113,8 +100,8 @@ interface UpdateManagerType {
   GetPublicFeedURLPath(): string;
   ListReleases(Channel?: UpdateChannel): Promise<ReleaseOption[]>;
   GetStatus(): Promise<UpdateStatus>;
-  DownloadRelease(Tag?: unknown, Options?: DownloadOptions): Promise<DownloadResult>;
-  DownloadLatestRelease(Options?: DownloadOptions): Promise<DownloadResult>;
+  DownloadRelease(Tag?: unknown, Options?: DownloadOptions): Promise<UpdateDownloadResult>;
+  DownloadLatestRelease(Options?: DownloadOptions): Promise<UpdateDownloadResult>;
   RegisterRoutes(expressApp: ExpressLike): void;
 }
 

@@ -8,7 +8,7 @@ import { CreateDummyClientsRepository } from '../DB/repositories/dummy-clients';
 import { Manager as BroadcastManager } from '../Broadcast';
 import { Ok, Fail } from '../Utils';
 import { createGroupOrdering } from '../Shared/group-ordering';
-import type { Result } from '@showtrak/protocol';
+import type { Result, DummyClientView } from '@showtrak/protocol';
 
 import {
   MIN_INTERVAL_MS,
@@ -20,7 +20,6 @@ import {
 } from './normalize';
 import * as SlugService from '../Slug';
 import { DummyClient } from './dummy';
-import type { DummyClientSnapshot } from './dummy';
 import { RecordAction, RecordEdit, RecordUpdate } from '../AuditLog/edits';
 import { Entity, Line } from '../AuditLog/message';
 import { DiffFields, type FieldSpec } from '../AuditLog/diff';
@@ -128,7 +127,7 @@ const Manager = {
     }
   },
 
-  async GetAll(): Promise<Result<DummyClientSnapshot[]>> {
+  async GetAll(): Promise<Result<DummyClientView[]>> {
     if (!Manager.Initialized) await Manager.Init();
     return [null, DummyList.map((D) => D.ToJSON())];
   },
@@ -137,7 +136,7 @@ const Manager = {
     return DummyList.map((D) => D.ToJSON());
   },
 
-  async Get(UUID: string): Promise<[string | null, DummyClientSnapshot | null]> {
+  async Get(UUID: string): Promise<[string | null, DummyClientView | null]> {
     const Cached = DummyList.find((D) => D.UUID === UUID);
     if (!Cached) return ['Dummy client not found', null];
     return [null, Cached.ToJSON()];
@@ -145,7 +144,7 @@ const Manager = {
 
   // Resolve a dummy by slug (its DummyID, case-insensitive), for OSC/API/SDK
   // addressing; mirrors MonitoringTargetManager.GetBySlug.
-  async GetBySlug(Slug: string): Promise<DummyClientSnapshot | null> {
+  async GetBySlug(Slug: string): Promise<DummyClientView | null> {
     if (!Slug) return null;
     if (!Manager.Initialized) await Manager.Init();
     const Lower = String(Slug).toLowerCase();
@@ -153,7 +152,7 @@ const Manager = {
     return Found ? Found.ToJSON() : null;
   },
 
-  async Create(Payload: Record<string, unknown> = {}): Promise<Result<DummyClientSnapshot>> {
+  async Create(Payload: Record<string, unknown> = {}): Promise<Result<DummyClientView>> {
     if (!Manager.Initialized) await Manager.Init();
     const Now = Date.now();
     const Defaults = await Manager.GenerateDefaults();
@@ -208,7 +207,7 @@ const Manager = {
   async Update(
     UUID: string,
     Payload: Record<string, unknown> = {}
-  ): Promise<Result<DummyClientSnapshot>> {
+  ): Promise<Result<DummyClientView>> {
     const Dummy = DummyList.find((D) => D.UUID === UUID);
     if (!Dummy) return Fail('Dummy client not found');
     const Before = await AuditBefore(() => DummyAuditFieldsOf(Dummy));
@@ -283,7 +282,7 @@ const Manager = {
   },
 
   // Force a dummy back to Idle (RAM-only runtime state; no persistence needed).
-  async ResetToIdle(UUID: string): Promise<Result<DummyClientSnapshot>> {
+  async ResetToIdle(UUID: string): Promise<Result<DummyClientView>> {
     const Dummy = DummyList.find((D) => D.UUID === UUID);
     if (!Dummy) return Fail('Dummy client not found');
     Dummy.ResetToIdle();

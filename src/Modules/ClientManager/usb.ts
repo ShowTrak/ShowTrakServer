@@ -22,6 +22,7 @@ import type {
   USBDeviceState,
   USBIssue,
   USBIssueKind,
+  CriticalUSBConditionOptions,
 } from '@showtrak/protocol';
 import { AsRecord, normalizeSerialNumber, normalizeUSBNameKey } from './normalizers';
 import type { CriticalKind } from './critical-kind';
@@ -407,14 +408,9 @@ export function buildUSBView(
 
 // --- Mark requests ----------------------------------------------------------------
 
-/** Options a mark/update request may carry; absent ones keep their current value. */
-export interface CriticalUSBOptions {
-  /** Ignored: a monitored device is always required to be connected. */
-  RequirePresent?: boolean;
-  CheckLocation?: boolean;
-  CheckFirmware?: boolean;
-  RequireNoError?: boolean;
-}
+// The options a mark/update request may carry are the protocol's
+// CriticalUSBConditionOptions; absent ones keep their current value.
+// RequirePresent is ignored: a monitored device is always required to be connected.
 
 /**
  * Work out the conditions a mark/update request produces, for one device (by
@@ -429,11 +425,11 @@ export interface CriticalUSBOptions {
  * conditions cleared, but not new ones captured.
  */
 export function resolveUSBConditions(
-  Options: CriticalUSBOptions,
+  Options: CriticalUSBConditionOptions,
   Live: USBDevice[],
   Existing: CriticalUSBConditions | null
 ): [string | null, CriticalUSBConditions | null] {
-  const Has = (Key: keyof CriticalUSBOptions) =>
+  const Has = (Key: keyof CriticalUSBConditionOptions) =>
     Object.prototype.hasOwnProperty.call(Options, Key) && Options[Key] !== undefined;
   const Flag = (Key: 'RequireNoError') =>
     Has(Key) ? !!Options[Key] : Existing ? Existing[Key] : true;

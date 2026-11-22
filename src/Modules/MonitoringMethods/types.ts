@@ -1,15 +1,22 @@
 // Shared types for the MonitoringMethods family.
 //
 // The parts of a method's definition that reach the renderer and the SDK as
-// they are (its info panel, discovery signature, setting visibility and option
-// lists) are the protocol's own types, re-exported below with the notes on how
-// a method fills them in.
+// they are (its settings schema, actions, info panel, discovery signature and
+// option lists) are the protocol's own types, re-exported below with the notes
+// on how a method fills them in. What a method streams and returns is the
+// protocol's too, less the fields the manager fills in.
 import type {
+  MonitoringActionDef,
   MonitoringActionOptions,
   MonitoringMethodDiscovery,
   MonitoringMethodInfo,
+  MonitoringSettingField,
   MonitoringSettingOptions,
   MonitoringSettingVisibleWhen,
+  MonitoringTileWidgetView,
+  MonitorLiveLevelChange,
+  MonitorLiveLevelResult,
+  MonitorLiveLevelsCheck,
 } from '@showtrak/protocol';
 
 export interface MonitoringResult {
@@ -36,57 +43,35 @@ export interface MonitoringTargetLike {
 // detectors, which is a set test, not a comparison against one value.
 export type { MonitoringSettingVisibleWhen };
 
-export interface MonitoringSettingField {
-  Key: string;
-  Label: string;
-  // 'string' (default) | 'number' | 'boolean' | 'select' | 'list'. A 'list' field
-  // collects multiple values as a string[] (chip/tag input); see ItemType.
-  Type: string;
-  Default?: unknown;
-  Min?: number;
-  Max?: number;
-  Options?: Array<string | { value: string; label?: string }>;
-  // For Type 'list': hints how each entry is validated/coerced. 'number' keeps only
-  // entries that parse as finite numbers; 'string' (default) trims and keeps text.
-  ItemType?: 'string' | 'number';
-  // For Type 'list': the editor also offers what the device itself reported on the
-  // check's last successful run (the method's GetSettingOptions, keyed by this
-  // field's Key) as a checkbox per item. Ticked items are stored like typed
-  // entries, so the value stays a plain string[] and typing still works.
-  FromDevice?: boolean;
-  // For Type 'names': one name box per channel, Count of them. The value is a
-  // string[] of exactly that length; a blank entry means the default, which is
-  // ItemDefault with {n} replaced by the channel number (e.g. 'Channel {n}').
-  Count?: number;
-  ItemDefault?: string;
-  // For Type 'channels': a checkbox per channel, in these groups. The value is a
-  // string[] of the ticked channels' IDs, `<Prefix>:<n>` (e.g. 'out:1'). Each box
-  // is labelled with the name from the 'names' setting NamesKey, if any.
-  Groups?: Array<{
-    Prefix: string;
-    Label: string;
-    Count: number;
-    ItemDefault: string;
-    NamesKey?: string;
-  }>;
-  Advanced?: boolean;
-  // Marks a setting the check cannot run without. The editor appends a red
-  // asterisk to the label. Purely a display hint; server-side validation in the
-  // method's Run() remains the source of truth.
-  Required?: boolean;
-  // Optional per-input hint. Rendered as a hover popover on a small info icon to
-  // the right of the input; keep it to a sentence or two. Escaped before display.
-  Note?: string;
-  // Marks a credential (password, passcode, community string). Surfaces that must
-  // not hand credentials out redact it via Utils/redact; the stored value and the
-  // probe are unaffected.
-  Sensitive?: boolean;
-  // When set, the field is shown only while the referenced sibling setting
-  // matches. An array is ANDed: every condition must hold. Its value is still
-  // retained while hidden so toggling the controlling field back on restores it.
-  VisibleWhen?: MonitoringSettingVisibleWhen | MonitoringSettingVisibleWhen[];
-  [key: string]: unknown;
-}
+// One field of a method's settings schema, rendered by the editor's
+// schema-driven field renderer and normalised against by NormalizeFields.
+//
+//   Type        'string' (default) | 'number' | 'boolean' | 'select' | 'list' |
+//               'names' | 'channels'. A 'list' field collects multiple values as
+//               a string[] (chip/tag input); see ItemType.
+//   ItemType    For Type 'list': how each entry is validated/coerced. 'number'
+//               keeps only entries that parse as finite numbers; 'string'
+//               (default) trims and keeps text.
+//   FromDevice  For Type 'list': the editor also offers what the device itself
+//               reported on the check's last successful run (the method's
+//               GetSettingOptions, keyed by this field's Key) as a checkbox per
+//               item. Ticked items are stored like typed entries, so the value
+//               stays a plain string[] and typing still works.
+//   Count,      For Type 'names': one name box per channel, Count of them. The
+//   ItemDefault value is a string[] of exactly that length; a blank entry means
+//               the default, ItemDefault with {n} replaced by the channel number.
+//   Groups      For Type 'channels': a checkbox per channel, in these groups.
+//   Required    The editor appends a red asterisk to the label. Purely a display
+//               hint; server-side validation in the method's Run() remains the
+//               source of truth.
+//   Note        A hover popover on a small info icon beside the input; keep it
+//               to a sentence or two. Escaped before display.
+//   Sensitive   A credential (password, passcode, community string). Surfaces
+//               that must not hand credentials out redact it via Utils/redact.
+//   VisibleWhen The field shows only while the referenced sibling setting
+//               matches. Its value is still retained while hidden, so toggling
+//               the controlling field back on restores it.
+export type { MonitoringSettingField };
 
 // Editor-facing "how to set this up" help, shown in a panel below the method
 // picker. Purely informational; never affects probe behaviour. All fields are
@@ -104,32 +89,19 @@ export type { MonitoringMethodInfo };
 // private action namespace and a new check type gains a control surface without
 // a transport change.
 
-export interface MonitoringActionDef {
-  /** Stable and OSC-safe within its method (no slashes/spaces), e.g. `power.on`. */
-  ID: string;
-  Label: string;
-  /** Bootstrap Icons name without the `bi-` prefix. */
-  Icon: string;
-  /** Grouping label for the monitor modal's control panel (e.g. "Power"). */
-  Group: string;
-  /**
-   * Parameter schema, reusing MonitoringSettingField so an action's form renders
-   * through the same schema-driven renderer as check settings, and normalizes
-   * through the same defaults/clamping.
-   */
-  Params?: MonitoringSettingField[];
-  /** Needs a confirmation dialog before it is sent. */
-  Destructive?: boolean;
-  /**
-   * Keep the control enabled while the check is offline. Offline normally
-   * disables every control (the device cannot be reached, so every press would
-   * fail the same way), but a recovery action (rebooting a player whose status
-   * endpoint has stopped answering) is wanted most at exactly that moment.
-   */
-  AllowedWhileOffline?: boolean;
-  Note?: string;
-}
+// An action's ID is stable and OSC-safe within its method (no slashes or
+// spaces), e.g. `power.on`. Its Params reuse MonitoringSettingField, so an
+// action's form renders through the same schema-driven renderer as check
+// settings and normalises through the same defaults and clamping.
+// AllowedWhileOffline keeps the control enabled while the check is offline:
+// offline normally disables every control (every press would fail the same
+// way), but a recovery action (rebooting a player whose status endpoint has
+// stopped answering) is wanted most at exactly that moment.
+export type { MonitoringActionDef };
 
+// What RunAction resolves to. The manager folds it into a MonitoringActionOutcome
+// per check (adding which target and check it was), so it is the method's half
+// of that contract rather than a view of its own.
 export interface MonitoringActionResult {
   Success: boolean;
   /** Why it failed. Shown to the operator verbatim, so make it specific. */
@@ -159,35 +131,12 @@ export type { MonitoringSettingOptions };
 // A check can also stream audio meters while its monitor's view is open (see
 // src/main/monitoring-live.ts). Nothing streams while nobody is watching.
 
-export interface LiveLevelsFrame {
-  /** 'connecting' until the first meters arrive; 'unavailable' carries Message. */
-  State: 'connecting' | 'live' | 'unavailable';
-  Message: string | null;
-  /**
-   * dBFS per channel; null = no signal (−∞) or not yet read. Group heads a block
-   * of meters in the monitor view ('Inputs', 'Outputs'); Tile marks the ones the
-   * dashboard tile shows. Control marks a channel the view may move (see
-   * SetLiveLevel), with its current Fader (dB, null = −∞) and Muted when read.
-   */
-  Channels: Array<{
-    ID: string;
-    Group: string;
-    Label: string;
-    Db: number | null;
-    // In the monitor view (its group is toggled on there) / on the tile.
-    View?: boolean;
-    Tile?: boolean;
-    Control?: boolean;
-    Fader?: number | null;
-    Muted?: boolean;
-  }>;
-}
-
-/** A fader level (dB, null = −∞) or a mute, sent from the monitor view. */
-export interface LiveLevelChange {
-  Fader?: number | null;
-  Muted?: boolean;
-}
+// A method streams one check's frames; the manager names the check (CheckID,
+// Name) to make the MonitorLiveLevelsCheck a viewer receives. Control marks a
+// channel the view may move (see SetLiveLevel), with its current Fader (dB,
+// null = −∞) and Muted when read; the move arrives as a MonitorLiveLevelChange
+// and its answer goes back to the view as a MonitorLiveLevelResult.
+export type LiveLevelsFrame = Pick<MonitorLiveLevelsCheck, 'State' | 'Message' | 'Channels'>;
 
 // --- Tile widgets ---------------------------------------------------------------
 //
@@ -196,11 +145,9 @@ export interface LiveLevelChange {
 // the renderer's drawer (src/UI/js/app/tile-widgets.ts); Data is whatever that
 // drawer needs from the check's last result. 'levels' draws live meters from
 // the check's tile channels (StartLiveLevels), streamed only while a dashboard is
-// open.
-export interface MonitoringTileWidget {
-  Kind: string;
-  Data?: unknown;
-}
+// open. The manager adds the check the widget belongs to (CheckID) to make the
+// tile's MonitoringTileWidgetView.
+export type MonitoringTileWidget = Omit<MonitoringTileWidgetView, 'CheckID'>;
 
 // --- LAN discovery --------------------------------------------------------------
 //
@@ -318,8 +265,8 @@ export interface MonitoringMethod {
   SetLiveLevel?(
     Target: MonitoringTargetLike,
     ChannelID: string,
-    Change: LiveLevelChange
-  ): Promise<MonitoringActionResult>;
+    Change: MonitorLiveLevelChange
+  ): Promise<MonitorLiveLevelResult>;
   NormalizeSettings?(Input: unknown): Record<string, unknown>;
   GetRunCacheKeyExtra?(Target: MonitoringTargetLike, Settings: Record<string, unknown>): unknown;
   GetRunCacheTtlMs?(Target: MonitoringTargetLike): number;

@@ -9,51 +9,29 @@
 // click away in a bulk context menu. Its absence is the control, not an
 // oversight, so do not add it without a deliberate decision.
 //
-// Params reuse MonitoringSettingField so a command's parameter form renders
-// through the same schema-driven field renderer as everything else.
-import type { MonitoringSettingField } from '../MonitoringMethods/types';
-import type { FreeKioskDisplayMode } from './metrics';
+// Each entry is the protocol's FreeKioskCommandDef: the catalogue goes to the
+// renderer as declared (FreeKiosk:GetCommands). Params reuse
+// MonitoringSettingField so a command's parameter form renders through the same
+// schema-driven field renderer as everything else. Two fields need more than
+// the protocol's notes:
+//
+//   Modes             Not cosmetic. FreeKiosk accepts a WebView command in
+//                     External App mode, answers `executed: true`, and does
+//                     nothing (verified against a live device, where POSTing a
+//                     new URL in app mode left `webview.currentUrl` untouched).
+//                     Reporting that as a success would be a lie ShowTrak told
+//                     on the device's behalf, so a command outside its modes is
+//                     refused rather than sent.
+//   ExpectDisconnect  A reboot or a UI restart tears down the HTTP server
+//                     mid-response, so the socket dies before an answer
+//                     arrives. That is the command WORKING. Without this flag
+//                     ShowTrak reports "socket hang up" as a failure on exactly
+//                     the commands most likely to have succeeded, which trains
+//                     an operator to ignore the one error message that would
+//                     matter if it were real.
+import type { FreeKioskCommandDef, MonitoringSettingField } from '@showtrak/protocol';
 
-export type FreeKioskCommandGroup = 'Power' | 'Display' | 'Content' | 'Audio' | 'Maintenance';
-
-export interface FreeKioskCommandDef {
-  ID: string;
-  Label: string;
-  /** Bootstrap Icons name without the `bi-` prefix. */
-  Icon: string;
-  Method: 'GET' | 'POST';
-  Path: string;
-  Group: FreeKioskCommandGroup;
-  Params?: MonitoringSettingField[];
-  /** Needs a confirmation dialog. */
-  Destructive?: boolean;
-  /** Offered as a bulk action in the multi-select context menu. */
-  Bulk?: boolean;
-  /** How the view modal draws it. Sliders write the metric named by Metric. */
-  Control?: 'button' | 'slider';
-  Metric?: string;
-  /**
-   * Display modes this command does anything in. Absent means all of them.
-   *
-   * This is not cosmetic. FreeKiosk accepts a WebView command in External App
-   * mode, answers `executed: true`, and does nothing (verified against a live
-   * device, where POSTing a new URL in app mode left `webview.currentUrl`
-   * untouched. Reporting that as a success would be a lie ShowTrak told on the
-   * device's behalf, so a command outside its modes is refused rather than sent.
-   */
-  Modes?: readonly FreeKioskDisplayMode[];
-  /**
-   * The device is expected to drop the connection while carrying this out.
-   *
-   * A reboot or a UI restart tears down the HTTP server mid-response, so the
-   * socket dies before an answer arrives. That is the command WORKING. Without
-   * this flag ShowTrak reports "socket hang up" as a failure on exactly the
-   * commands most likely to have succeeded, which trains an operator to ignore
-   * the one error message that would matter if it were real.
-   */
-  ExpectDisconnect?: boolean;
-  Note?: string;
-}
+export type { FreeKioskCommandDef };
 
 /** Shared by the two 0–100 sliders, which take the same body either way. */
 const LEVEL_PARAM: MonitoringSettingField[] = [

@@ -3,7 +3,11 @@
 // What the section shows, each volume's card (title, usage, Monitor toggle) and
 // the conditions table of a monitored one. The server judges the conditions;
 // this only lays them out and turns the operator's edits into a request.
-import type { ClientView, StorageVolumeView } from '@showtrak/protocol';
+import type {
+  ClientView,
+  CriticalStorageVolumePayload,
+  StorageVolumeView,
+} from '@showtrak/protocol';
 import { AudioPlatformLabel, IsVersionAtLeast } from './audio-devices';
 
 /** The first ShowTrak Client release that reports its volumes. */
@@ -379,20 +383,15 @@ export interface StorageRuleFields {
   RequireHealthy?: boolean;
 }
 
-export interface StorageRulePayload {
-  MountPoint: string;
-  MinFreePercent?: number | null;
-  MinFreeGB?: number | null;
-  RequireWritable?: boolean;
-  RequireHealthy?: boolean;
-}
-
-/** Turn the conditions form into a request, or say what is wrong with it. */
+/**
+ * Turn the conditions form into a request (MarkClientStorageVolumeCritical's
+ * payload), or say what is wrong with it.
+ */
 export function ParseStorageRuleFields(
   MountPoint: string,
   Fields: StorageRuleFields
-): { Payload: StorageRulePayload } | { Error: string } {
-  const Payload: StorageRulePayload = { MountPoint };
+): { Payload: CriticalStorageVolumePayload } | { Error: string } {
+  const Payload: CriticalStorageVolumePayload = { MountPoint };
   for (const Field of ['MinFreePercent', 'MinFreeGB'] as const) {
     const Raw = Fields[Field];
     if (Raw === undefined) continue;

@@ -5,9 +5,8 @@ import { TRIGGERS } from './triggers';
 import { ScopeCoversEntity } from '../ScopeMatching';
 import type { ScopeTag } from '../ScopeMatching';
 
-// The in-memory alert rule (as produced by normalizeRuleRow) matches the wire
-// AlertRuleView shape.
-type AlertRule = AlertRuleView;
+// Rules are evaluated as the in-memory rule normalizeRuleRow produces, which is
+// the protocol's AlertRuleView: the same object the editor receives.
 
 // Runtime context describing the event being evaluated against the rules. Built
 // by the AlertsManager event handlers; the concrete fields present depend on the
@@ -40,7 +39,11 @@ interface AlertContext {
 // `Tags` is the full tag list, needed only to expand a rule that targets tags
 // (tags nest, so expansion is a graph walk; see ../ScopeMatching). Omitting it
 // silently under-matches such rules, so the evaluator always supplies it.
-function isScopeMatch(Rule: AlertRule, Context: AlertContext, Tags?: readonly ScopeTag[]): boolean {
+function isScopeMatch(
+  Rule: AlertRuleView,
+  Context: AlertContext,
+  Tags?: readonly ScopeTag[]
+): boolean {
   const Scope = Rule.Scope || {};
   const Workspace = !!Scope.Workspace;
   const GroupIDs = new Set(Array.isArray(Scope.Groups) ? Scope.Groups.map((x) => Number(x)) : []);
@@ -118,7 +121,7 @@ const HEALTH_TRIGGERS: ReadonlySet<string> = new Set([
 // CLIENT_DEGRADED case additionally consults the rule's TriggerConfig.Source.
 function singleTriggerMatches(
   TriggerType: string,
-  Rule: AlertRule,
+  Rule: AlertRuleView,
   Context: AlertContext
 ): boolean {
   switch (TriggerType) {
@@ -203,7 +206,7 @@ function singleTriggerMatches(
 }
 
 // A rule fires when ANY of its configured trigger types matches the context.
-function triggerMatches(Rule: AlertRule, Context: AlertContext): boolean {
+function triggerMatches(Rule: AlertRuleView, Context: AlertContext): boolean {
   const Types = Array.isArray(Rule.TriggerTypes) ? Rule.TriggerTypes : [];
   for (const TriggerType of Types) {
     if (singleTriggerMatches(TriggerType, Rule, Context)) return true;
@@ -529,4 +532,4 @@ export {
   describeFreeKioskAlarm,
   describeContext,
 };
-export type { AlertContext, AlertRule };
+export type { AlertContext };

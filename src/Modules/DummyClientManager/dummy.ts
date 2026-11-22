@@ -17,6 +17,7 @@
 // until the next heartbeat arrives.
 import { Manager as BroadcastManager } from '../Broadcast';
 import { ClampInterval } from './normalize';
+import type { DummyClientView } from '@showtrak/protocol';
 
 const STATE_IDLE = 'IDLE';
 const STATE_ONLINE = 'ONLINE';
@@ -39,28 +40,7 @@ export interface DummyClientInit {
   Timestamp: number;
 }
 
-// Snapshot shape produced by ToJSON(). A structurally looser sibling of the
-// shared DummyClientView (State/Version/Type are plain strings here because the
-// runtime class stores them untyped).
-export interface DummyClientSnapshot {
-  UUID: string;
-  DummyID: string;
-  Nickname: string;
-  Hostname: string;
-  IP: string | null;
-  Version: string;
-  Interval: number;
-  GroupID: number | null;
-  Weight: number;
-  Timestamp: number;
-  State: string;
-  Online: boolean;
-  Degraded: boolean;
-  DegradedWarnings: string[];
-  LastSeen: number | null;
-  Type: string;
-}
-
+// ToJSON() produces the protocol's DummyClientView.
 class DummyClient {
   UUID: string;
   DummyID: string;
@@ -70,7 +50,7 @@ class DummyClient {
   GroupID: number | null;
   Weight: number;
   Timestamp: number;
-  State: string;
+  State: DummyClientView['State'];
   Online: boolean;
   Degraded: boolean;
   DegradedWarnings: string[];
@@ -101,7 +81,7 @@ class DummyClient {
 
   // Snapshot used for IPC + broadcast payloads. Shaped so the existing client
   // UI (and the client alert handler) can consume it directly.
-  ToJSON(): DummyClientSnapshot {
+  ToJSON(): DummyClientView {
     return {
       UUID: this.UUID,
       DummyID: this.DummyID,

@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import type { Result } from '@showtrak/protocol';
+import type { Result, NetworkScanEvent, NetworkScanResult } from '@showtrak/protocol';
 import { CreateLogger } from '../Logger';
 import { CreateBonjourErrorHandler } from '@showtrak/protocol/runtime';
 
@@ -67,33 +67,15 @@ interface ScanOptions {
 }
 
 /** A single discovered host/service surfaced to the UI. */
-interface DiscoveryResult {
-  Key?: string;
-  Name?: string | null;
-  Hostname?: string | null;
-  Address?: string;
-  Source?: string;
-  ServiceType?: string;
-  Port?: number | null;
-  TXT?: Record<string, unknown> | null;
-  MethodHint?: string;
-  OpenPorts?: number[];
-}
+// The events delivered to the scan's `onEvent` callback, and the results they
+// carry, are the protocol's NetworkScanEvent and NetworkScanResult: the renderer
+// receives them as they are (OnNetworkDeviceScanEvent).
+
+// Omit applied to each member of a union, so the union stays discriminated.
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
 /** Payload passed to `emitEvent`, before the `ScanID` is attached. */
-interface ScanEventPayload {
-  Type: 'status' | 'result' | 'done';
-  Status?: string;
-  Message?: string;
-  Progress?: { Current: number; Total: number; Percent: number };
-  Result?: DiscoveryResult;
-  Count?: number;
-}
-
-/** The event object delivered to the scan's `onEvent` callback. */
-interface ScanEvent extends ScanEventPayload {
-  ScanID: string;
-}
+type ScanEventPayload = DistributiveOmit<NetworkScanEvent, 'ScanID'>;
 
 interface Scan {
   ScanID: string;
@@ -114,12 +96,12 @@ interface Scan {
   PJLinkHandle: PJLinkDiscoveryHandle | null;
   Timer: ReturnType<typeof setTimeout> | null;
   ProbePromise: Promise<void> | null;
-  onEvent: (payload: ScanEvent) => void;
+  onEvent: (payload: NetworkScanEvent) => void;
 }
 
 const ACTIVE_SCANS = new Map<string, Scan>();
 
-function createScan(options: ScanOptions, onEvent: (payload: ScanEvent) => void): Scan {
+function createScan(options: ScanOptions, onEvent: (payload: NetworkScanEvent) => void): Scan {
   const scanID = randomUUID();
   const scan: Scan = {
     ScanID: scanID,
@@ -172,7 +154,7 @@ function emitProgress(scan: Scan, current: number, total: number) {
   });
 }
 
-function pushResult(scan: Scan, result: DiscoveryResult) {
+function pushResult(scan: Scan, result: NetworkScanResult) {
   const key = String(result.Key || result.Address || '')
     .trim()
     .toLowerCase();
@@ -200,7 +182,7 @@ function stopBonjour(scan: Scan) {
   }
 }
 
-function finalizeScan(scan: Scan, status = 'completed') {
+function finalizeScan(scan: Scan, status: 'completed' | 'cancelled' = 'completed') {
   if (!scan || scan.Finished) return;
   scan.Finished = true;
   if (scan.Timer) {
@@ -390,7 +372,7 @@ async function startProbeScan(scan: Scan) {
 const Manager = {
   Start: (
     options: ScanOptions = {},
-    onEvent: (payload: ScanEvent) => void
+    onEvent: (payload: NetworkScanEvent) => void
   ): Result<{ ScanID: string }> => {
     if (typeof onEvent !== 'function') return ['Callback is required', null];
     const scan = createScan(options || {}, onEvent);

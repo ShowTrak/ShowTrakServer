@@ -11,14 +11,16 @@ import type {
   CriticalUSBDevicePayloadResult,
   CriticalUSBNamePayloadResult,
   CriticalApplicationPayloadResult,
-  CriticalDisplayPayloadResult,
-  CriticalAudioDevicePayloadResult,
-  CriticalNetworkInterfacePayloadResult,
-  CriticalStorageVolumePayloadResult,
-  ClientSystemCheckPayloadResult,
-  AudioLevelRequestResult,
 } from '../../Modules/IPCValidation';
-import type { ClientSystemCheckKey } from '@showtrak/protocol';
+import type {
+  ClientSystemCheckKey,
+  CriticalDisplayPayload,
+  CriticalAudioDevicePayload,
+  CriticalNetworkInterfacePayload,
+  CriticalStorageVolumePayload,
+  ClientSystemCheckPayload,
+  AudioLevelRequest,
+} from '@showtrak/protocol';
 import { Manager as ClientManager } from '../../Modules/ClientManager';
 import { Manager as AdoptionManager } from '../../Modules/AdoptionManager';
 import { Manager as ServerManager } from '../../Modules/Server';
@@ -134,12 +136,12 @@ function register(): void {
 
   RPC.handle(
     'MarkClientDisplayCritical',
-    createTupleHandler<[string, CriticalDisplayPayloadResult], unknown>(
+    createTupleHandler<[string, CriticalDisplayPayload], unknown>(
       (UUID: unknown, Display: unknown) => [
         IPCValidation.UUID(UUID),
         IPCValidation.CriticalDisplayPayload(Display),
       ],
-      (UUID: string, Display: CriticalDisplayPayloadResult) =>
+      (UUID: string, Display: CriticalDisplayPayload) =>
         ClientManager.MarkDisplayCritical(UUID, Display)
     )
   );
@@ -157,12 +159,12 @@ function register(): void {
 
   RPC.handle(
     'MarkClientAudioDeviceCritical',
-    createTupleHandler<[string, CriticalAudioDevicePayloadResult], unknown>(
+    createTupleHandler<[string, CriticalAudioDevicePayload], unknown>(
       (UUID: unknown, Device: unknown) => [
         IPCValidation.UUID(UUID),
         IPCValidation.CriticalAudioDevicePayload(Device),
       ],
-      (UUID: string, Device: CriticalAudioDevicePayloadResult) =>
+      (UUID: string, Device: CriticalAudioDevicePayload) =>
         ClientManager.MarkAudioDeviceCritical(UUID, Device)
     )
   );
@@ -181,12 +183,12 @@ function register(): void {
 
   RPC.handle(
     'MarkClientNetworkInterfaceCritical',
-    createTupleHandler<[string, CriticalNetworkInterfacePayloadResult], unknown>(
+    createTupleHandler<[string, CriticalNetworkInterfacePayload], unknown>(
       (UUID: unknown, Interface: unknown) => [
         IPCValidation.UUID(UUID),
         IPCValidation.CriticalNetworkInterfacePayload(Interface),
       ],
-      (UUID: string, Interface: CriticalNetworkInterfacePayloadResult) =>
+      (UUID: string, Interface: CriticalNetworkInterfacePayload) =>
         ClientManager.MarkNetworkInterfaceCritical(UUID, Interface)
     )
   );
@@ -204,12 +206,12 @@ function register(): void {
 
   RPC.handle(
     'MarkClientStorageVolumeCritical',
-    createTupleHandler<[string, CriticalStorageVolumePayloadResult], unknown>(
+    createTupleHandler<[string, CriticalStorageVolumePayload], unknown>(
       (UUID: unknown, Volume: unknown) => [
         IPCValidation.UUID(UUID),
         IPCValidation.CriticalStorageVolumePayload(Volume),
       ],
-      (UUID: string, Volume: CriticalStorageVolumePayloadResult) =>
+      (UUID: string, Volume: CriticalStorageVolumePayload) =>
         ClientManager.MarkStorageVolumeCritical(UUID, Volume)
     )
   );
@@ -228,13 +230,12 @@ function register(): void {
 
   RPC.handle(
     'MarkClientSystemCheck',
-    createTupleHandler<[string, ClientSystemCheckPayloadResult], unknown>(
+    createTupleHandler<[string, ClientSystemCheckPayload], unknown>(
       (UUID: unknown, Check: unknown) => [
         IPCValidation.UUID(UUID),
         IPCValidation.ClientSystemCheckPayload(Check),
       ],
-      (UUID: string, Check: ClientSystemCheckPayloadResult) =>
-        ClientManager.MarkSystemCheck(UUID, Check)
+      (UUID: string, Check: ClientSystemCheckPayload) => ClientManager.MarkSystemCheck(UUID, Check)
     )
   );
 
@@ -253,13 +254,12 @@ function register(): void {
   // works in SHOW mode, and remote surfaces gate it with the script permission.
   RPC.handle(
     'SetClientAudioLevel',
-    createTupleHandler<[string, AudioLevelRequestResult], boolean>(
+    createTupleHandler<[string, AudioLevelRequest], boolean>(
       (UUID: unknown, Request: unknown) => [
         IPCValidation.UUID(UUID),
         IPCValidation.AudioLevelRequest(Request),
       ],
-      (UUID: string, Request: AudioLevelRequestResult) =>
-        ServerManager.SetClientAudioLevel(UUID, Request)
+      (UUID: string, Request: AudioLevelRequest) => ServerManager.SetClientAudioLevel(UUID, Request)
     )
   );
 

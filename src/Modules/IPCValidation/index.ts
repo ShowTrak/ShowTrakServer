@@ -6,98 +6,40 @@
 // Every validator throws (via `fail`) on invalid input and otherwise returns a
 // normalized value. The Manager type below is the composition of every domain's
 // validator surface; each domain file imports it to type its register function.
-import type { ClientSystemCheckKey } from '@showtrak/protocol';
+import type {
+  AudioLevelRequest,
+  ClientSystemCheckKey,
+  ClientSystemCheckPayload,
+  CriticalAudioDevicePayload,
+  CriticalDisplayPayload,
+  CriticalNetworkInterfacePayload,
+  CriticalStorageVolumePayload,
+  CriticalUSBConditionOptions,
+} from '@showtrak/protocol';
 import type { AlertRuleCreatePayload } from '../AlertsManager';
 import type { MonitoringTargetCreatePayload } from '../MonitoringTargetManager';
 
-// Present only when the request carried them; absent keeps the current value.
-export interface CriticalUSBConditionOptionsResult {
-  RequirePresent?: boolean;
-  CheckLocation?: boolean;
-  CheckFirmware?: boolean;
-  RequireNoError?: boolean;
-}
-
-export interface CriticalUSBDevicePayloadResult extends CriticalUSBConditionOptionsResult {
+// What a validator returns for a payload the protocol describes is that payload
+// type, normalized: only the options the request carried are present (an absent
+// one keeps its current value; null stops guarding it). The USB marks are the
+// exception: their names are normalized to string-or-null, always present.
+export interface CriticalUSBDevicePayloadResult extends CriticalUSBConditionOptions {
   SerialNumber: string;
   ManufacturerName: string | null;
   ProductName: string | null;
 }
 
-export interface CriticalUSBNamePayloadResult extends CriticalUSBConditionOptionsResult {
+export interface CriticalUSBNamePayloadResult extends CriticalUSBConditionOptions {
   ManufacturerName: string | null;
   ProductName: string | null;
 }
 
+// No protocol type: MarkClientApplicationCritical takes its payload as unknown.
 export interface CriticalApplicationPayloadResult {
   Name: string;
   // Absent leaves an existing entry's foreground condition as it was.
   RequireForeground?: boolean;
   RequireResponding?: boolean;
-}
-
-export interface CriticalDisplayPayloadResult {
-  DisplayID: string;
-  // Present only when the request carried them; absent keeps the current value.
-  RequirePresent?: boolean;
-  RequirePrimary?: boolean;
-  CheckResolution?: boolean;
-  CheckRefreshRate?: boolean;
-  CheckScale?: boolean;
-  CheckRotation?: boolean;
-  CheckPosition?: boolean;
-}
-
-export interface CriticalAudioDevicePayloadResult {
-  EndpointID: string;
-  // Present only when the request carried them; absent keeps the current value.
-  RequireDefault?: boolean;
-  RequireUnmuted?: boolean;
-  MinVolume?: number | null;
-  MaxVolume?: number | null;
-  CheckChannels?: boolean;
-  CheckSampleRate?: boolean;
-}
-
-export interface CriticalNetworkInterfacePayloadResult {
-  Name: string;
-  Family?: 'IPv4' | 'IPv6';
-  // Present only when the request carried them; absent keeps the current value.
-  RequirePresent?: boolean;
-  Address?: string | null;
-  RangeStart?: string | null;
-  RangeEnd?: string | null;
-  Netmask?: string | null;
-  Gateway?: string | null;
-}
-
-export interface CriticalStorageVolumePayloadResult {
-  MountPoint: string;
-  // Present only when the request carried them; absent keeps the current value.
-  MinFreePercent?: number | null;
-  MinFreeGB?: number | null;
-  RequireWritable?: boolean;
-  RequireHealthy?: boolean;
-}
-
-// A system-check edit. Only the fields the request carried are present; an
-// absent field keeps its current value and null stops guarding it.
-export interface ClientSystemCheckPayloadResult {
-  Key: ClientSystemCheckKey;
-  MaxPercent?: number | null;
-  SustainSeconds?: number;
-  MaxDays?: number | null;
-  RequireMains?: boolean;
-  MinBatteryPercent?: number | null;
-  ChargingBelowPercent?: number | null;
-  MaxCelsius?: number | null;
-  MaxThermalState?: 'nominal' | 'fair' | 'serious' | null;
-}
-
-export interface AudioLevelRequestResult {
-  EndpointID: string;
-  Volume?: number;
-  Muted?: boolean;
 }
 
 export interface IPCValidationManager {
@@ -137,16 +79,16 @@ export interface IPCValidationManager {
   // typing an address by hand may legitimately enter one for an interface the
   // server has never observed, so the external/physical filter is not applied.
   MacAddress(value: unknown, fieldName?: string): string;
-  CriticalDisplayPayload(value: unknown): CriticalDisplayPayloadResult;
+  CriticalDisplayPayload(value: unknown): CriticalDisplayPayload;
   AudioEndpointID(value: unknown, fieldName?: string): string;
-  CriticalAudioDevicePayload(value: unknown): CriticalAudioDevicePayloadResult;
-  AudioLevelRequest(value: unknown): AudioLevelRequestResult;
+  CriticalAudioDevicePayload(value: unknown): CriticalAudioDevicePayload;
+  AudioLevelRequest(value: unknown): AudioLevelRequest;
   NetworkInterfaceName(value: unknown, fieldName?: string): string;
-  CriticalNetworkInterfacePayload(value: unknown): CriticalNetworkInterfacePayloadResult;
+  CriticalNetworkInterfacePayload(value: unknown): CriticalNetworkInterfacePayload;
   StorageMountPoint(value: unknown, fieldName?: string): string;
-  CriticalStorageVolumePayload(value: unknown): CriticalStorageVolumePayloadResult;
+  CriticalStorageVolumePayload(value: unknown): CriticalStorageVolumePayload;
   SystemCheckKey(value: unknown): ClientSystemCheckKey;
-  ClientSystemCheckPayload(value: unknown): ClientSystemCheckPayloadResult;
+  ClientSystemCheckPayload(value: unknown): ClientSystemCheckPayload;
   ClientUpdatePayload(value: unknown): Record<string, unknown>;
 
   // Monitoring targets (monitoring-validators.ts)

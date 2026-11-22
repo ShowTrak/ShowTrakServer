@@ -35,7 +35,6 @@ import { Manager as VariableManager } from '../VariableManager';
 import * as SlugService from '../Slug';
 import { Ok, Fail } from '../Utils';
 import { Client } from './client';
-import type { ClientMacAddress } from './client';
 import {
   AsRecord,
   normalizeSerialNumber,
@@ -89,16 +88,17 @@ import type {
   CriticalUSBName,
   USBDevice,
   Result,
+  ClientMacAddressView,
+  CriticalDisplayPayload,
+  CriticalAudioDevicePayload,
+  CriticalNetworkInterfacePayload,
+  CriticalStorageVolumePayload,
+  ClientSystemCheckPayload,
 } from '@showtrak/protocol';
 import type {
   CriticalUSBDevicePayloadResult,
   CriticalUSBNamePayloadResult,
   CriticalApplicationPayloadResult,
-  CriticalDisplayPayloadResult,
-  CriticalAudioDevicePayloadResult,
-  CriticalNetworkInterfacePayloadResult,
-  CriticalStorageVolumePayloadResult,
-  ClientSystemCheckPayloadResult,
 } from '../IPCValidation';
 
 const Logger = CreateLogger('ClientManager');
@@ -165,10 +165,7 @@ export interface ClientManagerType {
     Device: CriticalUSBNamePayloadResult
   ): Promise<Result<boolean>>;
   IsUSBNameCritical(UUID: string, NameKey: unknown): Promise<Result<boolean>>;
-  MarkDisplayCritical(
-    UUID: string,
-    Display: CriticalDisplayPayloadResult
-  ): Promise<Result<boolean>>;
+  MarkDisplayCritical(UUID: string, Display: CriticalDisplayPayload): Promise<Result<boolean>>;
   RemoveDisplayCritical(UUID: string, DisplayID: unknown): Promise<Result<boolean>>;
   IsDisplayCritical(UUID: string, DisplayID: unknown): Promise<Result<boolean>>;
   SetAudioDevices(UUID: string, Snapshot: ValidatedAudioDevices): Promise<Result<string>>;
@@ -178,13 +175,13 @@ export interface ClientManagerType {
   // Mark an endpoint critical or update its conditions; Ok(true) when newly marked.
   MarkAudioDeviceCritical(
     UUID: string,
-    Device: CriticalAudioDevicePayloadResult
+    Device: CriticalAudioDevicePayload
   ): Promise<Result<boolean>>;
   RemoveAudioDeviceCritical(UUID: string, EndpointID: unknown): Promise<Result<boolean>>;
   // Mark a network interface critical or update its conditions; Ok(true) when newly marked.
   MarkNetworkInterfaceCritical(
     UUID: string,
-    Interface: CriticalNetworkInterfacePayloadResult
+    Interface: CriticalNetworkInterfacePayload
   ): Promise<Result<boolean>>;
   RemoveNetworkInterfaceCritical(UUID: string, Name: unknown): Promise<Result<boolean>>;
   // Mounted volumes (clients from 3.28.0).
@@ -192,10 +189,10 @@ export interface ClientManagerType {
   // Monitor a volume or update its conditions; Ok(true) when newly monitored.
   MarkStorageVolumeCritical(
     UUID: string,
-    Volume: CriticalStorageVolumePayloadResult
+    Volume: CriticalStorageVolumePayload
   ): Promise<Result<boolean>>;
   RemoveStorageVolumeCritical(UUID: string, MountPoint: unknown): Promise<Result<boolean>>;
-  MarkSystemCheck(UUID: string, Check: ClientSystemCheckPayloadResult): Promise<Result<boolean>>;
+  MarkSystemCheck(UUID: string, Check: ClientSystemCheckPayload): Promise<Result<boolean>>;
   RemoveSystemCheck(UUID: string, Key: ClientSystemCheckKey): Promise<Result<boolean>>;
   // Per-client MAC addresses (the Wake-on-LAN target set). Add resolves to
   // Ok(true) when a new address was stored, Ok(false) when it was already on
@@ -685,7 +682,7 @@ async function IsCritical<Row, Entry>(
 // Per-client MAC addresses. Structurally identical to the critical-entity
 // indexes (per-client keyed rows in a side table, projected onto the Client on
 // every hydration), so it reuses the same factory. Keyed by the normalized MAC.
-const MacAddresses = makeCriticalIndex<ClientMacAddressRow, ClientMacAddress>({
+const MacAddresses = makeCriticalIndex<ClientMacAddressRow, ClientMacAddressView>({
   loadAll: () => MacAddressesRepo.LoadAll(),
   fromRow: (Row) => {
     const UUID = Row && Row.UUID ? String(Row.UUID) : '';
@@ -1117,7 +1114,7 @@ Manager.SetDisplayList = async (UUID: string, DisplayList: ValidatedDisplay[]) =
   return Ok('Display List updated successfully');
 };
 
-Manager.MarkDisplayCritical = async (UUID: string, Display: CriticalDisplayPayloadResult) => {
+Manager.MarkDisplayCritical = async (UUID: string, Display: CriticalDisplayPayload) => {
   const [Err, Target] = await Manager.Get(UUID);
   if (Err) return Fail(Err);
   if (!Target) return Fail('Client Not Found');
@@ -1223,10 +1220,7 @@ Manager.SetTemperatures = async (UUID: string, Snapshot: ValidatedTemperatures) 
   return Ok('Temperatures updated successfully');
 };
 
-Manager.MarkAudioDeviceCritical = async (
-  UUID: string,
-  Device: CriticalAudioDevicePayloadResult
-) => {
+Manager.MarkAudioDeviceCritical = async (UUID: string, Device: CriticalAudioDevicePayload) => {
   const [Err, Target] = await Manager.Get(UUID);
   if (Err) return Fail(Err);
   if (!Target) return Fail('Client Not Found');
@@ -1272,7 +1266,7 @@ Manager.RemoveAudioDeviceCritical = (UUID: string, EndpointID: unknown) =>
 
 Manager.MarkNetworkInterfaceCritical = async (
   UUID: string,
-  Interface: CriticalNetworkInterfacePayloadResult
+  Interface: CriticalNetworkInterfacePayload
 ) => {
   const [Err, Target] = await Manager.Get(UUID);
   if (Err) return Fail(Err);
@@ -1327,10 +1321,7 @@ Manager.SetStorageVolumes = async (UUID: string, Snapshot: ValidatedStorageVolum
   return Ok('Storage volumes updated successfully');
 };
 
-Manager.MarkStorageVolumeCritical = async (
-  UUID: string,
-  Volume: CriticalStorageVolumePayloadResult
-) => {
+Manager.MarkStorageVolumeCritical = async (UUID: string, Volume: CriticalStorageVolumePayload) => {
   const [Err, Target] = await Manager.Get(UUID);
   if (Err) return Fail(Err);
   if (!Target) return Fail('Client Not Found');
@@ -1371,7 +1362,7 @@ Manager.MarkStorageVolumeCritical = async (
 Manager.RemoveStorageVolumeCritical = (UUID: string, MountPoint: unknown) =>
   RemoveCritical(CriticalStorage, UUID, MountPoint);
 
-Manager.MarkSystemCheck = async (UUID: string, Check: ClientSystemCheckPayloadResult) => {
+Manager.MarkSystemCheck = async (UUID: string, Check: ClientSystemCheckPayload) => {
   const [Err, Target] = await Manager.Get(UUID);
   if (Err) return Fail(Err);
   if (!Target) return Fail('Client Not Found');

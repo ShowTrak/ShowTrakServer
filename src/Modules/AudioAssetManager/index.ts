@@ -8,7 +8,12 @@ import { Manager as AppData } from '../AppData';
 import { Manager as UUID } from '../UUID';
 import { Ok, Fail } from '../Utils';
 import { IsArray } from '../Utils/guards';
-import type { Result } from '@showtrak/protocol';
+import type {
+  AudioAssetData,
+  AudioAssetInspection,
+  AudioAssetView,
+  Result,
+} from '@showtrak/protocol';
 import { RecordEdit, RecordUpdate, type EditInput } from '../AuditLog/edits';
 import { Line, Value } from '../AuditLog/message';
 import { DiffFields, Snapshot } from '../AuditLog/diff';
@@ -29,36 +34,10 @@ interface AudioAsset {
   Timestamp: number;
 }
 
-// The renderer-facing projection of an asset (adds Missing, omits FileName).
-interface PublicAudioAsset {
-  ID: string;
-  Label: string;
-  OriginalName: string;
-  Extension: string;
-  Volume: number;
-  Size: number;
-  Duration: number | null;
-  Timestamp: number;
-  Missing: boolean;
-}
-
-interface AudioDataURL {
-  ID: string;
-  Label: string;
-  Volume: number;
-  DataURL: string;
-}
-
-// Result of inspecting a candidate source file before import.
-interface AudioInspection {
-  Path: unknown;
-  OriginalName: string;
-  BaseLabel: string;
-  Extension: string;
-  Size: number;
-  DataURL: string | null;
-  Error: string | null;
-}
+// What the renderer is handed is the protocol's: an asset's projection
+// (AudioAssetView: adds Missing, omits FileName), its playable data
+// (AudioAssetData), and the inspection of a candidate file before import
+// (AudioAssetInspection).
 
 interface AudioImportPayload {
   SourcePath?: unknown;
@@ -82,17 +61,17 @@ interface AudioAssetManagerType {
   };
   ClampVolume(Value: unknown): number;
   Init(): Promise<void>;
-  GetAll(): Promise<Result<PublicAudioAsset[]>>;
+  GetAll(): Promise<Result<AudioAssetView[]>>;
   Get(ID: string): AudioAsset | null;
   Exists(ID: string): boolean;
   FindMissing(ReferencedIDs: unknown): string[];
-  GetDataURL(ID: string): Result<AudioDataURL>;
-  InspectCandidate(FilePath: unknown): AudioInspection;
-  Import(Payload: AudioImportPayload | null | undefined): Promise<Result<PublicAudioAsset>>;
+  GetDataURL(ID: string): Result<AudioAssetData>;
+  InspectCandidate(FilePath: unknown): AudioAssetInspection;
+  Import(Payload: AudioImportPayload | null | undefined): Promise<Result<AudioAssetView>>;
   Update(
     ID: string,
     Payload: AudioUpdatePayload | null | undefined
-  ): Promise<Result<PublicAudioAsset>>;
+  ): Promise<Result<AudioAssetView>>;
   Delete(ID: string): Promise<Result<{ ID: string }>>;
 }
 
@@ -245,7 +224,7 @@ function persistManifest(): boolean {
   }
 }
 
-function publicShape(Asset: AudioAsset): PublicAudioAsset {
+function publicShape(Asset: AudioAsset): AudioAssetView {
   return {
     ID: Asset.ID,
     Label: Asset.Label,
@@ -315,7 +294,7 @@ Manager.GetDataURL = (ID: string) => {
 Manager.InspectCandidate = (FilePath: unknown) => {
   const OriginalName = path.basename(String(FilePath || ''));
   const Extension = NormalizeExtension(OriginalName);
-  const Result: AudioInspection = {
+  const Result: AudioAssetInspection = {
     Path: FilePath,
     OriginalName,
     BaseLabel: SanitizeLabel(OriginalName.replace(/\.[^.]+$/, '')),

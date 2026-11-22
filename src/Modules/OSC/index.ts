@@ -1,6 +1,12 @@
 import { CreateLogger } from '../Logger';
 import type { ClientManagerType } from '../ClientManager';
-import type { OSCRouteValue } from '@showtrak/protocol';
+import type {
+  DebugTrafficEntry,
+  FreeKioskTerminalView,
+  OSCRoute,
+  OSCRouteValue,
+  OSCRouteValueList,
+} from '@showtrak/protocol';
 import { OSC_PORT } from '../Config/constants';
 import { Manager as Broadcast } from '../Broadcast';
 import { RunWithAuditSource } from '../AuditLog/source';
@@ -175,13 +181,9 @@ interface OSCRemoteInfo {
   size?: number;
 }
 
-// Debug-traffic payload emitted for the WebUI traffic inspector.
-interface OSCDebugPayload {
-  valid: boolean;
-  summary: string;
-  detail: string;
-  source?: string | null;
-}
+// Debug-traffic payload emitted for the WebUI traffic inspector: the protocol's
+// DebugTrafficEntry, less what emitDebugEntry stamps on it.
+type OSCDebugPayload = Omit<DebugTrafficEntry, 'protocol' | 'timestamp'>;
 
 type OSCRouteCallback = (Req: OSCRequest, Meta?: OSCMeta) => RouteResult | Promise<RouteResult>;
 
@@ -192,31 +194,25 @@ type OSCTag = NonNullable<Awaited<ReturnType<typeof TagManager.GetBySlug>>>;
 
 // An OSCRouteValue (from the protocol) is one accepted value for a route's
 // placeholder(s), as listed in the OSC/API reference, e.g. `pjlink/power.on`
-// for a check action, `reboot` for a FreeKiosk command. Plain data so it
-// survives the JSON clone that pushes the route list to the renderer.
+// for a check action, `reboot` for a FreeKiosk command; an OSCRouteValueList
+// is every value a route accepts. Plain data so it survives the JSON clone
+// that pushes the route list to the renderer.
 
-interface OSCRouteValueList {
-  /** The placeholder(s) the entries fill, e.g. `Method/ActionID`. */
-  Param: string;
-  Entries: OSCRouteValue[];
-}
-
-interface OSCRoute {
-  Title: string;
-  Path: string;
+// A route in the table: the protocol's OSCRoute, as the OSC reference lists it
+// (SetOSCList, whose JSON clone drops the handler), plus its handler.
+interface OSCRouteEntry extends OSCRoute {
   Callback: OSCRouteCallback;
-  /** Every value the route accepts, when they come from a fixed catalogue. */
-  Values?: OSCRouteValueList;
 }
 
-const Routes: OSCRoute[] = [];
+const Routes: OSCRouteEntry[] = [];
 
 function emitDebugEntry(payload: OSCDebugPayload) {
-  Broadcast.emit('DebugTrafficEntry', {
+  const Entry: DebugTrafficEntry = {
     protocol: 'osc',
     timestamp: Date.now(),
     ...payload,
-  });
+  };
+  Broadcast.emit('DebugTrafficEntry', Entry);
 }
 
 function failureResult(detail: unknown): RouteResult {
@@ -319,7 +315,7 @@ async function getTagClients(
 
 async function HandleOSCMessage(Route: unknown, Info: OSCRemoteInfo | undefined) {
   const RawPath = Array.isArray(Route) && Route.length > 0 ? String(Route[0] || '') : '';
-  const ValidRoutes: OSCRoute[] = [];
+  const ValidRoutes: OSCRouteEntry[] = [];
 
   Main: for (const PRoute of Routes) {
     const PRouteParts = PRoute.Path.split('/');
@@ -401,7 +397,7 @@ async function HandleOSCMessage(Route: unknown, Info: OSCRemoteInfo | undefined)
 }
 
 const OSC = {
-  GetRoutes(): OSCRoute[] {
+  GetRoutes(): OSCRouteEntry[] {
     return Routes;
   },
 
@@ -909,14 +905,12 @@ OSC.CreateRoute(
 // parameter, from the path or the first OSC argument. The Group, Tag
 // and All forms send to every FreeKiosk terminal they cover; other client types
 // are not touched.
-type OSCFreeKioskTerminal = NonNullable<Awaited<ReturnType<typeof FreeKioskManager.GetBySlug>>>;
-
 // The terminals a FreeKiosk route addresses, plus how to name them in the
 // notification ("lobby-tablet", or "3 FreeKiosk terminals in group ...").
-type FreeKioskTargets = [string, null, null] | [null, OSCFreeKioskTerminal[], string];
+type FreeKioskTargets = [string, null, null] | [null, FreeKioskTerminalView[], string];
 
 // `Where` is the trailing scope (` in group "Foyer" (foyer)`), empty for All.
-function describeTerminalSet(Terminals: OSCFreeKioskTerminal[], Where: string): FreeKioskTargets {
+function describeTerminalSet(Terminals: FreeKioskTerminalView[], Where: string): FreeKioskTargets {
   if (!Terminals.length) return [`No FreeKiosk terminals${Where}`, null, null];
   const Noun = Terminals.length === 1 ? 'FreeKiosk terminal' : 'FreeKiosk terminals';
   return [null, Terminals, `${Terminals.length} ${Noun}${Where}`];

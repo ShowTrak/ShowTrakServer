@@ -510,7 +510,7 @@ class ApiSession {
 
 // --- Parsing --------------------------------------------------------------------------
 
-export interface TemperatureSensor {
+export interface NetgearTemperatureSensor {
   Number: number;
   Description: string | null;
   Celsius: number | null;
@@ -527,7 +527,7 @@ export interface NetgearDevice {
   ActivePorts: number | null;
   FanState: string | null;
   PoeBudgetMw: number | null;
-  Sensors: TemperatureSensor[];
+  Sensors: NetgearTemperatureSensor[];
 }
 
 // deviceInfo.temperatureSensorStates, from the spec.
@@ -603,7 +603,7 @@ function ParseDeviceInfo(Json: unknown): NetgearDevice | null {
     : IsObject(Info.temperatureSensors)
       ? [Info.temperatureSensors]
       : [];
-  const Sensors: TemperatureSensor[] = [];
+  const Sensors: NetgearTemperatureSensor[] = [];
   for (const S of RawSensors) {
     if (!IsObject(S)) continue;
     const Num = NumOrNull(S.sensorNum);
@@ -792,7 +792,7 @@ function EvaluatePoe(Wanted: number[], Ports: PoePort[]): PoeState[] {
   });
 }
 
-function EvaluateTemperature(Sensors: TemperatureSensor[]): string[] {
+function EvaluateTemperature(Sensors: NetgearTemperatureSensor[]): string[] {
   return Sensors.filter((S) => S.State != null && BAD_SENSOR_STATES.has(S.State)).map(
     (S) =>
       `${S.Description || `Sensor ${S.Number}`} ${(SENSOR_STATES[S.State as number] || '').toLowerCase()}` +
@@ -1034,7 +1034,9 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
   }
   if (Result.AuthFailed) return Rows(Head);
 
-  const Sensors = Array.isArray(Result.Sensors) ? (Result.Sensors as TemperatureSensor[]) : [];
+  const Sensors = Array.isArray(Result.Sensors)
+    ? (Result.Sensors as NetgearTemperatureSensor[])
+    : [];
   const Body = [
     ...Head,
     Result.Model ? TextRow('Model', String(Result.Model)) : null,

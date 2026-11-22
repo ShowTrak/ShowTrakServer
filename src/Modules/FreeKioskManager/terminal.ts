@@ -27,47 +27,12 @@ import {
   ParseSettings,
 } from './normalize';
 import type { FreeKioskTerminalRow } from '../DB/rows';
+import type { FreeKioskAlarmState, FreeKioskTerminalView } from '@showtrak/protocol';
 
 const Logger = CreateLogger('FreeKiosk');
 
-export type FreeKioskState = 'IDLE' | 'ONLINE' | 'DEGRADED' | 'OFFLINE';
-
-export interface FreeKioskAlarmSummary {
-  Key: string;
-  Label: string;
-  Value: FreeKioskReading;
-  Reason: string;
-}
-
-export interface FreeKioskTerminalSnapshot {
-  UUID: string;
-  Slug: string | null;
-  Nickname: string;
-  Hostname: string;
-  Address: string;
-  Port: number;
-  HasApiKey: boolean;
-  IP: string | null;
-  Version: 'FreeKiosk';
-  Interval: number;
-  TimeoutMs: number;
-  GroupID: number | null;
-  Weight: number;
-  Timestamp: number;
-  Settings: Record<string, unknown>;
-  State: FreeKioskState;
-  Online: boolean;
-  Degraded: boolean;
-  DegradedWarnings: string[];
-  Alarms: FreeKioskAlarmSummary[];
-  Metrics: Record<string, FreeKioskReading>;
-  LastError: string | null;
-  LastChecked: number | null;
-  LastSuccessAt: number | null;
-  LastLatencyMs: number | null;
-  ControlEnabled: boolean | null;
-  Type: 'freekiosk';
-}
+// ToJSON() is the protocol's FreeKioskTerminalView, its alarms FreeKioskAlarmState.
+export type FreeKioskState = FreeKioskTerminalView['State'];
 
 export interface FreeKioskTerminalInput {
   UUID: string;
@@ -110,7 +75,7 @@ class FreeKioskTerminal {
   Online: boolean | null = null;
   Degraded = false;
   DegradedWarnings: string[] = [];
-  Alarms: FreeKioskAlarmSummary[] = [];
+  Alarms: FreeKioskAlarmState[] = [];
   Metrics: Record<string, FreeKioskReading> = EmptyMetrics();
   LastError: string | null = null;
   LastChecked: number | null = null;
@@ -177,7 +142,7 @@ class FreeKioskTerminal {
     return this.Degraded ? 'DEGRADED' : 'ONLINE';
   }
 
-  ToJSON(): FreeKioskTerminalSnapshot {
+  ToJSON(): FreeKioskTerminalView {
     return {
       UUID: this.UUID,
       Slug: this.Slug,

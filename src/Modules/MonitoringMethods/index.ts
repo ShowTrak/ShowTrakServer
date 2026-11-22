@@ -20,8 +20,8 @@ import {
   MONITORING_MAX_CONCURRENT_PINGS,
   MONITORING_MAX_CONCURRENT_PROBES,
 } from '../Config/constants';
+import type { MonitorLiveLevelChange, MonitorLiveLevelResult } from '@showtrak/protocol';
 import type {
-  LiveLevelChange,
   LiveLevelsFrame,
   MonitoringActionDef,
   MonitoringActionOptions,
@@ -721,8 +721,8 @@ const Manager = {
     ID: string,
     Target: MonitoringTargetLike,
     ChannelID: string,
-    Change: LiveLevelChange
-  ): Promise<MonitoringActionResult> => {
+    Change: MonitorLiveLevelChange
+  ): Promise<MonitorLiveLevelResult> => {
     const Method = Methods.get(ID);
     if (!Method || typeof Method.SetLiveLevel !== 'function') {
       return { Success: false, Error: 'This check type has no live control' };

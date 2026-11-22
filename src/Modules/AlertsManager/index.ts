@@ -12,7 +12,14 @@ import {
   HISTORY_RETENTION_MS,
   HISTORY_RETENTION_SWEEP_INTERVAL_MS,
 } from '../Config/constants';
-import type { AlertTriggerType, MonitoringCheckView, TagView, Result } from '@showtrak/protocol';
+import type {
+  AlertTriggerType,
+  MonitoringCheckView,
+  TagView,
+  Result,
+  AlertActionType,
+  AlertRuleView,
+} from '@showtrak/protocol';
 import { IsArray, IsObject } from '../Utils/guards';
 import type { AlertRuleWriteRow } from '../DB/repositories/alert-rules';
 
@@ -25,7 +32,7 @@ import {
   toRowTriggerTypes,
 } from './serialization';
 import { isScopeMatch, triggerMatches, describeContext } from './evaluation';
-import type { AlertContext, AlertRule } from './evaluation';
+import type { AlertContext } from './evaluation';
 import { RecordEdit, RecordUpdate } from '../AuditLog/edits';
 import { Entity, Line, Value } from '../AuditLog/message';
 import { DiffFields, type FieldSpec } from '../AuditLog/diff';
@@ -98,14 +105,14 @@ type ClientEventHandler = (Client: AlertEntityLike, Payload?: unknown) => Promis
 // order; the assertion is safe because every member is populated at module load.
 interface AlertsManagerType {
   Init(): Promise<void>;
-  GetAll(): Promise<Result<AlertRule[]>>;
-  Get(RuleID: unknown): Promise<Result<AlertRule>>;
+  GetAll(): Promise<Result<AlertRuleView[]>>;
+  Get(RuleID: unknown): Promise<Result<AlertRuleView>>;
   GetTriggers(): AlertTriggerType[];
-  GetActionTypes(): ReturnType<typeof AlertActions.GetAll>;
-  Create(Payload: AlertRuleCreatePayload): Promise<Result<AlertRule>>;
-  Update(RuleID: unknown, Payload: AlertRuleUpdatePayload): Promise<Result<AlertRule>>;
+  GetActionTypes(): AlertActionType[];
+  Create(Payload: AlertRuleCreatePayload): Promise<Result<AlertRuleView>>;
+  Update(RuleID: unknown, Payload: AlertRuleUpdatePayload): Promise<Result<AlertRuleView>>;
   Delete(RuleID: unknown): Promise<Result<boolean>>;
-  SetEnabled(RuleID: unknown, Enabled: unknown): Promise<Result<AlertRule>>;
+  SetEnabled(RuleID: unknown, Enabled: unknown): Promise<Result<AlertRuleView>>;
   GetActionsEnabled(): boolean;
   SetActionsEnabled(Enabled: unknown): boolean;
   HandleUSBDeviceConnected: ClientEventHandler;
@@ -138,7 +145,7 @@ const HistoryRepo = CreateAlertHistoryRepository(DB);
 const Manager = {} as AlertsManagerType;
 
 let Initialized = false;
-let RuleList: AlertRule[] = [];
+let RuleList: AlertRuleView[] = [];
 // Last known online/degraded state per entity. Alerts fire on TRANSITIONS
 // between two observed states, so the absence of a key is meaningful: it means
 // this process has never seen the entity, and the first snapshot establishes
@@ -256,7 +263,7 @@ function historyContext(Context: AlertContext) {
 }
 
 async function writeHistory(
-  Rule: AlertRule,
+  Rule: AlertRuleView,
   Context: AlertContext,
   Results: AlertActionResultSummary[]
 ) {
@@ -275,7 +282,7 @@ async function writeHistory(
   if (Err) Logger.error('Failed to persist alert history', Err);
 }
 
-async function executeRule(Rule: AlertRule, Context: AlertContext) {
+async function executeRule(Rule: AlertRuleView, Context: AlertContext) {
   if (!AlertActionsEnabled) return;
 
   const Actions = Array.isArray(Rule.Actions) ? Rule.Actions : [];
@@ -350,14 +357,14 @@ async function evaluateAgainstRules(Context: AlertContext) {
 // A rule is reported in the editor's terms. Action settings are never shown:
 // webhook URLs and tokens live there, so a settings edit reads as "Changed".
 
-function TriggerNames(Rule: AlertRule): string | null {
+function TriggerNames(Rule: AlertRuleView): string | null {
   const Names = (Rule.TriggerTypes || []).map(
     (ID) => TRIGGER_CATALOG.find((Entry) => Entry.ID === ID)?.Name || ID
   );
   return Names.length ? Names.join(', ') : null;
 }
 
-function ActionNames(Rule: AlertRule): string | null {
+function ActionNames(Rule: AlertRuleView): string | null {
   const Names = (Rule.Actions || []).map(
     (Action) => AlertActions.Get(Action.Type)?.Name || Action.Type
   );
@@ -368,7 +375,7 @@ function Counted(Count: number, Noun: string): string | null {
   return Count ? `${Count} ${Noun}${Count === 1 ? '' : 's'}` : null;
 }
 
-function ScopeSummary(Rule: AlertRule): string {
+function ScopeSummary(Rule: AlertRuleView): string {
   const Scope = Rule.Scope || { Workspace: false, Groups: [], Clients: [], Tags: [] };
   if (Scope.Workspace) return 'Everything';
   const Parts = [
@@ -381,7 +388,7 @@ function ScopeSummary(Rule: AlertRule): string {
 
 // Settings are compared whole and reported as changed: they are JSON, and the
 // action settings hold credentials.
-const RULE_AUDIT_FIELDS: readonly FieldSpec<AlertRule>[] = [
+const RULE_AUDIT_FIELDS: readonly FieldSpec<AlertRuleView>[] = [
   { Key: 'Title', Label: 'Rule Title' },
   { Key: 'Enabled', Label: 'Enabled' },
   { Key: 'TriggerTypes', Label: 'Triggers', Format: (_Value, Rule) => TriggerNames(Rule) },
@@ -400,7 +407,7 @@ const RULE_AUDIT_FIELDS: readonly FieldSpec<AlertRule>[] = [
   },
 ];
 
-function RuleChanges(Before: AlertRule, After: AlertRule) {
+function RuleChanges(Before: AlertRuleView, After: AlertRuleView) {
   const Changes = DiffFields(Before, After, RULE_AUDIT_FIELDS);
   // A new set of actions changes their settings too; one line says it.
   const Fields = new Set(Changes.map((Change) => Change.Field));
@@ -420,7 +427,7 @@ function RuleChanges(Before: AlertRule, After: AlertRule) {
   return Kept;
 }
 
-function RuleAuditBase(Rule: AlertRule) {
+function RuleAuditBase(Rule: AlertRuleView) {
   return { EntityType: 'alert-rule' as const, EntityID: Rule.RuleID, EntityName: Rule.Title };
 }
 
@@ -535,7 +542,7 @@ Manager.Update = async (RuleID: unknown, Payload: AlertRuleUpdatePayload) => {
     ...Existing,
     ...Next,
     UpdatedAt,
-  } as AlertRule;
+  } as AlertRuleView;
 
   RuleList = RuleList.map((Rule) => (Rule.RuleID === ID ? Updated : Rule));
   BroadcastManager.emit('AlertRuleListChanged');

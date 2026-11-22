@@ -5,7 +5,7 @@
 
 import { RPC } from '../rpc';
 import { Manager as MonitoringTargetManager } from '../../Modules/MonitoringTargetManager';
-import type { LiveLevelChange } from '../../Modules/MonitoringMethods/types';
+import type { MonitorLiveLevelChange, MonitorLiveLevelResult } from '@showtrak/protocol';
 import {
   CloseMonitorLiveLevels,
   CloseMonitorTileLevels,
@@ -50,7 +50,7 @@ function Track(Sender: LiveSender): void {
 }
 
 // Exactly one of a fader level (finite number, or null for −∞) or a mute.
-function ParseChange(Change: unknown): LiveLevelChange | null {
+function ParseChange(Change: unknown): MonitorLiveLevelChange | null {
   if (!Change || typeof Change !== 'object') return null;
   const C = Change as Record<string, unknown>;
   const HasFader = Object.prototype.hasOwnProperty.call(C, 'Fader');
@@ -89,7 +89,7 @@ function register(): void {
       ChannelID: unknown,
       Change: unknown,
       Final: unknown
-    ) => {
+    ): Promise<MonitorLiveLevelResult> => {
       const Change_ = ParseChange(Change);
       if (
         !Number.isInteger(Number(TargetID)) ||

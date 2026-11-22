@@ -44,6 +44,7 @@ import type {
   MonitoringSettingField,
   MonitoringTargetLike,
 } from './types';
+import type { MonitorLiveLevelChange, MonitorLiveLevelResult } from '@showtrak/protocol';
 
 const ID = 'tascam-mx8a';
 const DEFAULT_PORT = 54726;
@@ -1516,8 +1517,8 @@ function StartLiveLevels(
 async function SetLiveLevel(
   Target: MonitoringTargetLike,
   ChannelID: string,
-  Change: { Fader?: number | null; Muted?: boolean }
-): Promise<MonitoringActionResult> {
+  Change: MonitorLiveLevelChange
+): Promise<MonitorLiveLevelResult> {
   const Index = ID_INDEX.get(String(ChannelID));
   if (Index == null) return { Success: false, Error: `Unknown channel "${String(ChannelID)}"` };
   const Channel = METER_CHANNELS[Index]!;

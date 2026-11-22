@@ -24,9 +24,10 @@ import type {
   MonitoringSettingOptions,
   MonitoringCheckView,
   MonitoringTargetView,
+  MonitoringTileWidgetView,
 } from '@showtrak/protocol';
 
-import type { MonitoringResult, MonitoringTileWidget } from '../MonitoringMethods/types';
+import type { MonitoringResult } from '../MonitoringMethods/types';
 
 import {
   ParseSettings,
@@ -430,7 +431,7 @@ class MonitoringTarget {
 
   // A tile widget is drawn only when its check is the monitor's only one: the
   // tile has room for one, and with several checks whose would it be?
-  TileWidget(): (MonitoringTileWidget & { CheckID: number }) | null {
+  TileWidget(): MonitoringTileWidgetView | null {
     if (this.Checks.length !== 1) return null;
     const Only = this.Checks[0]!;
     const Widget = MonitoringMethods.GetTileWidget(Only.Method, Only, Only.LastResult);
