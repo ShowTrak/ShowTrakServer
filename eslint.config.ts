@@ -98,7 +98,6 @@ export default defineConfig([
       parserOptions: {
         project: [
           './tsconfig.json',
-          './tsconfig.common.json',
           './tsconfig.renderer.json',
           './tsconfig.preloader.json',
           './tsconfig.service-worker.json',
