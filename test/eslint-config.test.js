@@ -8,7 +8,7 @@ const { ESLint } = require('eslint');
 // program in the repo, and shared/ (ShowTrak-Protocol, which lints itself)
 // stays out of them.
 
-const ROOT = path.join(__dirname, '..');
+const ROOT = path.resolve(__dirname, '..');
 const UNSAFE_RULES = [
   'no-unsafe-argument',
   'no-unsafe-assignment',
@@ -49,7 +49,9 @@ test('every TypeScript program is linted against implicit any, with type informa
     }
     assert.equal(config.rules['@typescript-eslint/no-explicit-any'][0], 2);
     assert.deepEqual(config.languageOptions.parserOptions.project, PROGRAMS, file);
-    assert.equal(config.languageOptions.parserOptions.tsconfigRootDir, ROOT);
+    // Resolved: ESLint hands the config's import.meta.dirname over with forward
+    // slashes on Windows (D:/a/...), which is the same folder as D:\a\....
+    assert.equal(path.resolve(config.languageOptions.parserOptions.tsconfigRootDir), ROOT);
   }
 });
 
