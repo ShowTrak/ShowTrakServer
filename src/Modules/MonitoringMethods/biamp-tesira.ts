@@ -49,6 +49,7 @@ import type {
   MonitoringSettingField,
   MonitoringTargetLike,
 } from './types';
+import { AddressPortError } from './_target-checks';
 
 const ID = 'biamp-tesira';
 const DEFAULT_PORT = 23;
@@ -1080,10 +1081,8 @@ function EvaluateHealth(Snapshot: TesiraSnapshot, Options: HealthOptions): strin
 
 async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   const Config = ParseConfig(Target);
-  if (!Config.Address) return { Success: false, Error: 'No address configured' };
-  if (Config.Port < 1 || Config.Port > 65535) {
-    return { Success: false, Error: `Invalid port: ${Config.Port}` };
-  }
+  const AddressError = AddressPortError(Config);
+  if (AddressError) return { Success: false, Error: AddressError };
   const CredentialError = CheckCredentials(Config);
   if (CredentialError) return { Success: false, Error: CredentialError };
   const Options = ParseHealthOptions(Target);
@@ -1288,10 +1287,8 @@ async function RunAction(
   Params: Record<string, unknown>
 ): Promise<MonitoringActionResult> {
   const Config = ParseConfig(Target);
-  if (!Config.Address) return { Success: false, Error: 'No address configured' };
-  if (Config.Port < 1 || Config.Port > 65535) {
-    return { Success: false, Error: `Invalid port: ${Config.Port}` };
-  }
+  const AddressError = AddressPortError(Config);
+  if (AddressError) return { Success: false, Error: AddressError };
   const CredentialError = CheckCredentials(Config);
   if (CredentialError) return { Success: false, Error: CredentialError };
 

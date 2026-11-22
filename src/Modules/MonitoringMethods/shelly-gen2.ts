@@ -61,6 +61,7 @@ import type {
   MonitoringTargetLike,
 } from './types';
 import { CachedLookup, RequestHostname } from './_dns-cache';
+import { AddressPortError } from './_target-checks';
 
 const ID = 'shelly-gen2';
 
@@ -821,10 +822,8 @@ export function EvaluateConditions(R: ShellyReadings, C: ShellyConditions): stri
 
 async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   const Config = ParseConfig(Target);
-  if (!Config.Address) return { Success: false, Error: 'No address configured' };
-  if (Config.Port < 1 || Config.Port > 65535) {
-    return { Success: false, Error: `Invalid port: ${Config.Port}` };
-  }
+  const AddressError = AddressPortError(Config);
+  if (AddressError) return { Success: false, Error: AddressError };
   const Started = Date.now();
   const Deadline = Started + Config.TimeoutMs;
 
@@ -943,10 +942,8 @@ async function RunAction(
   Params: Record<string, unknown>
 ): Promise<MonitoringActionResult> {
   const Config = ParseConfig(Target);
-  if (!Config.Address) return { Success: false, Error: 'No address configured' };
-  if (Config.Port < 1 || Config.Port > 65535) {
-    return { Success: false, Error: `Invalid port: ${Config.Port}` };
-  }
+  const AddressError = AddressPortError(Config);
+  if (AddressError) return { Success: false, Error: AddressError };
   if (!Actions.some((A) => A.ID === ActionID)) {
     return { Success: false, Error: `Unknown Shelly action "${ActionID}"` };
   }

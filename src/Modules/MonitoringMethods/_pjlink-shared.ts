@@ -27,6 +27,7 @@ import { Manager as CacheManager } from '../CacheManager';
 import { ReplyQueue, RunTcpSession } from './_tcp-session';
 import { Esc, Rows, TextRow, Row, Note, FormatLatency } from './debug';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
+import { AddressPortError } from './_target-checks';
 
 export const DEFAULT_PJLINK_PORT = 4352;
 
@@ -704,10 +705,8 @@ export async function RunPJLinkProbe(
   Target: MonitoringTargetLike
 ): Promise<{ Result: MonitoringResult } | { Ctx: PJLinkContext }> {
   const Config = ParsePJLinkConfig(Target);
-  if (!Config.Address) return { Result: { Success: false, Error: 'No address configured' } };
-  if (Config.Port < 1 || Config.Port > 65535) {
-    return { Result: { Success: false, Error: `Invalid port: ${Config.Port}` } };
-  }
+  const AddressError = AddressPortError(Config);
+  if (AddressError) return { Result: { Success: false, Error: AddressError } };
 
   const Snapshot = (await PJLINK_QUERY_CACHE.GetOrCreate(
     BuildQueryCacheKey(Config.Address, Config.Port, Config.Password, Config.TimeoutMs),

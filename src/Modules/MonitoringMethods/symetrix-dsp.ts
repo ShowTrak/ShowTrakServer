@@ -48,6 +48,7 @@ import type {
   MonitoringSettingField,
   MonitoringTargetLike,
 } from './types';
+import { AddressPortError } from './_target-checks';
 
 const ID = 'symetrix-dsp';
 const DEFAULT_PORT = 48631;
@@ -528,10 +529,8 @@ function EvaluateHealth(Snapshot: SymetrixSnapshot, Options: HealthOptions): str
 
 async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   const Config = ParseConfig(Target);
-  if (!Config.Address) return { Success: false, Error: 'No address configured' };
-  if (Config.Port < 1 || Config.Port > 65535) {
-    return { Success: false, Error: `Invalid port: ${Config.Port}` };
-  }
+  const AddressError = AddressPortError(Config);
+  if (AddressError) return { Success: false, Error: AddressError };
   const Options = ParseHealthOptions(Target);
   const Numbers = Array.from(new Set(Options.Assertions.map((A) => A.Number)));
 
@@ -726,10 +725,8 @@ async function RunAction(
   Params: Record<string, unknown>
 ): Promise<MonitoringActionResult> {
   const Config = ParseConfig(Target);
-  if (!Config.Address) return { Success: false, Error: 'No address configured' };
-  if (Config.Port < 1 || Config.Port > 65535) {
-    return { Success: false, Error: `Invalid port: ${Config.Port}` };
-  }
+  const AddressError = AddressPortError(Config);
+  if (AddressError) return { Success: false, Error: AddressError };
   const Built = BuildActionCommand(ActionID, Params || {});
   if (!Built.Ok) return { Success: false, Error: Built.Error };
 

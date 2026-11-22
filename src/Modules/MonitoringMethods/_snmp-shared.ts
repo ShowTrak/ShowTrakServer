@@ -18,6 +18,7 @@ import snmp, {
 } from 'net-snmp';
 import type { SnmpSession } from './_snmp-ups-shared';
 import type { MonitoringSettingField, MonitoringSettingVisibleWhen } from './types';
+import { AddressPortError } from './_target-checks';
 
 // Editor value -> net-snmp AuthProtocol. 'none' means no message authentication
 // (which, per SNMPv3, also forces no privacy), i.e. the noAuthNoPriv level.
@@ -262,8 +263,8 @@ export function ParseSnmpCredentials(
 
 // Why the connection cannot be attempted, or null when it can.
 export function SnmpConnectionError(Config: SnmpConnection): string | null {
-  if (!Config.Address) return 'No address configured';
-  if (Config.Port < 1 || Config.Port > 65535) return `Invalid port: ${Config.Port}`;
+  const AddressError = AddressPortError(Config);
+  if (AddressError) return AddressError;
   if (Config.Version === '3') return ValidateV3Credentials(Config);
   return null;
 }

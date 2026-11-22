@@ -62,6 +62,7 @@ import type {
   MonitoringSettingField,
   MonitoringTargetLike,
 } from './types';
+import { AddressPortError } from './_target-checks';
 
 const ID = 'allen-heath-console';
 const DEFAULT_PORT = 51325;
@@ -634,8 +635,8 @@ function EvaluateHealth(Snapshot: AhSnapshot, Options: HealthOptions, Family: Ah
 
 // Shared by Run and RunAction: the reason a config cannot be used, or null.
 function ValidateConfig(Config: AhConfig): string | null {
-  if (!Config.Address) return 'No address configured';
-  if (Config.Port < 1 || Config.Port > 65535) return `Invalid port: ${Config.Port}`;
+  const AddressError = AddressPortError(Config);
+  if (AddressError) return AddressError;
   const MaxChannel = MaxBaseChannel(Config.Family);
   if (Config.BaseChannel < 0 || Config.BaseChannel + 1 > MaxChannel) {
     return `Base MIDI channel must be 1 to ${MaxChannel} on ${FAMILY_LABELS[Config.Family]}`;

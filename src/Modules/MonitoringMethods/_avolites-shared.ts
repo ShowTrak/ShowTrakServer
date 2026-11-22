@@ -20,6 +20,7 @@ import { Manager as CacheManager } from '../CacheManager';
 import { PerformHttpRequest } from './_http-shared';
 import { Rows, TextRow, Row, Note, FormatLatency, Esc } from './debug';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
+import { AddressPortError } from './_target-checks';
 
 export const DEFAULT_AVOLITES_PORT = 4430;
 
@@ -188,10 +189,8 @@ export async function RunAvolitesProbe(
   Target: MonitoringTargetLike
 ): Promise<{ Result: MonitoringResult } | { Ctx: AvolitesContext }> {
   const Config = ParseAvolitesConfig(Target);
-  if (!Config.Address) return { Result: { Success: false, Error: 'No address configured' } };
-  if (Config.Port < 1 || Config.Port > 65535) {
-    return { Result: { Success: false, Error: `Invalid port: ${Config.Port}` } };
-  }
+  const AddressError = AddressPortError(Config);
+  if (AddressError) return { Result: { Success: false, Error: AddressError } };
 
   const Snapshot = (await TITAN_QUERY_CACHE.GetOrCreate(
     BuildTitanQueryCacheKey(Config.Address, Config.Port, Config.TimeoutMs),

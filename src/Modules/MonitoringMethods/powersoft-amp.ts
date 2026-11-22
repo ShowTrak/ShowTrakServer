@@ -73,6 +73,7 @@ import type {
   MonitoringSettingField,
   MonitoringTargetLike,
 } from './types';
+import { AddressPortError } from './_target-checks';
 
 const ID = 'powersoft-amp';
 
@@ -836,10 +837,8 @@ async function RunAction(
   Params: Record<string, unknown>
 ): Promise<MonitoringActionResult> {
   const Config = ParseConfig(Target);
-  if (!Config.Address) return { Success: false, Error: 'No address configured' };
-  if (Config.Port < 1 || Config.Port > 65535) {
-    return { Success: false, Error: `Invalid port: ${Config.Port}` };
-  }
+  const AddressError = AddressPortError(Config);
+  if (AddressError) return { Success: false, Error: AddressError };
   const BudgetMs = Math.max(500, Config.TimeoutMs | 0);
   const Deadline = Date.now() + BudgetMs;
 
@@ -948,10 +947,8 @@ function DescribeAction(ActionID: string, Params: Record<string, unknown>): stri
 
 async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   const Config = ParseConfig(Target);
-  if (!Config.Address) return { Success: false, Error: 'No address configured' };
-  if (Config.Port < 1 || Config.Port > 65535) {
-    return { Success: false, Error: `Invalid port: ${Config.Port}` };
-  }
+  const AddressError = AddressPortError(Config);
+  if (AddressError) return { Success: false, Error: AddressError };
   const Options = ParseHealthOptions(Target);
 
   const Outcome = await QueryPowersoft(Config, {

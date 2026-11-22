@@ -45,6 +45,7 @@ import type {
   MonitoringTargetLike,
 } from './types';
 import type { MonitorLiveLevelChange, MonitorLiveLevelResult } from '@showtrak/protocol';
+import { AddressPortError } from './_target-checks';
 
 const ID = 'tascam-mx8a';
 const DEFAULT_PORT = 54726;
@@ -872,10 +873,8 @@ function EvaluateHealth(Snapshot: MxSnapshot, Options: HealthOptions): string[] 
 
 async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   const Config = ParseConfig(Target);
-  if (!Config.Address) return { Success: false, Error: 'No address configured' };
-  if (Config.Port < 1 || Config.Port > 65535) {
-    return { Success: false, Error: `Invalid port: ${Config.Port}` };
-  }
+  const AddressError = AddressPortError(Config);
+  if (AddressError) return { Success: false, Error: AddressError };
   if (/[\r\n]/.test(Config.Password)) {
     return { Success: false, Error: 'The password cannot contain line breaks' };
   }
@@ -1794,10 +1793,8 @@ async function RunAction(
   Params: Record<string, unknown>
 ): Promise<MonitoringActionResult> {
   const Config = ParseConfig(Target);
-  if (!Config.Address) return { Success: false, Error: 'No address configured' };
-  if (Config.Port < 1 || Config.Port > 65535) {
-    return { Success: false, Error: `Invalid port: ${Config.Port}` };
-  }
+  const AddressError = AddressPortError(Config);
+  if (AddressError) return { Success: false, Error: AddressError };
   if (/[\r\n]/.test(Config.Password)) {
     return { Success: false, Error: 'The password cannot contain line breaks' };
   }

@@ -58,6 +58,7 @@ import type {
   MonitoringSettingField,
   MonitoringTargetLike,
 } from './types';
+import { AddressPortError } from './_target-checks';
 
 const ID = 'behringer-wing';
 
@@ -241,9 +242,7 @@ function ParseConfig(Target: MonitoringTargetLike): WingConfig {
 
 // Shared by Run and RunAction: the reason a config cannot be used, or null.
 function ValidateConfig(Config: WingConfig): string | null {
-  if (!Config.Address) return 'No address configured';
-  if (Config.Port < 1 || Config.Port > 65535) return `Invalid port: ${Config.Port}`;
-  return null;
+  return AddressPortError(Config);
 }
 
 // --- Strips -------------------------------------------------------------------

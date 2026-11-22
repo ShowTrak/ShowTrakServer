@@ -33,6 +33,7 @@ import { ReplyQueue, RunTcpSession } from './_tcp-session';
 import { FormatLatency, Note, Pill, Row, Rows, TextRow, HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
+import { AddressPortError } from './_target-checks';
 
 const ID = 'yamaha-console';
 const DEFAULT_PORT = 49280;
@@ -540,10 +541,8 @@ function EvaluateHealth(Snapshot: ConsoleSnapshot, Options: HealthOptions): stri
 
 async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   const Config = ParseConfig(Target);
-  if (!Config.Address) return { Success: false, Error: 'No address configured' };
-  if (Config.Port < 1 || Config.Port > 65535) {
-    return { Success: false, Error: `Invalid port: ${Config.Port}` };
-  }
+  const AddressError = AddressPortError(Config);
+  if (AddressError) return { Success: false, Error: AddressError };
   const Options = ParseHealthOptions(Target);
 
   const Probe = await QueryConsole(Config, {

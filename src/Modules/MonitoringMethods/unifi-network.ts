@@ -51,6 +51,7 @@ import type {
   MonitoringSettingOptions,
   MonitoringTargetLike,
 } from './types';
+import { AddressPortError } from './_target-checks';
 
 const ID = 'unifi-network';
 
@@ -555,10 +556,8 @@ async function GetAll(
 
 async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   const Config = ParseConfig(Target);
-  if (!Config.Address) return { Success: false, Error: 'No address configured' };
-  if (Config.Port < 1 || Config.Port > 65535) {
-    return { Success: false, Error: `Invalid port: ${Config.Port}` };
-  }
+  const AddressError = AddressPortError(Config);
+  if (AddressError) return { Success: false, Error: AddressError };
   if (!Config.ApiKey) return { Success: false, Error: 'No API key configured' };
   if (Config.Monitored.length > MAX_MONITORED) {
     return { Success: false, Error: `Too many monitored devices (at most ${MAX_MONITORED})` };

@@ -32,6 +32,7 @@ import { EncodeOscMessage, ParseOscPacket } from './_osc-shared';
 import type { OscMessage } from './_osc-shared';
 import { DEFAULT_MONITORING_INTERVAL_MS, MONITORING_INTEREST_TTL_MS } from '../Config/constants';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
+import { AddressPortError } from './_target-checks';
 
 const ID = 'greengo';
 
@@ -486,10 +487,8 @@ function SnapshotSource(Source: GreenGoSource): GreenGoSource {
 
 async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   const Config = ParseConfig(Target);
-  if (!Config.Address) return { Success: false, Error: 'No address configured' };
-  if (Config.Port < 1 || Config.Port > 65535) {
-    return { Success: false, Error: `Invalid port: ${Config.Port}` };
-  }
+  const AddressError = AddressPortError(Config);
+  if (AddressError) return { Success: false, Error: AddressError };
   const Address = NormalizeAddress(Config.Address);
 
   const Listener = await Receiver.Observe(Config.Port);

@@ -92,6 +92,7 @@ import type {
   MonitoringTargetLike,
 } from './types';
 import { CachedLookup } from './_dns-cache';
+import { AddressPortError } from './_target-checks';
 
 const ID = 'ptz-camera';
 const DEFAULT_HTTP_PORT = 80;
@@ -898,10 +899,8 @@ function SnapshotKey(Config: PtzConfig): string {
 
 async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   const Config = ParseConfig(Target);
-  if (!Config.Address) return { Success: false, Error: 'No address configured' };
-  if (Config.Port < 1 || Config.Port > 65535) {
-    return { Success: false, Error: `Invalid port: ${Config.Port}` };
-  }
+  const AddressError = AddressPortError(Config);
+  if (AddressError) return { Success: false, Error: AddressError };
 
   const Snap = (await SNAPSHOT_CACHE.GetOrCreate(
     SnapshotKey(Config),
@@ -1086,10 +1085,8 @@ async function RunAction(
   Params: Record<string, unknown> = {}
 ): Promise<MonitoringActionResult> {
   const Config = ParseConfig(Target);
-  if (!Config.Address) return { Success: false, Error: 'No address configured' };
-  if (Config.Port < 1 || Config.Port > 65535) {
-    return { Success: false, Error: `Invalid port: ${Config.Port}` };
-  }
+  const AddressError = AddressPortError(Config);
+  if (AddressError) return { Success: false, Error: AddressError };
   const Sony = Config.Protocol === 'sony';
 
   if (ActionID === 'power.on' || ActionID === 'power.standby') {

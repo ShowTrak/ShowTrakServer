@@ -77,6 +77,7 @@ import type {
   MonitoringTargetLike,
 } from './types';
 import { CachedLookup } from './_dns-cache';
+import { AddressPortError } from './_target-checks';
 
 const ID = 'aja-device';
 const DEFAULT_PORT = 80;
@@ -911,10 +912,8 @@ const SnapshotKey = (Config: AjaConfig) =>
 
 async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   const Config = ParseConfig(Target);
-  if (!Config.Address) return { Success: false, Error: 'No address configured' };
-  if (Config.Port < 1 || Config.Port > 65535) {
-    return { Success: false, Error: `Invalid port: ${Config.Port}` };
-  }
+  const AddressError = AddressPortError(Config);
+  if (AddressError) return { Success: false, Error: AddressError };
 
   const Snap = (await SNAPSHOT_CACHE.GetOrCreate(
     SnapshotKey(Config),
@@ -1027,10 +1026,8 @@ async function RunAction(
   ActionID: string
 ): Promise<MonitoringActionResult> {
   const Config = ParseConfig(Target);
-  if (!Config.Address) return { Success: false, Error: 'No address configured' };
-  if (Config.Port < 1 || Config.Port > 65535) {
-    return { Success: false, Error: `Invalid port: ${Config.Port}` };
-  }
+  const AddressError = AddressPortError(Config);
+  if (AddressError) return { Success: false, Error: AddressError };
   const Spec = ACTION_COMMANDS[ActionID];
   if (!Spec) return { Success: false, Error: `Unknown AJA action "${ActionID}"` };
 

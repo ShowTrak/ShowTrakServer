@@ -73,6 +73,7 @@ import type {
   MonitoringSettingField,
   MonitoringTargetLike,
 } from './types';
+import { AddressPortError } from './_target-checks';
 
 const ID = 'netgear-av';
 const DEFAULT_PORT = 8443;
@@ -804,10 +805,8 @@ function EvaluateTemperature(Sensors: NetgearTemperatureSensor[]): string[] {
 
 async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   const Config = ParseConfig(Target);
-  if (!Config.Address) return { Success: false, Error: 'No address configured' };
-  if (Config.Port < 1 || Config.Port > 65535) {
-    return { Success: false, Error: `Invalid port: ${Config.Port}` };
-  }
+  const AddressError = AddressPortError(Config);
+  if (AddressError) return { Success: false, Error: AddressError };
   const Base = BuildSwitchUrl(Config.Address, 'https', Config.Port);
   if (!Base) return { Success: false, Error: 'Invalid address' };
   if (!Config.Password) {

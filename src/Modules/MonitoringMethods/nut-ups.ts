@@ -40,6 +40,7 @@ import type {
   MonitoringSettingField,
   MonitoringTargetLike,
 } from './types';
+import { AddressPortError } from './_target-checks';
 
 const ID = 'nut-ups';
 
@@ -349,10 +350,8 @@ async function RunAction(
   ActionID: string
 ): Promise<MonitoringActionResult> {
   const Config = ParseNutConfig(Target);
-  if (!Config.Address) return { Success: false, Error: 'No address configured' };
-  if (Config.Port < 1 || Config.Port > 65535) {
-    return { Success: false, Error: `Invalid port: ${Config.Port}` };
-  }
+  const AddressError = AddressPortError(Config);
+  if (AddressError) return { Success: false, Error: AddressError };
   if (!Config.UpsName) return { Success: false, Error: 'No UPS name configured' };
 
   const Spec = ACTION_COMMANDS[ActionID];

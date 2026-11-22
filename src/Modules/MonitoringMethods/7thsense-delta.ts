@@ -71,6 +71,7 @@ import { Card, Esc, FormatLatency, Note, Pill, Row, Rows, TextRow, HealthPill } 
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 import { CachedLookup } from './_dns-cache';
+import { AddressPortError } from './_target-checks';
 
 const ID = '7thsense-delta';
 const DEFAULT_PORT = 23;
@@ -1017,10 +1018,8 @@ function EvaluateHealth(
 
 async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   const Config = ParseConfig(Target);
-  if (!Config.Address) return { Success: false, Error: 'No address configured' };
-  if (Config.Port < 1 || Config.Port > 65535) {
-    return { Success: false, Error: `Invalid port: ${Config.Port}` };
-  }
+  const AddressError = AddressPortError(Config);
+  if (AddressError) return { Success: false, Error: AddressError };
   const Options = ParseHealthOptions(Target);
   const HttpPortValid = Config.HttpPort >= 1 && Config.HttpPort <= 65535;
   const Address = Config.Address.toLowerCase();

@@ -18,6 +18,7 @@
 import { Esc, Rows, TextRow, Row, Note, FormatLatency } from './debug';
 import { ReplyQueue, RunTcpSession } from './_tcp-session';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
+import { AddressPortError } from './_target-checks';
 
 export const DEFAULT_NUT_PORT = 3493;
 
@@ -430,10 +431,8 @@ export async function RunNutProbe(
   Vars: string[]
 ): Promise<{ Result: MonitoringResult } | { Ctx: NutContext }> {
   const Config = ParseNutConfig(Target);
-  if (!Config.Address) return { Result: { Success: false, Error: 'No address configured' } };
-  if (Config.Port < 1 || Config.Port > 65535) {
-    return { Result: { Success: false, Error: `Invalid port: ${Config.Port}` } };
-  }
+  const AddressError = AddressPortError(Config);
+  if (AddressError) return { Result: { Success: false, Error: AddressError } };
   if (!Config.UpsName) return { Result: { Success: false, Error: 'No UPS name configured' } };
 
   const Probe = await ProbeNut(

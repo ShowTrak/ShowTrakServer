@@ -35,6 +35,7 @@ import {
 } from './_snmp-shared';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
+import { AddressPortError } from './_target-checks';
 
 const ID = 'snmp-ups-v3';
 
@@ -66,10 +67,8 @@ function ParseConfig(Target: MonitoringTargetLike): V3Config {
 
 async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   const Config = ParseConfig(Target);
-  if (!Config.Address) return { Success: false, Error: 'No address configured' };
-  if (Config.Port < 1 || Config.Port > 65535) {
-    return { Success: false, Error: `Invalid port: ${Config.Port}` };
-  }
+  const AddressError = AddressPortError(Config);
+  if (AddressError) return { Success: false, Error: AddressError };
   const CredentialError = ValidateV3Credentials(Config);
   if (CredentialError) return { Success: false, Error: CredentialError };
 

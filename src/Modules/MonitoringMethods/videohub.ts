@@ -57,6 +57,7 @@ import {
 import { Card, Esc, FormatLatency, Note, Pill, Row, Rows, TextRow, HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
+import { AddressPortError } from './_target-checks';
 
 const ID = 'videohub';
 const DEFAULT_PORT = 9990;
@@ -571,10 +572,8 @@ function RoutingTable(Snap: VideohubSnapshot): RouteRow[] {
 
 async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   const Config = ParseConfig(Target);
-  if (!Config.Address) return { Success: false, Error: 'No address configured' };
-  if (Config.Port < 1 || Config.Port > 65535) {
-    return { Success: false, Error: `Invalid port: ${Config.Port}` };
-  }
+  const AddressError = AddressPortError(Config);
+  if (AddressError) return { Success: false, Error: AddressError };
 
   const Snap = (await SNAPSHOT_CACHE.GetOrCreate(
     `${Config.Address.toLowerCase()}|${Config.Port}|${Config.TimeoutMs}`,

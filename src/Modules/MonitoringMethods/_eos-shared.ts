@@ -29,6 +29,7 @@ import { EncodeOscTcp, DecodeOscStream, type OscFraming } from './_osc-shared';
 import { ErrorMessage, RunTcpSession } from './_tcp-session';
 import { Esc, Rows, TextRow, Row, Note, FormatLatency } from './debug';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
+import { AddressPortError } from './_target-checks';
 
 export const DEFAULT_EOS_PORT = 3032;
 
@@ -255,10 +256,8 @@ export async function RunEosProbe(
   Target: MonitoringTargetLike
 ): Promise<{ Result: MonitoringResult } | { Ctx: EosContext }> {
   const Config = ParseEosConfig(Target);
-  if (!Config.Address) return { Result: { Success: false, Error: 'No address configured' } };
-  if (Config.Port < 1 || Config.Port > 65535) {
-    return { Result: { Success: false, Error: `Invalid port: ${Config.Port}` } };
-  }
+  const AddressError = AddressPortError(Config);
+  if (AddressError) return { Result: { Success: false, Error: AddressError } };
 
   const Snapshot = (await EOS_QUERY_CACHE.GetOrCreate(
     BuildEosQueryCacheKey(

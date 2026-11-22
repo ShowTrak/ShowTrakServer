@@ -21,6 +21,7 @@ import { Manager as CacheManager } from '../CacheManager';
 import { RunTcpSession, type TcpSession } from './_tcp-session';
 import { Esc, Rows, TextRow, Row, Note, FormatLatency } from './debug';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
+import { AddressPortError } from './_target-checks';
 
 export const DEFAULT_MA2_PORT = 30000;
 
@@ -292,10 +293,8 @@ export async function RunMa2Probe(
   Target: MonitoringTargetLike
 ): Promise<{ Result: MonitoringResult } | { Ctx: Ma2Context }> {
   const Config = ParseMa2Config(Target);
-  if (!Config.Address) return { Result: { Success: false, Error: 'No address configured' } };
-  if (Config.Port < 1 || Config.Port > 65535) {
-    return { Result: { Success: false, Error: `Invalid port: ${Config.Port}` } };
-  }
+  const AddressError = AddressPortError(Config);
+  if (AddressError) return { Result: { Success: false, Error: AddressError } };
 
   const Snapshot = (await MA2_QUERY_CACHE.GetOrCreate(
     BuildMa2QueryCacheKey(

@@ -43,6 +43,7 @@ import {
 } from './_videoproc-http-shared';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
+import { AddressPortError } from './_target-checks';
 
 const ID = 'clearcom-freespeak-ii';
 
@@ -119,10 +120,8 @@ function IsAntenna(Record: Record<string, unknown>): boolean {
 
 async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   const Config = ParseConfig(Target);
-  if (!Config.Address) return { Success: false, Error: 'No address configured' };
-  if (Config.Port < 1 || Config.Port > 65535) {
-    return { Success: false, Error: `Invalid port: ${Config.Port}` };
-  }
+  const AddressError = AddressPortError(Config);
+  if (AddressError) return { Success: false, Error: AddressError };
   const Base = BuildBaseUrl(Config.Address, 'http', Config.Port);
   if (!Base) return { Success: false, Error: 'Invalid address' };
 
