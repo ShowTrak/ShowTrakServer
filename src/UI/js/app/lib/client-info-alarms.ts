@@ -15,7 +15,7 @@
 // clients only have Status to show an alarm on.
 import { FreeKioskSectionTab } from './client-info-tabs';
 import type { ClientInfoTabKey } from './client-info-tabs';
-import { ArrayOrEmpty } from './guards';
+import { ArrayOrEmpty } from '@showtrak/protocol/common';
 
 export const CLIENT_WARNING_TABS: Readonly<Record<string, ClientInfoTabKey>> = {
   // USB_WARNINGS

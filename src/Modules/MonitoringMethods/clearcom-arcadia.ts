@@ -35,13 +35,13 @@ import {
 } from './_clearcom-shared';
 import {
   BuildBaseUrl,
-  IsObject,
   NumOrNull,
   RequestJson,
   StrOrNull,
   TimeoutOf,
   WithPath,
 } from './_videoproc-http-shared';
+import { IsRecord } from '@showtrak/protocol/common';
 import type { JsonResponse } from './_videoproc-http-shared';
 import { DEFAULT_MONITORING_INTERVAL_MS, MONITORING_INTEREST_TTL_MS } from '../Config/constants';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
@@ -170,7 +170,7 @@ async function Login(Base: URL, Config: ArcadiaConfig, DeadlineAt: number): Prom
       },
     };
   }
-  const Token = IsObject(Reply.Json) ? StrOrNull(Reply.Json.jwt) : null;
+  const Token = IsRecord(Reply.Json) ? StrOrNull(Reply.Json.jwt) : null;
   if (Reply.Status < 200 || Reply.Status > 299 || !Token) {
     return {
       Ok: false,
@@ -249,7 +249,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
       Status: Device.Status,
     };
   }
-  if (Device.Status < 200 || Device.Status > 299 || !IsObject(Device.Json)) {
+  if (Device.Status < 200 || Device.Status > 299 || !IsRecord(Device.Json)) {
     return {
       Success: false,
       Degraded: true,
@@ -296,7 +296,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   const List = NormaliseEndpoints(Endpoints.Json, {
     IsTransceiver: (Record) => Record.isGateway === true,
     RoleId: (_Record, Live) =>
-      IsObject(Live.association) ? NumOrNull(Live.association.dpId) : null,
+      IsRecord(Live.association) ? NumOrNull(Live.association.dpId) : null,
     Roles: RoleById,
   });
   return { ...Out, ...BeltpackResult(List, RoleById, ParseBeltpackOptions(Target)) };

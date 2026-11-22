@@ -40,7 +40,7 @@ import dgram from 'dgram';
 import dns from 'dns';
 import { Card, FormatLatency, Note, Pill, Row, Rows, TextRow, HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
-import { IsArray } from '../Utils/guards';
+import { IsArray, IsRecord } from '@showtrak/protocol/common';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 import { AddressPortError } from './_target-checks';
 
@@ -260,10 +260,6 @@ function QueriesFor(Profile: SscProfile | null): Json[] {
 
 // --- Reply handling ---------------------------------------------------------
 
-function IsPlainObject(Value: unknown): Value is Json {
-  return Value != null && typeof Value === 'object' && !Array.isArray(Value);
-}
-
 // Merge a reply into the accumulated state. The `osc` subtree (errors, xid) is
 // protocol bookkeeping, not device state, and is dropped. Arrays and leaves
 // replace; objects merge.
@@ -277,8 +273,8 @@ function MergeReply(State: Json, Reply: Json, Depth = 0): void {
     if (Key === 'osc' || Key === '__proto__' || Key === 'constructor' || Key === 'prototype')
       continue;
     const Existing = State[Key];
-    if (IsPlainObject(Value) && IsPlainObject(Existing)) MergeReply(Existing, Value, Depth + 1);
-    else if (IsPlainObject(Value)) {
+    if (IsRecord(Value) && IsRecord(Existing)) MergeReply(Existing, Value, Depth + 1);
+    else if (IsRecord(Value)) {
       if (Depth + 1 >= MAX_MERGE_DEPTH) continue;
       const Fresh: Json = {};
       MergeReply(Fresh, Value, Depth + 1);
@@ -291,7 +287,7 @@ function MergeReply(State: Json, Reply: Json, Depth = 0): void {
 function ParseDatagram(Data: Buffer | string): Json | null {
   try {
     const Parsed: unknown = JSON.parse(typeof Data === 'string' ? Data : Data.toString('utf8'));
-    return IsPlainObject(Parsed) ? Parsed : null;
+    return IsRecord(Parsed) ? Parsed : null;
   } catch {
     return null;
   }
@@ -320,7 +316,7 @@ function StringList(Value: unknown): string[] {
 function Path(State: Json, ...Keys: string[]): unknown {
   let Cur: unknown = State;
   for (const K of Keys) {
-    if (!IsPlainObject(Cur)) return undefined;
+    if (!IsRecord(Cur)) return undefined;
     Cur = Cur[K];
   }
   return Cur;
@@ -386,7 +382,7 @@ function ReadMeter(Row: unknown): {
 }
 
 function InterpretDigital6000(N: number, Rx: Json, Meter: unknown): SennheiserChannel {
-  const Skx = IsPlainObject(Rx.skx) ? Rx.skx : null;
+  const Skx = IsRecord(Rx.skx) ? Rx.skx : null;
   const TypeValue = Skx ? Skx.type : undefined;
   const TxType = Array.isArray(TypeValue) ? Str(TypeValue[0]) : Str(TypeValue);
   const TxName = Skx ? Str(Skx.name) : '';
@@ -445,7 +441,7 @@ function InterpretEwdx(
   else if (Rsqi != null) TxPresent = Rsqi > 0;
   else if (KnownType) TxPresent = true;
 
-  const BatteryNode = Mate && IsPlainObject(Mate.battery) ? Mate.battery : null;
+  const BatteryNode = Mate && IsRecord(Mate.battery) ? Mate.battery : null;
   const Gauge = BatteryNode ? Num(BatteryNode.gauge) : null;
   const BatteryType = BatteryNode ? Str(BatteryNode.type) : '';
   const Lifetime = BatteryNode ? Num(BatteryNode.lifetime) : null;
@@ -483,7 +479,7 @@ function InterpretState(State: Json): SennheiserDevice {
     // Unrecognised or missing product: infer from the shape of what answered.
     const HasD6000 = [1, 2].some((N) => {
       const Rx = State[`rx${N}`];
-      return IsPlainObject(Rx) && ('carrier' in Rx || 'skx' in Rx || 'audio_mute' in Rx);
+      return IsRecord(Rx) && ('carrier' in Rx || 'skx' in Rx || 'audio_mute' in Rx);
     });
     if (HasD6000 || 'mm' in State) Profile = 'Digital 6000';
     else if ('mates' in State || 'm' in State) Profile = 'EW-DX';
@@ -493,7 +489,7 @@ function InterpretState(State: Json): SennheiserDevice {
   const Max = Profile === 'Digital 6000' ? 2 : MAX_CHANNEL;
   for (let N = 1; N <= Max; N++) {
     const Rx = State[`rx${N}`];
-    if (!IsPlainObject(Rx) || !Object.keys(Rx).length) continue;
+    if (!IsRecord(Rx) || !Object.keys(Rx).length) continue;
     if (Profile === 'Digital 6000') {
       const Mm = IsArray(State.mm) ? State.mm[N - 1] : undefined;
       Channels.push(InterpretDigital6000(N, Rx, Mm));
@@ -501,7 +497,7 @@ function InterpretState(State: Json): SennheiserDevice {
       const Mate = Path(State, 'mates', `tx${N}`);
       const Meter = Path(State, 'm', `rx${N}`);
       Channels.push(
-        InterpretEwdx(N, Rx, IsPlainObject(Mate) ? Mate : null, IsPlainObject(Meter) ? Meter : null)
+        InterpretEwdx(N, Rx, IsRecord(Mate) ? Mate : null, IsRecord(Meter) ? Meter : null)
       );
     }
   }

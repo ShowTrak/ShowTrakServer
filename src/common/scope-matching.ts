@@ -17,6 +17,8 @@
 // a missing script whitelist means "everyone", a missing tag scope means
 // "nobody". That decision stays with each caller.
 
+import { IsArray } from '@showtrak/protocol/common';
+
 /** Permissive scope shape: accepts stored JSON, wire views and editor drafts. */
 export interface ScopeShape {
   Workspace?: unknown;
@@ -47,11 +49,6 @@ export interface ScopeTagLike {
 
 /** How a scope came to cover an entity. `null` means it does not. */
 export type ScopeMembershipKind = 'direct' | 'group' | 'tag' | 'workspace' | null;
-
-// Array.isArray, narrowed to unknown[] rather than any[].
-function IsArray(Value: unknown): Value is unknown[] {
-  return Array.isArray(Value);
-}
 
 /** Coerce an arbitrary `Scope.Tags` value into a deduped list of tag IDs. */
 export function NormalizeScopeTags(Raw: unknown): number[] {

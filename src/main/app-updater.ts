@@ -17,7 +17,7 @@ import type { BrowserWindow } from 'electron';
 import type { AppUpdater, ProgressInfo, UpdateInfo } from 'electron-updater';
 import type { AppUpdateInfo, AppUpdateStatus } from '@showtrak/protocol';
 import { CreateLogger } from '../Modules/Logger';
-import { IsObject } from '../Modules/Utils/guards';
+import { IsObject } from '@showtrak/protocol/common';
 import {
   NormalizeUpdateChannel,
   ResolveChannelRelease,

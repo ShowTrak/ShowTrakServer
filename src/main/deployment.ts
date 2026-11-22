@@ -9,7 +9,7 @@
 
 import { CreateLogger } from '../Modules/Logger';
 import { SCRIPT_DEPLOY_DEBOUNCE_MS } from '../Modules/Config/constants';
-import { IsArray } from '../Modules/Utils/guards';
+import { IsArray } from '@showtrak/protocol/common';
 import { Manager as ScriptManager } from '../Modules/ScriptManager';
 import { Manager as ClientManager } from '../Modules/ClientManager';
 import { Manager as ServerManager } from '../Modules/Server';

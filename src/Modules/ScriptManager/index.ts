@@ -13,7 +13,7 @@ import { Manager as AppDataManager } from '../AppData';
 import { ChecksumFile } from '@showtrak/protocol/runtime';
 import { Manager as BroadcastManager } from '../Broadcast';
 import { Ok, Fail } from '../Utils';
-import { IsArray } from '../Utils/guards';
+import { IsArray } from '@showtrak/protocol/common';
 import { SCRIPT_EXECUTION_DEFAULT_TIMEOUT_MS } from '../Config/constants';
 import { RecordEdit, RecordUpdate } from '../AuditLog/edits';
 import { Entity, Line } from '../AuditLog/message';

@@ -9,7 +9,7 @@ import type {
   AuditSegment,
 } from '@showtrak/protocol';
 import { Safe } from '../utils';
-import { ArrayOrEmpty } from './guards';
+import { ArrayOrEmpty } from '@showtrak/protocol/common';
 
 const ENTITY_TYPE_LABELS: Record<AuditEntityType, string> = {
   client: 'Client',

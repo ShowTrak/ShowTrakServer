@@ -15,7 +15,8 @@
 // tolerant: a field that is missing or of the wrong type reads as unknown, and
 // unknown is never treated as low or bad.
 import { Card, FormatLatency, Note, Pill, Row, Rows, TextRow, HealthPill } from './debug';
-import { AsList, IsObject, NumOrNull, StrOrNull } from './_videoproc-http-shared';
+import { AsList, NumOrNull, StrOrNull } from './_videoproc-http-shared';
+import { IsRecord } from '@showtrak/protocol/common';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 
 // FreeSpeak II reports this as a beltpack's live role while it holds none.
@@ -153,7 +154,7 @@ export function RoleMap(Records: unknown): Map<number, string> {
   const Map_ = new Map<number, string>();
   if (!Array.isArray(Records)) return Map_;
   for (const R of Records) {
-    if (!IsObject(R)) continue;
+    if (!IsRecord(R)) continue;
     const Id = NumOrNull(R.id);
     const Label = StrOrNull(R.label) ?? StrOrNull(R.name);
     if (Id != null && Label) Map_.set(Id, Label);
@@ -162,7 +163,7 @@ export function RoleMap(Records: unknown): Map<number, string> {
 }
 
 function Longevity(Value: unknown): number | null {
-  if (!IsObject(Value)) return null;
+  if (!IsRecord(Value)) return null;
   const H = NumOrNull(Value.hours);
   const M = NumOrNull(Value.minutes);
   if (H == null && M == null) return null;
@@ -188,14 +189,14 @@ export function NormaliseEndpoint(
   Record: unknown,
   Options: NormaliseOptions
 ): ClearComEndpoint | null {
-  if (!IsObject(Record)) return null;
+  if (!IsRecord(Record)) return null;
   const IdRaw = Record.id;
   const Id = typeof IdRaw === 'number' && Number.isFinite(IdRaw) ? String(IdRaw) : StrOrNull(IdRaw);
   if (!Id) return null;
-  const Live = IsObject(Record.liveStatus) ? Record.liveStatus : {};
+  const Live = IsRecord(Record.liveStatus) ? Record.liveStatus : {};
   const Online = String(Live.status ?? '').toLowerCase() === 'online';
   const RoleId = Options.RoleId(Record, Live);
-  const RoleRecord = IsObject(Record.role) ? Record.role : null;
+  const RoleRecord = IsRecord(Record.role) ? Record.role : null;
   const Role =
     (RoleId != null ? Options.Roles.get(RoleId) : undefined) ??
     (RoleRecord ? StrOrNull(RoleRecord.label) : null) ??

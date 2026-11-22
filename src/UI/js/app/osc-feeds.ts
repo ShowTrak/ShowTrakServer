@@ -47,7 +47,7 @@ import { RefreshClientInfoTags, RefreshClientInfoVariables } from './client-info
 import { RefreshMonitorInfoEditor, RefreshMonitorInfoTags } from './monitor-info-edit';
 import { RefreshDummyInfoEditor, RefreshDummyInfoTags } from './dummy-info-edit';
 import { RefreshFreeKioskInfoEditor, RefreshFreeKioskInfoTags } from './freekiosk-info-edit';
-import { IsArray } from './lib/guards';
+import { IsArray } from '@showtrak/protocol/common';
 import type { ClientPatch } from '@showtrak/protocol';
 
 /** One line rendered in the OSC/HTTP debug terminal. */

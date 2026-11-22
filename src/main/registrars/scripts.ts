@@ -12,9 +12,9 @@ import {
   resolveContainedScriptFile,
   normalizeRelativePathForCompare,
   getLocalPlatformKey,
-  parseArgumentString,
   runLocalScriptFile,
 } from '../local-scripts';
+import { ParseArgumentString } from '@showtrak/protocol/common';
 import { shell } from 'electron';
 import path from 'path';
 import fs from 'fs';
@@ -513,7 +513,7 @@ function register(): void {
         Script && Script.Arguments && typeof Script.Arguments[PlatformKey] === 'string'
           ? Script.Arguments[PlatformKey]
           : '';
-      const PlatformArgs = parseArgumentString(PlatformArgumentString);
+      const PlatformArgs = ParseArgumentString(PlatformArgumentString);
       const RequestedFile = normalizeRelativePathForCompare(RelativeFilePath);
       if (!MappedFile) {
         return [`No ${PlatformKey} executable is configured for this script`, null];

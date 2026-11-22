@@ -15,7 +15,7 @@
 // gaps, which is the detail that matters most here.
 import type { FreeKioskMetricSample } from '@showtrak/protocol';
 import { MONITOR_HISTORY_BLOCK_COUNT, MONITOR_HISTORY_WINDOW_MS } from './history-window';
-import { ArrayOrEmpty } from './guards';
+import { ArrayOrEmpty } from '@showtrak/protocol/common';
 
 export interface MetricChartThreshold {
   operator: 'below' | 'above' | 'outside' | 'inside';

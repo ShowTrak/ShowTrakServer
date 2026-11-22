@@ -32,7 +32,7 @@ import type {
   WebUiHandshakeAuth,
 } from '@showtrak/protocol';
 import { CreateLogger } from '../Logger';
-import { IsArray } from '../Utils/guards';
+import { IsArray } from '@showtrak/protocol/common';
 import { Config } from '../Config';
 import { Manager as BroadcastManager } from '../Broadcast';
 import { Manager as ClientManager } from '../ClientManager';

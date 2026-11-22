@@ -8,8 +8,8 @@
 import path from 'path';
 import fs from 'fs';
 import { Manager as AppDataManager } from '../AppData';
-import { WriteAndSyncFileSync } from '../Utils';
-import { IsArray, IsObject } from '../Utils/guards';
+import { ReplaceFileSync } from '@showtrak/protocol/runtime';
+import { IsArray, IsObject } from '@showtrak/protocol/common';
 import type { DBResult } from '../DB';
 import type { SettingRow } from '../DB/rows';
 
@@ -35,12 +35,8 @@ export function CreateInstallSettingsStore(GetFilePath: () => string = DefaultFi
   // install setting.
   function WriteValues(Values: Record<string, unknown>): DBResult<unknown> {
     try {
-      const FilePath = GetFilePath();
       const All = { ...ReadAll(), ...Values };
-      fs.mkdirSync(path.dirname(FilePath), { recursive: true });
-      const TempPath = `${FilePath}.tmp`;
-      WriteAndSyncFileSync(TempPath, JSON.stringify(All, null, 2));
-      fs.renameSync(TempPath, FilePath);
+      ReplaceFileSync(GetFilePath(), JSON.stringify(All, null, 2));
       return [null, true];
     } catch (Err) {
       return [Err, null];

@@ -7,7 +7,7 @@ import { CreateMonitoringChecksRepository } from '../DB/repositories/monitoring-
 import { Manager as BroadcastManager } from '../Broadcast';
 import { Manager as MonitoringMethods } from '../MonitoringMethods';
 import { Ok, Fail } from '../Utils';
-import { IsArray } from '../Utils/guards';
+import { IsArray } from '@showtrak/protocol/common';
 import * as SlugService from '../Slug';
 import { createGroupOrdering } from '../Shared/group-ordering';
 import type { TxRun } from '../DB';

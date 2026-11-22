@@ -49,7 +49,6 @@ import {
   BuildSwitchUrl,
   CardList,
   DescribePorts,
-  IsObject,
   JoinReasons,
   ParseActionPort,
   ParsePortList,
@@ -62,6 +61,7 @@ import {
   type SwitchRequest,
   type SwitchResponse,
 } from './_switch-shared';
+import { IsRecord } from '@showtrak/protocol/common';
 import { FormatLatency, Note, Row, Rows, TextRow, HealthPill } from './debug';
 import { WithProbeAgents, type ProbeAgents } from './_probe-agents';
 import { DEFAULT_MONITORING_INTERVAL_MS, MONITORING_INTEREST_TTL_MS } from '../Config/constants';
@@ -372,7 +372,7 @@ export interface GigaCorePoePort {
 
 // GET /api/device. Null unless it looks like the GigaCore Gen2 device object.
 function ParseDevice(Json: unknown): GigaCoreDevice | null {
-  if (!IsObject(Json)) return null;
+  if (!IsRecord(Json)) return null;
   const Device: GigaCoreDevice = {
     Name: StrOrNull(Json.name),
     Description: StrOrNull(Json.description),
@@ -401,7 +401,7 @@ function ParsePorts(Json: unknown): GigaCorePort[] | null {
   if (!Array.isArray(Json)) return null;
   const Ports: GigaCorePort[] = [];
   for (const Row of Json) {
-    if (!IsObject(Row)) continue;
+    if (!IsRecord(Row)) continue;
     const Port = Number(Row.port_number);
     if (!Number.isInteger(Port) || Port < 1) continue;
     const LinkState = StrOrNull(Row.link_state);
@@ -422,7 +422,7 @@ function ParsePoePorts(Json: unknown): GigaCorePoePort[] | null {
   if (!Array.isArray(Json)) return null;
   const Ports: GigaCorePoePort[] = [];
   for (const Row of Json) {
-    if (!IsObject(Row)) continue;
+    if (!IsRecord(Row)) continue;
     const Port = Number(Row.port_number);
     if (!Number.isInteger(Port) || Port < 1) continue;
     Ports.push({ Port, Enabled: Bool(Row.enabled), Indication: StrOrNull(Row.indication) });

@@ -7,9 +7,9 @@ export function fail(message: string): never {
   throw new Error(message);
 }
 
-export function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
+// An object with named fields, arrays excluded: the kit's IsRecord, under the
+// name the validators use.
+export { IsRecord as isPlainObject } from '@showtrak/protocol/common';
 
 interface NormalizeStringOptions {
   minLength?: number;

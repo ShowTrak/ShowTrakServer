@@ -53,13 +53,13 @@ import {
   BuildBaseUrl,
   WithPath,
   RequestJson,
-  IsObject,
   StrOrNull,
   NumOrNull,
   BoolOrNull,
   TimeoutOf,
   type JsonResponse,
 } from './_videoproc-http-shared';
+import { IsRecord } from '@showtrak/protocol/common';
 import { Card, Esc, FormatLatency, Note, Pill, Row, Rows, TextRow, HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type {
@@ -312,9 +312,9 @@ export interface CameraSnapshot {
 }
 
 export function ParseWorkingSet(Value: unknown): CameraSlot[] | null {
-  if (!IsObject(Value) || !Array.isArray(Value.workingset)) return null;
+  if (!IsRecord(Value) || !Array.isArray(Value.workingset)) return null;
   return Value.workingset.slice(0, MAX_SLOTS).map((Entry: unknown, I: number) => {
-    if (!IsObject(Entry)) {
+    if (!IsRecord(Entry)) {
       return {
         Slot: I + 1,
         Present: false,
@@ -341,7 +341,7 @@ export function ParseWorkingSet(Value: unknown): CameraSlot[] | null {
 
 // The active slot, 1-based, from GET /media/active; null when none is active.
 export function ParseActive(Value: unknown): number | null {
-  if (!IsObject(Value)) return null;
+  if (!IsRecord(Value)) return null;
   const Index = NumOrNull(Value.workingsetIndex);
   return Index != null && Number.isInteger(Index) && Index >= 0 ? Index + 1 : null;
 }
@@ -351,9 +351,9 @@ export function ParsePower(Value: unknown): {
   MilliVolt: number | null;
   Batteries: CameraBattery[];
 } | null {
-  if (!IsObject(Value)) return null;
+  if (!IsRecord(Value)) return null;
   const Batteries = Array.isArray(Value.batteries)
-    ? Value.batteries.filter(IsObject).map((B) => ({
+    ? Value.batteries.filter(IsRecord).map((B) => ({
         MilliVolt: NumOrNull(B.milliVolt),
         Percent: NumOrNull(B.chargeRemainingPercent),
         Flags: Array.isArray(B.statusFlags)
@@ -544,7 +544,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
   if (!ProductRes.Ok) return { Success: false, Error: ProductRes.Error };
   let Product: Record<string, unknown> = {};
   if (ProductRes.Status === 200) {
-    if (!IsObject(ProductRes.Json)) {
+    if (!IsRecord(ProductRes.Json)) {
       return { Success: false, Error: 'Answered, but not as the Blackmagic camera REST API' };
     }
     Product = ProductRes.Json;
@@ -585,8 +585,8 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
     return { Success: false, Error: 'The camera stopped answering before the check finished' };
   }
 
-  const VideoFormat = IsObject(System) && IsObject(System.videoFormat) ? System.videoFormat : {};
-  const Codec = IsObject(System) && IsObject(System.codecFormat) ? System.codecFormat : {};
+  const VideoFormat = IsRecord(System) && IsRecord(System.videoFormat) ? System.videoFormat : {};
+  const Codec = IsRecord(System) && IsRecord(System.codecFormat) ? System.codecFormat : {};
   // 204 = no media is active; 200 with a null body says the same.
   const ActiveRead = !!ActiveRes && (ActiveRes.Status === 200 || ActiveRes.Status === 204);
   const ActiveSlot = ActiveRes && ActiveRes.Status === 200 ? ParseActive(ActiveRes.Json) : null;
@@ -601,9 +601,9 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
     Height: NumOrNull(VideoFormat.height),
     Codec: StrOrNull(Codec.codec),
     Container: StrOrNull(Codec.container),
-    TransportMode: IsObject(Transport) ? StrOrNull(Transport.mode) : null,
-    Recording: IsObject(Record) ? BoolOrNull(Record.recording) : null,
-    Timecode: IsObject(Timecode)
+    TransportMode: IsRecord(Transport) ? StrOrNull(Transport.mode) : null,
+    Recording: IsRecord(Record) ? BoolOrNull(Record.recording) : null,
+    Timecode: IsRecord(Timecode)
       ? (StrOrNull(Timecode.display) ?? StrOrNull(Timecode.timeline))
       : null,
     Slots: WorkingSet,
@@ -612,8 +612,8 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
     PowerSource: Power ? Power.Source : null,
     PowerMilliVolt: Power ? Power.MilliVolt : null,
     Batteries: Power ? Power.Batteries : null,
-    Tally: IsObject(Tally) ? StrOrNull(Tally.status) : null,
-    ReferenceLocked: IsObject(Lock) ? BoolOrNull(Lock.locked) : null,
+    Tally: IsRecord(Tally) ? StrOrNull(Tally.status) : null,
+    ReferenceLocked: IsRecord(Lock) ? BoolOrNull(Lock.locked) : null,
   };
 
   const Options = ParseOptions(Target);
@@ -666,7 +666,7 @@ async function RunAction(
 
   const State = await Send(Config, 'GET', '/transports/0/record', DeadlineAt);
   if (!State.Ok) return { Success: false, Error: State.Error };
-  if (State.Status !== 200 || !IsObject(State.Json)) {
+  if (State.Status !== 200 || !IsRecord(State.Json)) {
     return { Success: false, Error: `Failed to read the recording state (HTTP ${State.Status})` };
   }
   const Recording = BoolOrNull(State.Json.recording);

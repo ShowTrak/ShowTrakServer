@@ -48,7 +48,7 @@ import {
   FreeKioskMenuSettingKey,
   IsFreeKioskMenuActionEnabled,
 } from './lib/freekiosk-menu';
-import { IsArray } from './lib/guards';
+import { IsArray } from '@showtrak/protocol/common';
 
 export // One row in the right-click / mobile context menu. `Type` selects how the row
 // renders (informational label, section header, divider, or actionable item);

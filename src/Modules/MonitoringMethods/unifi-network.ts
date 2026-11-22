@@ -40,7 +40,8 @@
 //   Degraded = reachable, but a Monitored device is not online or missing, any
 //              adopted device is not online (when enabled), or fewer access
 //              points / clients than the configured minimum.
-import { BuildBaseUrl, WithPath, RequestJson, IsObject, TimeoutOf } from './_videoproc-http-shared';
+import { BuildBaseUrl, WithPath, RequestJson, TimeoutOf } from './_videoproc-http-shared';
+import { IsRecord } from '@showtrak/protocol/common';
 import { WithProbeAgents, type ProbeAgents } from './_probe-agents';
 import type { JsonResponse } from './_videoproc-http-shared';
 import { Card, Esc, Pill, Rows, Row, TextRow, Note, FormatLatency, HealthPill } from './debug';
@@ -240,20 +241,20 @@ const Str = (Value: unknown): string =>
 
 // A page body: { data: [...], totalCount }. Null when it is not one.
 export function ParsePage(Json: unknown): { Data: unknown[]; TotalCount: number | null } | null {
-  if (!IsObject(Json) || !Array.isArray(Json.data)) return null;
+  if (!IsRecord(Json) || !Array.isArray(Json.data)) return null;
   const Total = Number(Json.totalCount);
   return { Data: Json.data, TotalCount: Number.isFinite(Total) && Total >= 0 ? Total : null };
 }
 
 export function ParseSite(Raw: unknown): UnifiSite | null {
-  if (!IsObject(Raw)) return null;
+  if (!IsRecord(Raw)) return null;
   const Id = Str(Raw.id);
   if (!Id) return null;
   return { Id, Name: Str(Raw.name), InternalReference: Str(Raw.internalReference) };
 }
 
 export function ParseDevice(Raw: unknown): UnifiDevice | null {
-  if (!IsObject(Raw)) return null;
+  if (!IsRecord(Raw)) return null;
   const Id = Str(Raw.id);
   const Mac = Str(Raw.macAddress);
   if (!Id && !Mac) return null;
@@ -355,7 +356,7 @@ function GetSettingOptions(Result: MonitoringResult): MonitoringSettingOptions {
   const Raw = Result && Array.isArray(Result.SiteDevices) ? (Result.SiteDevices as unknown[]) : [];
   const Items: MonitoringSettingOptions[string] = [];
   for (const Entry of Raw) {
-    if (!IsObject(Entry)) continue;
+    if (!IsRecord(Entry)) continue;
     const Name = Str(Entry.Name);
     const Mac = Str(Entry.Mac);
     const Value = Mac || Name;
@@ -486,7 +487,7 @@ export function Evaluate(
 function ApiErrorText(Res: JsonResponse): string {
   if (!Res.Ok) return Res.Error;
   const Json = Res.Json;
-  if (IsObject(Json)) {
+  if (IsRecord(Json)) {
     const Message = Str(Json.message);
     const Code = Str(Json.code);
     if (Message && Code) return `${Message} (${Code})`;
@@ -582,7 +583,7 @@ async function Probe(
     return { Success: false, Error: StatusError(Info, 'application info') };
   }
   const LatencyMs = Date.now() - Started;
-  if (!IsObject(Info.Json) || !Str(Info.Json.applicationVersion)) {
+  if (!IsRecord(Info.Json) || !Str(Info.Json.applicationVersion)) {
     return {
       Success: false,
       Error: 'Answered, but not with the UniFi Network API application info',
@@ -671,7 +672,7 @@ function Debug(Result: MonitoringResult, Target: MonitoringTargetLike): string {
     );
   }
 
-  const C = (IsObject(Result.Counts) ? Result.Counts : {}) as Partial<UnifiCounts>;
+  const C = (IsRecord(Result.Counts) ? Result.Counts : {}) as Partial<UnifiCounts>;
   const N = (V: unknown) => (Number.isFinite(Number(V)) ? String(Number(V)) : '-');
   const CountRows = Rows([
     TextRow('Devices online', `${N(C.Online)} of ${N(C.Total)}`),

@@ -20,7 +20,7 @@ import type {
   AlertActionType,
   AlertRuleView,
 } from '@showtrak/protocol';
-import { IsArray, IsObject } from '../Utils/guards';
+import { IsArray, IsObject } from '@showtrak/protocol/common';
 import type { AlertRuleWriteRow } from '../DB/repositories/alert-rules';
 
 import { TRIGGERS, TRIGGER_CATALOG } from './triggers';

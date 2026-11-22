@@ -13,7 +13,7 @@ import { HandleNonFatalError } from './utils';
 import { CloseAllModals } from './modals';
 import { openModal } from './lib/modal';
 import { renderMarkdownSafe, sanitizeUpdateNotesHtml } from './lib/markdown';
-import { IsArray, IsObject } from './lib/guards';
+import { IsArray, IsObject } from '@showtrak/protocol/common';
 
 const MODAL_ID = 'SHOWTRAK_MODAL_APP_UPDATE';
 

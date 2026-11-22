@@ -13,9 +13,14 @@
       // typecheck against source while Node loads dist. An exact key outranks
       // the wildcard below, which still covers the ambient .d.ts protocol types.
       //
+      // The same holds for the other compiled entry points: /common (isomorphic
+      // helpers) and /electron-main (Electron main-process helpers).
+      //
       // This requires `npm run build:shared` to have run; it is the first step
       // of `build` and also runs on postinstall.
       "@showtrak/protocol/runtime": ["./shared/dist/runtime/index.d.ts"],
+      "@showtrak/protocol/common": ["./shared/dist/common/index.d.ts"],
+      "@showtrak/protocol/electron-main": ["./shared/dist/electron-main/index.d.ts"],
       "@showtrak/protocol/*": ["./shared/src/*"]
     }
   },

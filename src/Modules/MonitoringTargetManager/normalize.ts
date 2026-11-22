@@ -1,7 +1,7 @@
 // Pure normalization helpers and interval bounds shared across the
 // MonitoringTargetManager modules.
 import { DEFAULT_MONITORING_INTERVAL_MS, MAX_MONITORING_INTERVAL_MS } from '../Config/constants';
-import { IsObject } from '../Utils/guards';
+import { IsObject } from '@showtrak/protocol/common';
 
 const MIN_INTERVAL_MS = 3000;
 const MAX_INTERVAL_MS = MAX_MONITORING_INTERVAL_MS;

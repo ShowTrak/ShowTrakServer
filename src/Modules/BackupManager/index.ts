@@ -7,7 +7,7 @@ import { Manager as AppDataManager } from '../AppData';
 import { Manager as Broadcast } from '../Broadcast';
 import { Config } from '../Config';
 import { CompareVersions } from '../Utils';
-import { IsObject } from '../Utils/guards';
+import { IsObject } from '@showtrak/protocol/common';
 import { CreateShowFileInfoRepository } from '../DB/repositories/show-file-info';
 import type { ResultTuple, ShowFileOpenOutcome, ShowFileUpgrade } from '@showtrak/protocol';
 

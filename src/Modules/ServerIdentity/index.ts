@@ -3,7 +3,7 @@ import fs from 'fs';
 
 import { Manager as AppDataManager } from '../AppData';
 import { Manager as UUIDManager } from '../UUID';
-import { IsObject } from '../Utils/guards';
+import { IsObject } from '@showtrak/protocol/common';
 
 interface ServerIdentityRecord {
   Token: string;

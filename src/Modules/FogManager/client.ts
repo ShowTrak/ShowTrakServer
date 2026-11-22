@@ -29,7 +29,7 @@ import http from 'http';
 import https from 'https';
 import { FOG_REQUEST_TIMEOUT_MS } from '../Config/fog';
 import { NormalizeMacAddress } from '../MacAddress';
-import { IsArray } from '../Utils/guards';
+import { IsArray } from '@showtrak/protocol/common';
 
 export interface FogConfig {
   Protocol: 'http' | 'https';

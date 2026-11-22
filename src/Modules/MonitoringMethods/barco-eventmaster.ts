@@ -52,12 +52,12 @@ import {
   BuildBaseUrl,
   WithPath,
   RequestJson,
-  IsObject,
   StrOrNull,
   NumOrNull,
   AsList,
   TimeoutOf,
 } from './_videoproc-http-shared';
+import { IsRecord } from '@showtrak/protocol/common';
 import type { URL } from 'url';
 import { Card, FormatLatency, Note, Pill, Row, Rows, TextRow, HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
@@ -240,14 +240,14 @@ function SignalLabel(Status: number | null): string {
 
 // Unwrap a JSON-RPC reply to its "response", or explain why it is unusable.
 function UnwrapRpc(Json: unknown): { Ok: true; Response: unknown } | { Ok: false; Error: string } {
-  if (!IsObject(Json)) return { Ok: false, Error: 'Reply is not JSON-RPC' };
+  if (!IsRecord(Json)) return { Ok: false, Error: 'Reply is not JSON-RPC' };
   if (Json.error != null) {
     const Err = Json.error;
-    const Message = IsObject(Err) ? StrOrNull(Err.message) : StrOrNull(Err);
+    const Message = IsRecord(Err) ? StrOrNull(Err.message) : StrOrNull(Err);
     return { Ok: false, Error: `JSON-RPC error${Message ? `: ${Message}` : ''}` };
   }
   const Result = Json.result;
-  if (!IsObject(Result)) return { Ok: false, Error: 'Reply has no result' };
+  if (!IsRecord(Result)) return { Ok: false, Error: 'Reply has no result' };
   if (Result.success != null && Number(Result.success) !== 0) {
     return { Ok: false, Error: `Request refused (success ${String(Result.success)})` };
   }
@@ -259,16 +259,16 @@ function ParseFrames(Response: unknown): {
   Frames: EventMasterFrame[];
   Cards: EventMasterCard[];
 } | null {
-  const System = IsObject(Response) ? Response.System : null;
-  if (!IsObject(System)) return null;
+  const System = IsRecord(Response) ? Response.System : null;
+  if (!IsRecord(System)) return null;
   const Collection = System.FrameCollection;
-  const Raw = IsObject(Collection) ? Collection.Frame : null;
+  const Raw = IsRecord(Collection) ? Collection.Frame : null;
   const List = Array.isArray(Raw) ? Raw : Raw != null ? [Raw] : [];
   const Frames: EventMasterFrame[] = [];
   const Cards: EventMasterCard[] = [];
   for (const F of List) {
-    if (!IsObject(F)) continue;
-    const Enet = IsObject(F.Enet) ? F.Enet : {};
+    if (!IsRecord(F)) continue;
+    const Enet = IsRecord(F.Enet) ? F.Enet : {};
     const FrameName = StrOrNull(F.Name);
     Frames.push({
       Name: FrameName,
@@ -278,9 +278,9 @@ function ParseFrames(Response: unknown): {
       Mac: StrOrNull(Enet.MacAddress) || StrOrNull(F.id),
     });
     const Raws: unknown[] = [F.SysCard];
-    if (Array.isArray(F.Slot)) for (const S of F.Slot) Raws.push(IsObject(S) ? S.Card : null);
+    if (Array.isArray(F.Slot)) for (const S of F.Slot) Raws.push(IsRecord(S) ? S.Card : null);
     for (const C of Raws) {
-      if (!IsObject(C)) continue;
+      if (!IsRecord(C)) continue;
       Cards.push({
         Frame: List.length > 1 ? FrameName : null,
         Label: StrOrNull(C.CardTypeLabel) || 'Card',
@@ -297,9 +297,9 @@ function ParseFrames(Response: unknown): {
 
 function ParsePower(Response: unknown): EventMasterSupply[] {
   const Out: EventMasterSupply[] = [];
-  if (!IsObject(Response)) return Out;
+  if (!IsRecord(Response)) return Out;
   for (const [Frame, Value] of Object.entries(Response)) {
-    if (!IsObject(Value)) continue;
+    if (!IsRecord(Value)) continue;
     for (const Slot of [1, 2]) {
       // Companion's spelling first, then the one Barco's sketch uses.
       const Raw =
@@ -317,7 +317,7 @@ function ParseSources(Response: unknown): EventMasterSource[] {
   if (!Array.isArray(Response)) return [];
   const Out: EventMasterSource[] = [];
   for (const S of Response) {
-    if (!IsObject(S)) continue;
+    if (!IsRecord(S)) continue;
     const InputCfg = NumOrNull(S.InputCfgIndex);
     const Dest = NumOrNull(S.DestIndex);
     const UserKey = NumOrNull(S.UserKeyIndex);
@@ -347,7 +347,7 @@ function ParsePresets(Response: unknown): EventMasterPreset[] {
   if (!Array.isArray(Response)) return [];
   const Out: EventMasterPreset[] = [];
   for (const P of Response) {
-    if (!IsObject(P)) continue;
+    if (!IsRecord(P)) continue;
     const Sno = NumOrNull(P.presetSno);
     Out.push({
       Id: NumOrNull(P.id),
@@ -474,7 +474,7 @@ async function CallRpc(
   if (Res.Status !== 200) return { Ok: false, Error: `HTTP ${Res.Status}`, Status: Res.Status };
   const Unwrapped = UnwrapRpc(Res.Json);
   if (Unwrapped.Ok) return { Ok: true, Response: Unwrapped.Response };
-  const Result = IsObject(Res.Json) && IsObject(Res.Json.result) ? Res.Json.result : null;
+  const Result = IsRecord(Res.Json) && IsRecord(Res.Json.result) ? Res.Json.result : null;
   return {
     Ok: false,
     Error: Unwrapped.Error,

@@ -14,7 +14,7 @@
 import type { MonitoringSettingField, MonitoringSettingOptions } from '@showtrak/protocol';
 import { MonitoringMethodsCache, setMonitoringMethodsCache } from '../state';
 import { Safe } from '../utils';
-import { IsArray } from '../lib/guards';
+import { IsArray } from '@showtrak/protocol/common';
 
 // Called after an edit that this module makes on the user's behalf (adding or
 // removing a list chip), so the editor can pull the value into its working

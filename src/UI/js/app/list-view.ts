@@ -56,7 +56,7 @@ import {
   type ClientItem,
 } from './lib/client-items';
 import { RefreshListSearch } from './list-filter';
-import { IsArray } from './lib/guards';
+import { IsArray } from '@showtrak/protocol/common';
 
 /** How often the history column is refetched while the list is showing. */
 const LIST_HISTORY_REFRESH_MS = 20 * 1000;

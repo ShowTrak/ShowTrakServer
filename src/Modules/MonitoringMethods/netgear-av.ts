@@ -52,7 +52,6 @@ import {
   BuildSwitchUrl,
   CardList,
   DescribePorts,
-  IsObject,
   JoinReasons,
   NumOrNull,
   ParseActionPort,
@@ -64,6 +63,7 @@ import {
   WithPath,
   type SwitchResponse,
 } from './_switch-shared';
+import { IsRecord } from '@showtrak/protocol/common';
 import { FormatLatency, Note, Pill, Row, Rows, TextRow, HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS, MONITORING_INTEREST_TTL_MS } from '../Config/constants';
 import type {
@@ -339,7 +339,7 @@ function TokenIsStale(Entry: CachedToken, Now: number): boolean {
 // The resp envelope's verdict: null when it reports success (or is absent),
 // else its message.
 function EnvelopeFailure(Json: unknown): string | null {
-  if (!IsObject(Json) || !IsObject(Json.resp)) return null;
+  if (!IsRecord(Json) || !IsRecord(Json.resp)) return null;
   const Status = StrOrNull(Json.resp.status);
   if (!Status || Status.toLowerCase() === 'success') return null;
   return StrOrNull(Json.resp.respMsg) || 'Unknown error';
@@ -399,7 +399,7 @@ class ApiSession {
         AuthFailed: true,
       };
     }
-    const Login = IsObject(Res.Json) && IsObject(Res.Json.login) ? Res.Json.login : null;
+    const Login = IsRecord(Res.Json) && IsRecord(Res.Json.login) ? Res.Json.login : null;
     const Token = Login ? StrOrNull(Login.token) : null;
     if (Res.Status < 200 || Res.Status > 299 || !Token) {
       return {
@@ -464,7 +464,7 @@ class ApiSession {
     if (Res.Status < 200 || Res.Status > 299) {
       return { Ok: false, Error: `HTTP ${Res.Status} from ${Path}`, Answered: true };
     }
-    if (!IsObject(Res.Json)) {
+    if (!IsRecord(Res.Json)) {
       return {
         Ok: false,
         Error: Res.Body.trim() ? `${Path} did not return JSON` : `${Path} returned an empty reply`,
@@ -584,7 +584,7 @@ function DescribeFanState(Value: unknown): string | null {
   const Parts = Value.map((Fan) =>
     typeof Fan === 'string'
       ? Fan
-      : IsObject(Fan)
+      : IsRecord(Fan)
         ? Object.values(Fan)
             .map((V) => StrOrNull(V))
             .filter(Boolean)
@@ -596,17 +596,17 @@ function DescribeFanState(Value: unknown): string | null {
 
 // deviceInfo, or null when the reply is not this API.
 function ParseDeviceInfo(Json: unknown): NetgearDevice | null {
-  if (!IsObject(Json) || !IsObject(Json.deviceInfo)) return null;
+  if (!IsRecord(Json) || !IsRecord(Json.deviceInfo)) return null;
   const Info = Json.deviceInfo;
   // Documented as an array, but firmware has been seen to send a single object.
   const RawSensors = Array.isArray(Info.temperatureSensors)
     ? Info.temperatureSensors
-    : IsObject(Info.temperatureSensors)
+    : IsRecord(Info.temperatureSensors)
       ? [Info.temperatureSensors]
       : [];
   const Sensors: NetgearTemperatureSensor[] = [];
   for (const S of RawSensors) {
-    if (!IsObject(S)) continue;
+    if (!IsRecord(S)) continue;
     const Num = NumOrNull(S.sensorNum);
     if (Num == null) continue;
     Sensors.push({
@@ -639,11 +639,11 @@ export interface PortStat {
 
 function ParsePortStats(Json: Record<string, unknown>): PortStat[] | null {
   const List = Json.switchStatsPort;
-  const Rows = Array.isArray(List) ? List : IsObject(List) ? [List] : null;
+  const Rows = Array.isArray(List) ? List : IsRecord(List) ? [List] : null;
   if (!Rows) return null;
   const Out: PortStat[] = [];
   for (const Row of Rows) {
-    if (!IsObject(Row)) continue;
+    if (!IsRecord(Row)) continue;
     const Port = NumOrNull(Row.portId);
     if (Port == null) continue;
     const Status = NumOrNull(Row.status);
@@ -669,11 +669,11 @@ export interface PoePort {
 
 function ParsePoePorts(Json: Record<string, unknown>): PoePort[] | null {
   const List = Json.poePortConfig;
-  const Rows = Array.isArray(List) ? List : IsObject(List) ? [List] : null;
+  const Rows = Array.isArray(List) ? List : IsRecord(List) ? [List] : null;
   if (!Rows) return null;
   const Out: PoePort[] = [];
   for (const Row of Rows) {
-    if (!IsObject(Row)) continue;
+    if (!IsRecord(Row)) continue;
     const Port = NumOrNull(Row.portid);
     if (Port == null) continue;
     Out.push({
@@ -699,7 +699,7 @@ export interface QuerierState {
 // A querier is active on the VLAN when this switch is the querier, or one has
 // been detected (lastQuerierAddress is "Last IP address detected for querier").
 function ParseQuerier(Vlan: number, Json: Record<string, unknown>): QuerierState {
-  const Q = IsObject(Json.snooping_queriers) ? Json.snooping_queriers : null;
+  const Q = IsRecord(Json.snooping_queriers) ? Json.snooping_queriers : null;
   if (!Q) {
     return {
       Vlan,
@@ -869,7 +869,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
 
   if (Options.CheckPoeBudget) {
     const Reply = await Session.Request('poe_config');
-    const Poe = Reply.Ok && IsObject(Reply.Json.poe_config) ? Reply.Json.poe_config : null;
+    const Poe = Reply.Ok && IsRecord(Reply.Json.poe_config) ? Reply.Json.poe_config : null;
     if (!Poe) {
       Reasons.push(`Failed to read the PoE budget: ${Reply.Ok ? 'unreadable reply' : Reply.Error}`);
     } else {

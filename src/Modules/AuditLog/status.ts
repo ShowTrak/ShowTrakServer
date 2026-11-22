@@ -15,7 +15,7 @@ import { Device, Entity, Line, Value } from './message';
 import type { SummaryPart } from './message';
 import { DescribeUSBLocation } from '../ClientManager/usb';
 import { SYSTEM_CHECK_WARNINGS } from '../ClientManager/system-checks';
-import { IsArray, IsObject } from '../Utils/guards';
+import { IsArray, IsObject } from '@showtrak/protocol/common';
 
 // ---- Shared ------------------------------------------------------------------
 

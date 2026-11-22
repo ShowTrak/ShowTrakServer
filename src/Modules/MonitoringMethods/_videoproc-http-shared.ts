@@ -19,6 +19,7 @@ import https from 'https';
 import { URL } from 'url';
 import { CachedLookup, RequestHostname } from './_dns-cache';
 import type { ProbeAgents } from './_probe-agents';
+import { IsRecord } from '@showtrak/protocol/common';
 
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
 
@@ -194,15 +195,11 @@ export function RequestJson(Url: URL, Request: JsonRequest): Promise<JsonRespons
 
 // --- Small value readers shared by the three methods ------------------------
 
-export function IsObject(Value: unknown): Value is Record<string, unknown> {
-  return !!Value && typeof Value === 'object' && !Array.isArray(Value);
-}
-
 // Walk a nested object by keys; undefined when any step is missing.
 export function Dig(Root: unknown, Keys: string[]): unknown {
   let Cur: unknown = Root;
   for (const Key of Keys) {
-    if (!IsObject(Cur)) return undefined;
+    if (!IsRecord(Cur)) return undefined;
     Cur = Cur[Key];
   }
   return Cur;
@@ -250,7 +247,7 @@ export function AsList(Value: unknown): string[] {
 // list; a plain message/error/description field otherwise), falling back to a
 // short slice of a non-JSON body. Null when there is nothing readable.
 export function DeviceErrorText(Json: unknown, Body?: string): string | null {
-  if (IsObject(Json)) {
+  if (IsRecord(Json)) {
     const List = Json['error-messages'];
     if (Array.isArray(List)) {
       const Text = List.map((M) => StrOrNull(M))
@@ -260,7 +257,7 @@ export function DeviceErrorText(Json: unknown, Body?: string): string | null {
     }
     for (const Key of ['message', 'error', 'description', 'detail']) {
       const Value = Json[Key];
-      const Text = IsObject(Value) ? StrOrNull(Value.message) : StrOrNull(Value);
+      const Text = IsRecord(Value) ? StrOrNull(Value.message) : StrOrNull(Value);
       if (Text) return Text;
     }
     return null;

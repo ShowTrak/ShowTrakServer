@@ -4,7 +4,6 @@
 //
 // Exported as named functions; the CommonJS shape stays `{ Wait, Ok, Fail }`
 // so `const { Wait } = require('../Utils')` continues to work unchanged.
-import fs from 'fs';
 import type { Result } from '@showtrak/protocol';
 
 export function Wait(ms: number): Promise<void> {
@@ -30,19 +29,4 @@ export function CompareVersions(a: string, b: string): number {
     if (diff !== 0) return diff;
   }
   return 0;
-}
-
-/**
- * Write a text file and flush it to the disk before returning. For the temp
- * file of a write-then-rename: without the flush, a power cut can leave the
- * renamed file empty, because the rename can reach the disk before the data.
- */
-export function WriteAndSyncFileSync(FilePath: string, Text: string): void {
-  const Fd = fs.openSync(FilePath, 'w');
-  try {
-    fs.writeSync(Fd, Text, null, 'utf8');
-    fs.fsyncSync(Fd);
-  } finally {
-    fs.closeSync(Fd);
-  }
 }

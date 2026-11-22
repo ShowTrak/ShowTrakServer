@@ -6,7 +6,7 @@ import fs from 'fs';
 import { CreateLogger } from '../Logger';
 import { Manager as AppDataManager } from '../AppData';
 import { Manager as BroadcastManager } from '../Broadcast';
-import { IsArray } from '../Utils/guards';
+import { IsArray, IsObject } from '@showtrak/protocol/common';
 
 const Logger = CreateLogger('SampleScripts');
 
@@ -55,12 +55,6 @@ interface RefreshResult {
 interface FolderFile {
   fullPath: string;
   relativePath: string;
-}
-
-// Narrow an unknown value to a plain-object view (mirrors the historical
-// `Value && typeof Value === 'object'` guards these fetchers relied on).
-function IsRecord(Value: unknown): Value is Record<string, unknown> {
-  return typeof Value === 'object' && Value !== null;
 }
 
 let Samples: Sample[] = [];
@@ -145,13 +139,13 @@ async function FetchJson(Url: string): Promise<unknown> {
 async function FetchLatestSha(): Promise<string | null> {
   const Url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/commits/${REPO_BRANCH}`;
   const Data = await FetchJson(Url);
-  return IsRecord(Data) && typeof Data.sha === 'string' ? Data.sha : null;
+  return IsObject(Data) && typeof Data.sha === 'string' ? Data.sha : null;
 }
 
 async function FetchRepoTree(): Promise<unknown[]> {
   const Url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/git/trees/${REPO_BRANCH}?recursive=1`;
   const Data = await FetchJson(Url);
-  if (!IsRecord(Data) || !IsArray(Data.tree)) return [];
+  if (!IsObject(Data) || !IsArray(Data.tree)) return [];
   return Data.tree;
 }
 
@@ -171,7 +165,7 @@ async function BuildSamplesFromTree(Tree: unknown[]): Promise<Sample[]> {
   // Group blobs by their top-level folder.
   const FoldersByName = new Map<string, FolderFile[]>();
   for (const Entry of Tree) {
-    if (!IsRecord(Entry) || Entry.type !== 'blob' || typeof Entry.path !== 'string') continue;
+    if (!IsObject(Entry) || Entry.type !== 'blob' || typeof Entry.path !== 'string') continue;
     const Parts = Entry.path.split('/');
     if (Parts.length < 2) continue; // ignore root-level files (.DS_Store, README, ...)
     // Parts.length >= 2 checked above → index 0 is in-bounds.
@@ -208,7 +202,7 @@ async function BuildSamplesFromTree(Tree: unknown[]): Promise<Sample[]> {
           const Parsed: unknown = JSON.parse(FileBuffer.toString('utf-8'));
           // Anything but an object reads as one without fields, as it always did
           // (its defaults below); null, false, 0 and "" skip the sample.
-          Config = IsRecord(Parsed) ? Parsed : Parsed ? {} : null;
+          Config = IsObject(Parsed) ? Parsed : Parsed ? {} : null;
         } catch (Err) {
           Logger.error(`Sample ${Folder} has invalid Script.json, skipping:`, Err);
         }

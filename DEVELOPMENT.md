@@ -259,13 +259,14 @@ the types its code can use at run time:
 Logic that both processes need (parsing an IP or MAC address, matching a scope,
 comparing client versions, formatting a size) lives once in `src/common` and is
 imported by each side, rather than copied into the renderer. It may import only
-its own modules, and uses neither Node nor the DOM.
+its own modules and `@showtrak/protocol/common`, and uses neither Node nor the
+DOM.
 
 ESLint lints these programs with type information. Explicit `any` is an error,
 and the `no-unsafe-*` rules reject any value typed `any` that is used unchecked
 (an untyped `require()`, a `JSON.parse` result, a loosely typed library
-callback): type it as `unknown` and narrow it (`src/Modules/Utils/guards.ts`,
-`src/UI/js/app/lib/guards.ts`).
+callback): type it as `unknown` and narrow it (the type guards in
+`@showtrak/protocol/common`).
 
 Every type that crosses a process or network boundary comes from
 `@showtrak/protocol`, the `shared/` submodule: the client wire, `/sdk`, the Web

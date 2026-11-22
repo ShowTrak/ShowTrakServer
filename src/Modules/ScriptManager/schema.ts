@@ -17,6 +17,7 @@ import type {
 } from '@showtrak/protocol';
 
 import { SCRIPT_EXECUTION_DEFAULT_TIMEOUT_MS } from '../Config/constants';
+import { IsRecord } from '@showtrak/protocol/common';
 
 // The normalised Script.json, its console filter and its confirmation level are
 // the protocol's ScriptConfig, ScriptConsoleFilter and ScriptConfirmationLevel:
@@ -93,10 +94,6 @@ const BOOTSTRAP_TO_COLOUR_INDEX: Record<string, number> = {
   dark: 7, // dark grey
 };
 
-function IsPlainObject(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
 // Normalize a relative script path so it matches the folder's file listing and
 // resolves identically on every ShowTrakClient OS.
 function NormalizeRelativePath(value: unknown): string {
@@ -123,8 +120,8 @@ function NormalizeArgumentString(value: unknown): string {
 // so the author can fix it; the client disables an uncompilable filter.
 function NormalizeConsoleFilter(value: unknown): { filter: ScriptConsoleFilter; errors: string[] } {
   const errors: string[] = [];
-  const raw = IsPlainObject(value) ? value : {};
-  if (value !== undefined && !IsPlainObject(value)) {
+  const raw = IsRecord(value) ? value : {};
+  if (value !== undefined && !IsRecord(value)) {
     errors.push('"ConsoleFilter" was not an object; reset to an empty filter.');
   }
 
@@ -206,8 +203,8 @@ function NormalizeScriptConfig(
   ID: string
 ): { config: ScriptConfig; changed: boolean; errors: string[] } {
   const errors: string[] = [];
-  const data: Record<string, unknown> = IsPlainObject(RawData) ? RawData : {};
-  if (!IsPlainObject(RawData)) {
+  const data: Record<string, unknown> = IsRecord(RawData) ? RawData : {};
+  if (!IsRecord(RawData)) {
     errors.push('Root value was not a JSON object; rebuilt from defaults.');
   }
 
@@ -328,7 +325,7 @@ function NormalizeScriptConfig(
   }
 
   // Platforms ------------------------------------------------------------
-  const rawPlatforms = IsPlainObject(data.Platforms) ? data.Platforms : null;
+  const rawPlatforms = IsRecord(data.Platforms) ? data.Platforms : null;
   const legacyPath =
     typeof data.Path === 'string' && data.Path.trim() ? NormalizeRelativePath(data.Path) : null;
 
@@ -382,7 +379,7 @@ function NormalizeScriptConfig(
   config.Platforms = platforms;
 
   // Arguments ------------------------------------------------------------
-  const rawArguments = IsPlainObject(data.Arguments) ? data.Arguments : null;
+  const rawArguments = IsRecord(data.Arguments) ? data.Arguments : null;
   if (!rawArguments) {
     errors.push('"Arguments" was missing; added an empty cross-platform map.');
   }

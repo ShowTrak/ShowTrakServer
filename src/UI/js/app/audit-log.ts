@@ -23,7 +23,7 @@ import {
   OpenFreeKioskTerminalHistory,
   OpenMonitoringTargetHistory,
 } from './monitoring-history-modal';
-import { IsArray } from './lib/guards';
+import { IsArray } from '@showtrak/protocol/common';
 
 const PAGE_SIZE = 200;
 // A list left open through a busy evening keeps growing at the top; past this

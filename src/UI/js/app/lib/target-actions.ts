@@ -6,7 +6,7 @@ import type {
   MonitoringCheckView,
   MonitoringMethodView,
 } from '@showtrak/protocol';
-import { ArrayOrEmpty } from './guards';
+import { ArrayOrEmpty } from '@showtrak/protocol/common';
 
 export interface TargetActionMethod {
   Method: string;

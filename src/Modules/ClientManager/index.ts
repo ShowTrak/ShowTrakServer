@@ -18,7 +18,7 @@ import type {
   ValidatedUSBDevice,
 } from '../SocketValidation';
 import { CreateLogger } from '../Logger';
-import { IsArray } from '../Utils/guards';
+import { IsArray } from '@showtrak/protocol/common';
 import { Manager as DB } from '../DB';
 import { CreateClientsRepository } from '../DB/repositories/clients';
 import {

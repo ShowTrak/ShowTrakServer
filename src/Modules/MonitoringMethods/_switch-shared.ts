@@ -11,14 +11,13 @@ import { Card, Esc, Pill } from './debug';
 import {
   RequestJson,
   WithPath,
-  IsObject,
   StrOrNull,
   NumOrNull,
   type JsonRequest,
   type JsonResponse,
 } from './_videoproc-http-shared';
 
-export { WithPath, IsObject, StrOrNull, NumOrNull };
+export { WithPath, StrOrNull, NumOrNull };
 
 // A port list cannot name more ports than this, so a typo such as 1-99999
 // is reported instead of expanding into a huge list.

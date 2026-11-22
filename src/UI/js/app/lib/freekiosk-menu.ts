@@ -3,7 +3,7 @@
 // src/Modules/FreeKiosk/commands.ts (the renderer cannot import across its
 // rootDir); test/renderer-freekiosk-menu.test.js holds the two together.
 
-import { IsArray } from './guards';
+import { IsArray } from '@showtrak/protocol/common';
 
 export const FREEKIOSK_MENU_POLL_SETTING_KEY = 'FREEKIOSK_MENU_POLL';
 

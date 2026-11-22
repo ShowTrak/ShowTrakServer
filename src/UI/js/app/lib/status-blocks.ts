@@ -7,7 +7,7 @@
 import type { FreeKioskMetricSample, HistorySample } from '@showtrak/protocol';
 import { MONITOR_HISTORY_BLOCK_COUNT, MONITOR_HISTORY_WINDOW_MS } from './history-window';
 import { ExpandMetricSeries } from './metric-series';
-import { ArrayOrEmpty } from './guards';
+import { ArrayOrEmpty } from '@showtrak/protocol/common';
 
 // Per-state sample tallies inside a single timeline block.
 export interface StatusStateCounts {

@@ -56,7 +56,7 @@ import type {
   ServerToClientEvents,
 } from '@showtrak/protocol';
 import { CreateLogger } from '../Logger';
-import { IsArray } from '../Utils/guards';
+import { IsArray } from '@showtrak/protocol/common';
 import { Manager as BroadcastManager } from '../Broadcast';
 import { Manager as RemoteDeviceManager } from '../RemoteDeviceManager';
 import { Manager as SettingsManager } from '../SettingsManager';

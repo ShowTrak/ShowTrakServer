@@ -16,7 +16,7 @@
 import { MONITORING_HISTORY_MAX_AGE_MS } from './monitoring-history';
 import { FREEKIOSK_METRICS, RoundTo } from '../Modules/FreeKiosk/metrics';
 import { ParseAlarmSettings } from '../Modules/FreeKiosk/alarms';
-import { IsArray, IsObject } from '../Modules/Utils/guards';
+import { IsArray, IsObject } from '@showtrak/protocol/common';
 import type { FreeKioskMetricSample, FreeKioskMetricSeries } from '@showtrak/protocol';
 
 // One point of one metric's series (FreeKioskMetricSample, from the protocol):

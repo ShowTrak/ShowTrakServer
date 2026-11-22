@@ -46,13 +46,13 @@ import {
   BuildBaseUrl,
   WithPath,
   RequestJson,
-  IsObject,
   StrOrNull,
   NumOrNull,
   BoolOrNull,
   TimeoutOf,
   type JsonResponse,
 } from './_videoproc-http-shared';
+import { IsRecord } from '@showtrak/protocol/common';
 import { Card, Esc, FormatLatency, Note, Pill, Row, Rows, TextRow, HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type {
@@ -166,7 +166,7 @@ function Send(
 
 // The `name` of an {id: {uuid, name, index}} item.
 function IdName(Value: unknown): string | null {
-  return IsObject(Value) && IsObject(Value.id) ? StrOrNull(Value.id.name) : null;
+  return IsRecord(Value) && IsRecord(Value.id) ? StrOrNull(Value.id.name) : null;
 }
 
 export interface ProPresenterTimer {
@@ -203,7 +203,7 @@ export function ParseVersion(Value: unknown): {
   HostDescription: string | null;
   ApiVersion: string | null;
 } | null {
-  if (!IsObject(Value)) return null;
+  if (!IsRecord(Value)) return null;
   const HostDescription = StrOrNull(Value.host_description);
   const ApiVersion = StrOrNull(Value.api_version);
   // The spec promises both; one missing is enough to say "not ProPresenter".
@@ -218,9 +218,9 @@ export function ParseVersion(Value: unknown): {
 }
 
 export function ParseSlideIndex(Value: unknown): { Name: string | null; Index: number | null } {
-  const Pi = IsObject(Value) ? Value.presentation_index : null;
-  if (!IsObject(Pi)) return { Name: null, Index: null };
-  const Pid = IsObject(Pi.presentation_id) ? Pi.presentation_id : {};
+  const Pi = IsRecord(Value) ? Value.presentation_index : null;
+  if (!IsRecord(Pi)) return { Name: null, Index: null };
+  const Pid = IsRecord(Pi.presentation_id) ? Pi.presentation_id : {};
   return { Name: StrOrNull(Pid.name), Index: NumOrNull(Pi.index) };
 }
 
@@ -228,15 +228,15 @@ export function ParseActivePlaylist(Value: unknown): {
   Playlist: string | null;
   Item: string | null;
 } {
-  const P = IsObject(Value) && IsObject(Value.presentation) ? Value.presentation : {};
+  const P = IsRecord(Value) && IsRecord(Value.presentation) ? Value.presentation : {};
   return {
-    Playlist: IsObject(P.playlist) ? StrOrNull(P.playlist.name) : null,
-    Item: IsObject(P.item) ? StrOrNull(P.item.name) : null,
+    Playlist: IsRecord(P.playlist) ? StrOrNull(P.playlist.name) : null,
+    Item: IsRecord(P.item) ? StrOrNull(P.item.name) : null,
   };
 }
 
 export function ParseLayers(Value: unknown): Record<string, boolean> | null {
-  if (!IsObject(Value)) return null;
+  if (!IsRecord(Value)) return null;
   const Out: Record<string, boolean> = {};
   for (const [Key] of STATUS_LAYERS) {
     const B = BoolOrNull(Value[Key]);
@@ -247,7 +247,7 @@ export function ParseLayers(Value: unknown): Record<string, boolean> | null {
 
 export function ParseTimers(Value: unknown): ProPresenterTimer[] {
   if (!Array.isArray(Value)) return [];
-  return Value.filter(IsObject)
+  return Value.filter(IsRecord)
     .map((T) => ({ Name: IdName(T) || '', Time: StrOrNull(T.time), State: StrOrNull(T.state) }))
     .filter((T) => T.Name);
 }

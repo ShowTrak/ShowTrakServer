@@ -1,7 +1,7 @@
 // Pure (de)serialization helpers for translating AlertRule database rows
 // to/from the in-memory rule shape used by the AlertsManager.
 import type { AlertRuleView, AlertRuleScope, AlertRuleActionView } from '@showtrak/protocol';
-import { IsArray } from '../Utils/guards';
+import { IsArray } from '@showtrak/protocol/common';
 
 // The persisted/derived row shape consumed by normalizeRuleRow. Rows come either
 // from the AlertRules table (JSON columns as strings) or from freshly-built

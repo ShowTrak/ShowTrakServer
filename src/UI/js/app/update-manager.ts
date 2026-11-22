@@ -32,7 +32,7 @@ import {
   setUpdateManagerSelectedReleaseTag,
 } from './state';
 import type { ClientView, ScriptExecutionView } from '@showtrak/protocol';
-import { ArrayOrEmpty } from './lib/guards';
+import { ArrayOrEmpty } from '@showtrak/protocol/common';
 
 // The script name the server gives a client-update execution. Its progress is
 // shown per client in the Update Manager, never in the script executions panel.

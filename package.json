@@ -32,7 +32,7 @@
     "test:coverage": "c8 --all --include=dist/Modules/**/*.js --include=dist/main/**/*.js --include=dist/common/**/*.js --include=dist-test/UI/js/app/**/*.js --reporter=text --reporter=text-summary --reporter=lcov node scripts/run-isolated-tests.js",
     "prepare": "husky",
     "postinstall": "npm run build:shared && node scripts/copy-bootstrap-icons.js",
-    "build:shared": "tsc -p shared/tsconfig.build.json"
+    "build:shared": "tsc -p shared/tsconfig.build.json && tsc -p shared/tsconfig.build.ui.json"
   },
   "keywords": [
     "electron",

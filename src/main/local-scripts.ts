@@ -58,72 +58,6 @@ function getLocalPlatformKey() {
   return 'Linux';
 }
 
-// Split a shell-style argument string into argv, honouring single/double quotes
-// and backslash escapes.
-function parseArgumentString(value: unknown) {
-  const input = String(value || '').trim();
-  if (!input) return [];
-
-  const args: string[] = [];
-  let current = '';
-  let inSingle = false;
-  let inDouble = false;
-  let escaping = false;
-
-  const pushCurrent = () => {
-    if (current.length > 0) {
-      args.push(current);
-      current = '';
-    }
-  };
-
-  for (let i = 0; i < input.length; i += 1) {
-    const ch = input[i]!; // in-bounds: i < input.length
-
-    if (escaping) {
-      current += ch;
-      escaping = false;
-      continue;
-    }
-    if (ch === '\\') {
-      escaping = true;
-      continue;
-    }
-
-    if (inSingle) {
-      if (ch === "'") inSingle = false;
-      else current += ch;
-      continue;
-    }
-
-    if (inDouble) {
-      if (ch === '"') inDouble = false;
-      else current += ch;
-      continue;
-    }
-
-    if (ch === "'") {
-      inSingle = true;
-      continue;
-    }
-    if (ch === '"') {
-      inDouble = true;
-      continue;
-    }
-
-    if (/\s/.test(ch)) {
-      pushCurrent();
-      continue;
-    }
-
-    current += ch;
-  }
-
-  if (escaping) current += '\\';
-  pushCurrent();
-  return args;
-}
-
 // Strip a leading "v" and lower-case a version token for loose comparison.
 function normalizeVersionToken(value: unknown) {
   return String(value || '')
@@ -213,7 +147,6 @@ export {
   resolveContainedScriptFile,
   normalizeRelativePathForCompare,
   getLocalPlatformKey,
-  parseArgumentString,
   normalizeVersionToken,
   resolveLocalScriptLauncher,
   runLocalScriptFile,

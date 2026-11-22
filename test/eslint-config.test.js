@@ -65,7 +65,7 @@ test('shared/ keeps the rules it had, without the type-aware ones', async () => 
 });
 
 test('the JavaScript left in the repo is linted as before', async () => {
-  for (const file of ['scripts/build-renderer.js', 'test/guards.test.js']) {
+  for (const file of ['scripts/build-renderer.js', 'test/local-scripts.test.js']) {
     const config = await configFor(file);
     assert.equal(config.rules.eqeqeq[0], 2, file);
     assert.equal(config.rules['no-var'][0], 2, file);

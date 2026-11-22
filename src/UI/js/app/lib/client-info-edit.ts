@@ -9,7 +9,7 @@
 // its own any more (the Add flows for monitors, dummies and FreeKiosk terminals
 // aside, which create rather than edit).
 import type { ClientInfoKind } from './client-info-tabs';
-import { ArrayOrEmpty } from './guards';
+import { ArrayOrEmpty } from '@showtrak/protocol/common';
 import { NormalizeMacAddress, ZERO_MAC } from '../../../../common/mac-address';
 
 const EDITABLE_CLIENT_INFO_KINDS: readonly ClientInfoKind[] = [

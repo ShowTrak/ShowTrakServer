@@ -59,13 +59,13 @@ import {
   BuildBaseUrl,
   WithPath,
   RequestJson,
-  IsObject,
   StrOrNull,
   NumOrNull,
   BoolOrNull,
   TimeoutOf,
   type JsonResponse,
 } from './_videoproc-http-shared';
+import { IsRecord } from '@showtrak/protocol/common';
 import { Card, Esc, FormatLatency, Note, Pill, Row, Rows, TextRow, HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type {
@@ -256,7 +256,7 @@ async function Call(
   if (!Res.Ok) return { Ok: false, Error: Res.Error, Transport: true, TimedOut: Res.TimedOut };
   if (Res.Status !== 200) return { Ok: false, Error: `HTTP ${Res.Status}`, Transport: true };
   const Json = ParseBody(Res);
-  if (!IsObject(Json)) return { Ok: false, Error: 'Reply was not JSON', Transport: true };
+  if (!IsRecord(Json)) return { Ok: false, Error: 'Reply was not JSON', Transport: true };
   if (Json.Success === false) {
     const Message = StrOrNull(Json.ErrorMessage);
     const Code = NumOrNull(Json.ErrorCode);
@@ -337,13 +337,13 @@ function ParseHealth(Value: Record<string, unknown>): {
   Minimum: number | null;
 } {
   const Rails: Array<{ Name: string; Ok: boolean }> = [];
-  if (IsObject(Value.PowerSupply)) {
+  if (IsRecord(Value.PowerSupply)) {
     for (const [Name, Ok] of Object.entries(Value.PowerSupply)) {
       const B = BoolOrNull(Ok);
       if (B != null) Rails.push({ Name, Ok: B });
     }
   }
-  const T = IsObject(Value.Temperature) ? Value.Temperature : {};
+  const T = IsRecord(Value.Temperature) ? Value.Temperature : {};
   return {
     PowerRails: Rails,
     Average: NumOrNull(T.Average),

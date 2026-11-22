@@ -6,7 +6,6 @@ const {
   resolveContainedScriptFile,
   normalizeRelativePathForCompare,
   getLocalPlatformKey,
-  parseArgumentString,
   normalizeVersionToken,
   resolveLocalScriptLauncher,
 } = require('../dist/main/local-scripts');
@@ -53,23 +52,6 @@ test('getLocalPlatformKey maps the current platform', () => {
   const expected =
     process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
   assert.equal(getLocalPlatformKey(), expected);
-});
-
-test('parseArgumentString splits plain args on whitespace', () => {
-  assert.deepEqual(parseArgumentString('a b   c'), ['a', 'b', 'c']);
-  assert.deepEqual(parseArgumentString(''), []);
-  assert.deepEqual(parseArgumentString(null), []);
-});
-
-test('parseArgumentString honours single and double quotes', () => {
-  assert.deepEqual(parseArgumentString('"a b" c'), ['a b', 'c']);
-  assert.deepEqual(parseArgumentString("'a b' c"), ['a b', 'c']);
-  assert.deepEqual(parseArgumentString('a"b"c'), ['abc']);
-});
-
-test('parseArgumentString honours backslash escapes', () => {
-  assert.deepEqual(parseArgumentString('a\\ b'), ['a b']);
-  assert.deepEqual(parseArgumentString('a\\'), ['a\\']);
 });
 
 test('normalizeVersionToken strips leading v and lowercases', () => {

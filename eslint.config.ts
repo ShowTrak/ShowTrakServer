@@ -16,6 +16,9 @@ export default defineConfig([
       'out/**',
       'dist/**',
       'dist-test/**',
+      // The compiled kit (npm run build:shared): build output, which uses the
+      // page global `$` the renderer kit is written against.
+      'shared/dist/**',
       '.vscode/**',
     ],
   },
@@ -87,7 +90,7 @@ export default defineConfig([
     // above; these rules catch the implicit kind: an untyped require(), a
     // JSON.parse result, Array.isArray on an unknown value, jQuery's .data(), a
     // library callback typed loosely. Type such a value as `unknown` and narrow
-    // it (src/Modules/Utils/guards.ts, src/UI/js/app/lib/guards.ts).
+    // it (the type guards in @showtrak/protocol/common).
     //
     // They need type information, so every TypeScript file linted here must
     // belong to one of these programs. shared/ (the ShowTrak-Protocol
@@ -121,7 +124,8 @@ export default defineConfig([
   {
     // src/common is compiled into both the main process and the renderer, so
     // it imports neither Node, the DOM, nor either side's own modules
-    // (tsconfig.common.json checks the globals it uses).
+    // (tsconfig.common.json checks the globals it uses). The one exception is
+    // @showtrak/protocol/common, the kit's code held to the same rule.
     files: ['src/common/**/*.ts'],
     rules: {
       'no-restricted-imports': [
@@ -129,8 +133,9 @@ export default defineConfig([
         {
           patterns: [
             {
-              regex: '^(?!\\./)',
-              message: 'src/common only imports its own modules (it runs in both processes).',
+              regex: '^(?!\\./|@showtrak/protocol/common$)',
+              message:
+                'src/common only imports its own modules and @showtrak/protocol/common (it runs in both processes).',
             },
           ],
         },

@@ -24,7 +24,7 @@
 import { Manager as SettingsManager } from '../SettingsManager';
 import { Manager as ModeManager } from '../ModeManager';
 import type { SubscribeChannel } from '../IPCRegistry/channels';
-import { IsArray } from '../Utils/guards';
+import { IsArray } from '@showtrak/protocol/common';
 import type { OSCBulkActionType, SdkRpcError } from '@showtrak/protocol';
 
 /**

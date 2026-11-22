@@ -54,7 +54,6 @@ import {
   BuildBaseUrl,
   WithPath,
   RequestJson,
-  IsObject,
   Dig,
   StrOrNull,
   NumOrNull,
@@ -62,6 +61,7 @@ import {
   TimeoutOf,
   DeviceErrorText,
 } from './_videoproc-http-shared';
+import { IsRecord } from '@showtrak/protocol/common';
 import { Card, Esc, FormatLatency, Note, Pill, Row, Rows, TextRow, HealthPill } from './debug';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type {
@@ -254,7 +254,7 @@ function SensorName(Parts: string[]): string {
 
 // Every numeric leaf under system/temperature, whatever its depth.
 function CollectTemperatures(Node: unknown, Prefix: string[], Out: TesseraTemperature[]): void {
-  if (IsObject(Node)) {
+  if (IsRecord(Node)) {
     for (const [Key, Value] of Object.entries(Node)) {
       CollectTemperatures(Value, [...Prefix, Key], Out);
     }
@@ -266,7 +266,7 @@ function CollectTemperatures(Node: unknown, Prefix: string[], Out: TesseraTemper
 
 // Fans are objects carrying a status and/or speed leaf (system/fan/case/one/...).
 function CollectFans(Node: unknown, Prefix: string[], Out: TesseraFan[]): void {
-  if (!IsObject(Node)) return;
+  if (!IsRecord(Node)) return;
   if ('status' in Node || 'speed' in Node) {
     Out.push({
       Name: SensorName(Prefix),
@@ -280,16 +280,16 @@ function CollectFans(Node: unknown, Prefix: string[], Out: TesseraFan[]): void {
 
 // The tree below "api", or null when the body is not a Tessera API tree.
 function ApiTree(Json: unknown): Record<string, unknown> | null {
-  if (!IsObject(Json)) return null;
-  const Tree = IsObject(Json.api) ? Json.api : Json;
+  if (!IsRecord(Json)) return null;
+  const Tree = IsRecord(Json.api) ? Json.api : Json;
   // The system branch is present on every documented version; without it this
   // is some other web server.
-  return IsObject(Tree.system) ? Tree : null;
+  return IsRecord(Tree.system) ? Tree : null;
 }
 
 function ParseSnapshot(Tree: Record<string, unknown>): TesseraSnapshot {
   const System = Tree.system as Record<string, unknown>;
-  const Panels = IsObject(Dig(Tree, ['panels', 'statistics']))
+  const Panels = IsRecord(Dig(Tree, ['panels', 'statistics']))
     ? Dig(Tree, ['panels', 'statistics'])
     : Dig(Tree, ['devices', 'statistics']);
 
@@ -314,7 +314,7 @@ function ParseSnapshot(Tree: Record<string, unknown>): TesseraSnapshot {
 
   const Loops: Array<{ Loop: string; State: string }> = [];
   const LoopTree = Dig(Tree, ['output', 'network', 'cable-redundancy', 'loops']);
-  if (IsObject(LoopTree)) {
+  if (IsRecord(LoopTree)) {
     for (const [Loop, Value] of Object.entries(LoopTree)) {
       const State = StrOrNull(Dig(Value, ['state']));
       if (State) Loops.push({ Loop, State });
@@ -324,7 +324,7 @@ function ParseSnapshot(Tree: Record<string, unknown>): TesseraSnapshot {
   // The project's presets, numbered by their key under presets/items.
   const Presets: Array<{ Number: number; Name: string | null }> = [];
   const PresetTree = Dig(Tree, ['presets', 'items']);
-  if (IsObject(PresetTree)) {
+  if (IsRecord(PresetTree)) {
     for (const [Key, Value] of Object.entries(PresetTree)) {
       const N = Number(Key);
       if (!Number.isInteger(N) || N < 1) continue;

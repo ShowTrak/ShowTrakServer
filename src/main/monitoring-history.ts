@@ -4,7 +4,7 @@
 // are pruned. The backing Maps are encapsulated here; callers interact only
 // through exported helpers.
 import { HISTORY_RETENTION_MS } from '../Modules/Config/constants';
-import { IsArray, IsObject } from '../Modules/Utils/guards';
+import { IsArray, IsObject } from '@showtrak/protocol/common';
 import type { HistorySample } from '@showtrak/protocol';
 
 const MONITORING_HISTORY_MAX_AGE_MS = HISTORY_RETENTION_MS;

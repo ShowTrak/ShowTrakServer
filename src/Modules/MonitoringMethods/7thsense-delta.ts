@@ -72,6 +72,7 @@ import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 import { CachedLookup } from './_dns-cache';
 import { AddressPortError } from './_target-checks';
+import { IsRecord } from '@showtrak/protocol/common';
 
 const ID = '7thsense-delta';
 const DEFAULT_PORT = 23;
@@ -590,24 +591,20 @@ function FindKey(Obj: Record<string, unknown>, ...Names: string[]): unknown {
   return undefined;
 }
 
-function IsObject(Value: unknown): Value is Record<string, unknown> {
-  return !!Value && typeof Value === 'object' && !Array.isArray(Value);
-}
-
 /**
  * `{ "GPUS": [{ "GPU_Id": 0, "Temperature": 50 }, ...] }`, also accepted under a
  * `data` wrapper (the other DeltaMonitor endpoints use one) and with any key
  * case. Null when no GPU list is present.
  */
 export function ParseGpuTemps(Body: unknown): GpuReading[] | null {
-  if (!IsObject(Body)) return null;
+  if (!IsRecord(Body)) return null;
   let List = FindKey(Body, 'GPUS');
   if (List === undefined) {
     const Data = FindKey(Body, 'data');
-    if (IsObject(Data)) List = FindKey(Data, 'GPUS');
+    if (IsRecord(Data)) List = FindKey(Data, 'GPUS');
   }
   if (!Array.isArray(List)) return null;
-  return List.filter(IsObject).map((Item, Index) => {
+  return List.filter(IsRecord).map((Item, Index) => {
     const RawId = FindKey(Item, 'GPU_Id', 'GpuId', 'Id');
     const RawTemp = FindKey(Item, 'Temperature', 'Temp');
     const Temp =

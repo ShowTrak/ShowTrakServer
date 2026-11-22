@@ -27,8 +27,20 @@
     "types": ["jquery", "node"],
     "paths": {
       "@showtrak/protocol": ["./shared/src/index.d.ts"],
+      // The kit's compiled entry points resolve to their BUILT declarations
+      // (`npm run build:shared`), as in tsconfig.json: /common, and the
+      // renderer kit, one module per /ui/<name>.
+      "@showtrak/protocol/common": ["./shared/dist/common/index.d.ts"],
+      "@showtrak/protocol/ui/*": ["./shared/dist/ui/*"],
       "@showtrak/protocol/*": ["./shared/src/*"]
     }
   },
-  "include": ["src/UI/js/app/**/*", "src/UI/types/**/*", "src/common/**/*"]
+  // shared/src/ui/vendors.d.ts declares the Bootstrap and Howler page
+  // globals for the renderer kit and the app alike.
+  "include": [
+    "src/UI/js/app/**/*",
+    "src/UI/types/**/*",
+    "src/common/**/*",
+    "shared/src/ui/vendors.d.ts"
+  ]
 }

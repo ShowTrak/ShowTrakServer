@@ -46,7 +46,6 @@ import {
   BuildBaseUrl,
   WithPath,
   RequestJson,
-  IsObject,
   StrOrNull,
   NumOrNull,
   BoolOrNull,
@@ -56,6 +55,7 @@ import {
   type JsonRequest,
   type JsonResponse,
 } from './_videoproc-http-shared';
+import { IsRecord } from '@showtrak/protocol/common';
 import { Card, Esc, FormatLatency, Note, Pill, Row, Rows, TextRow, HealthPill } from './debug';
 import { createHash } from 'crypto';
 import { DEFAULT_MONITORING_INTERVAL_MS, MONITORING_INTEREST_TTL_MS } from '../Config/constants';
@@ -272,9 +272,9 @@ export interface LivePremierInput {
 }
 
 function ParseSystem(Json: unknown): LivePremierSystem | null {
-  if (!IsObject(Json)) return null;
+  if (!IsRecord(Json)) return null;
   const Type = StrOrNull(Json.type);
-  if (!Type || !IsObject(Json.version)) return null;
+  if (!Type || !IsRecord(Json.version)) return null;
   const V = Json.version;
   const Parts = [NumOrNull(V.major), NumOrNull(V.minor), NumOrNull(V.patch)];
   return {
@@ -286,7 +286,7 @@ function ParseSystem(Json: unknown): LivePremierSystem | null {
 }
 
 function ParseInput(Id: number, Json: unknown): LivePremierInput {
-  const O = IsObject(Json) ? Json : {};
+  const O = IsRecord(Json) ? Json : {};
   return {
     Id,
     Label: StrOrNull(O.label),
@@ -399,7 +399,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
         });
       } else if (Res.Status === 404) {
         Inputs.push({ Id, Label: null, Found: false, Enabled: null, Valid: null, Frozen: null });
-      } else if (Res.Status !== 200 || !IsObject(Res.Json)) {
+      } else if (Res.Status !== 200 || !IsRecord(Res.Json)) {
         Inputs.push({
           Id,
           Label: null,

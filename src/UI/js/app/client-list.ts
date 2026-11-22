@@ -84,7 +84,7 @@ import {
 import { ApplyListSearch } from './list-filter';
 import { SyncTileWidgets } from './tile-widgets';
 import { IndexClients } from './lib/client-patches';
-import { IsArray } from './lib/guards';
+import { IsArray } from '@showtrak/protocol/common';
 
 // Every client of the last full list, by UUID. The values are the list's own
 // objects (shared with __LastClients and AllClients), so a live patch applied

@@ -34,13 +34,13 @@ import {
 } from './_clearcom-shared';
 import {
   BuildBaseUrl,
-  IsObject,
   NumOrNull,
   RequestJson,
   StrOrNull,
   TimeoutOf,
   WithPath,
 } from './_videoproc-http-shared';
+import { IsRecord } from '@showtrak/protocol/common';
 import { DEFAULT_MONITORING_INTERVAL_MS } from '../Config/constants';
 import type { MonitoringResult, MonitoringSettingField, MonitoringTargetLike } from './types';
 import { AddressPortError } from './_target-checks';
@@ -108,9 +108,9 @@ function FsiiRoleId(Record: Record<string, unknown>, Live: Record<string, unknow
   const Online = String(Live.status ?? '').toLowerCase() === 'online';
   const LiveRole = NumOrNull(Live.role);
   if (Online && LiveRole != null && LiveRole !== NO_ROLE) return LiveRole;
-  const Assigned = IsObject(Record.role) ? NumOrNull(Record.role.id) : null;
+  const Assigned = IsRecord(Record.role) ? NumOrNull(Record.role.id) : null;
   if (Assigned != null) return Assigned;
-  const Default = IsObject(Record.settings) ? NumOrNull(Record.settings.default_role) : null;
+  const Default = IsRecord(Record.settings) ? NumOrNull(Record.settings.default_role) : null;
   return Default != null && Default !== NO_ROLE ? Default : null;
 }
 
@@ -142,7 +142,7 @@ async function Run(Target: MonitoringTargetLike): Promise<MonitoringResult> {
       Status: Device.Status,
     };
   }
-  if (!IsObject(Device.Json)) {
+  if (!IsRecord(Device.Json)) {
     return {
       Success: false,
       Degraded: true,

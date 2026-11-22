@@ -7,7 +7,7 @@ import { CreateLogger } from '../Logger';
 import { Manager as AppData } from '../AppData';
 import { Manager as UUID } from '../UUID';
 import { Ok, Fail } from '../Utils';
-import { IsArray } from '../Utils/guards';
+import { IsArray } from '@showtrak/protocol/common';
 import type {
   AudioAssetData,
   AudioAssetInspection,
