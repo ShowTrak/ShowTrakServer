@@ -11,7 +11,7 @@ import type {
   ClientView,
 } from '@showtrak/protocol';
 import { HandleNonFatalError, Safe } from './utils';
-import { ConditionsTableHtml } from './client-info-conditions';
+import { ConditionsTableHtml, MessageCard } from './client-info-sections';
 import {
   AudioConditionRows,
   AudioDirectionTitle,
@@ -40,18 +40,6 @@ const DIRECTIONS: AudioDirection[] = ['input', 'output'];
 const Saves = CreateConditionSaveQueue();
 
 const Token = (EndpointID: string) => encodeURIComponent(EndpointID);
-
-function MessageCard(Title: string, Body: string, Tone: 'ghost' | 'danger' = 'ghost'): string {
-  const Classes =
-    Tone === 'danger'
-      ? 'rounded-3 p-2 bg-danger bg-opacity-25 border border-danger-subtle'
-      : 'rounded-3 p-2 bg-ghost';
-  return `
-    <div class="${Classes}">
-      <h6 class="mb-0">${Safe(Title)}</h6>
-      <p class="text-sm mb-0">${Safe(Body)}</p>
-    </div>`;
-}
 
 function LevelRow(Endpoint: AudioEndpointView, Capabilities: AudioCapabilities | null): string {
   const Id = Token(Endpoint.EndpointID);

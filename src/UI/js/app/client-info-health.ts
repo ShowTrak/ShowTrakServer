@@ -5,7 +5,7 @@
 // an auto-saving conditions table. The decisions live in lib/system-health.
 import type { ClientSystemCheckKey, ClientView, FreeKioskMetricSample } from '@showtrak/protocol';
 import { HandleNonFatalError, Safe } from './utils';
-import { ConditionsTableHtml } from './client-info-conditions';
+import { ConditionsTableHtml } from './client-info-sections';
 import { ClearRenderKeys, RenderKeyIs, SetRenderKey } from './lib/render-key';
 import { BuildMetricChartModel, RenderMetricChartSvg } from './lib/metric-chart';
 import {

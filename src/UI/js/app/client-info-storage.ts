@@ -6,7 +6,7 @@
 import { CreateConditionSaveQueue } from './lib/condition-save-queue';
 import type { ClientView, StorageVolumeView } from '@showtrak/protocol';
 import { HandleNonFatalError, Safe } from './utils';
-import { ConditionsTableHtml } from './client-info-conditions';
+import { ConditionsTableHtml, MessageCard } from './client-info-sections';
 import {
   GetStorageSectionState,
   ParseStorageRuleFields,
@@ -34,14 +34,6 @@ const Saves = CreateConditionSaveQueue();
 let Pending: ClientView | null = null;
 
 const Token = (MountPoint: string) => encodeURIComponent(MountPoint);
-
-function MessageCard(Title: string, Body: string): string {
-  return `
-    <div class="rounded-3 p-2 bg-ghost">
-      <h6 class="mb-0">${Safe(Title)}</h6>
-      <p class="text-sm mb-0">${Safe(Body)}</p>
-    </div>`;
-}
 
 function ConditionCell(Row: StorageConditionRow): string {
   if (!Row.Supported) return `<span class="SHOWTRAK_AUDIO_COND_VALUE">Unsupported</span>`;

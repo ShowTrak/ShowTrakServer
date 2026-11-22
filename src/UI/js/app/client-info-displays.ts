@@ -5,7 +5,7 @@
 import { CreateConditionSaveQueue } from './lib/condition-save-queue';
 import type { ClientDisplayView, ClientView } from '@showtrak/protocol';
 import { HandleNonFatalError, Safe } from './utils';
-import { ConditionsTableHtml, ConditionValueHtml } from './client-info-conditions';
+import { ConditionsTableHtml, ConditionValueHtml, MessageCard } from './client-info-sections';
 import {
   DisplayBadge,
   DisplayConditionRows,
@@ -37,14 +37,6 @@ const CONDITION_FIELDS: DisplayConditionField[] = [
 const Saves = CreateConditionSaveQueue();
 
 const Token = (DisplayID: string) => encodeURIComponent(DisplayID);
-
-function MessageCard(Title: string, Body: string): string {
-  return `
-    <div class="rounded-3 p-2 bg-ghost">
-      <h6 class="mb-0">${Safe(Title)}</h6>
-      <p class="text-sm mb-0">${Safe(Body)}</p>
-    </div>`;
-}
 
 /** A critical display's conditions: key, value, and a tick to monitor it. Saves as it changes. */
 function ConditionsTable(Display: ClientDisplayView): string {

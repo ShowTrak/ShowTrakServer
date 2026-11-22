@@ -1,10 +1,27 @@
-// The conditions table of a monitored item in the client info modal (an audio
-// device, a display, a USB device, a network interface, a volume, an
-// application, a system check): one row per condition with its label, its
-// value and the tick that monitors it. Every section renders the same markup,
-// which the sections' change handlers and the stylesheet key on, so it is built
-// here once.
+// Markup every section of the client info modal (audio, displays, USB,
+// network, storage, applications, system checks) renders the same way, which the
+// sections' change handlers and the stylesheet key on, so it is built here once:
+// the message shown in place of a section's list, and the conditions table of a
+// monitored item (one row per condition with its label, its value and the tick
+// that monitors it).
 import { Safe } from './utils';
+
+/** A section's message in place of its list: waiting, offline, unsupported, an error. */
+export function MessageCard(
+  Title: string,
+  Body: string,
+  Tone: 'ghost' | 'danger' = 'ghost'
+): string {
+  const Classes =
+    Tone === 'danger'
+      ? 'rounded-3 p-2 bg-danger bg-opacity-25 border border-danger-subtle'
+      : 'rounded-3 p-2 bg-ghost';
+  return `
+    <div class="${Classes}">
+      <h6 class="mb-0">${Safe(Title)}</h6>
+      <p class="text-sm mb-0">${Safe(Body)}</p>
+    </div>`;
+}
 
 /** What every section's condition rows carry. */
 export interface ConditionTableRow {

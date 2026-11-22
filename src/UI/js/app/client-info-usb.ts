@@ -5,7 +5,7 @@
 import { CreateConditionSaveQueue } from './lib/condition-save-queue';
 import type { ClientView, USBCapabilities, USBDeviceView } from '@showtrak/protocol';
 import { HandleNonFatalError, Safe } from './utils';
-import { ConditionsTableHtml, ConditionValueHtml } from './client-info-conditions';
+import { ConditionsTableHtml, ConditionValueHtml, MessageCard } from './client-info-sections';
 import {
   GetUSBSectionState,
   ParseUSBRuleFields,
@@ -29,14 +29,6 @@ export const USB_LIST = '#SHOWTRAK_CLIENT_INFO_USB_DEVICES';
 const Saves = CreateConditionSaveQueue();
 
 const Token = (Value: unknown) => (Value ? encodeURIComponent(String(Value)) : '');
-
-function MessageCard(Title: string, Body: string): string {
-  return `
-    <div class="rounded-3 p-2 bg-ghost">
-      <h6 class="mb-0">${Safe(Title)}</h6>
-      <p class="text-sm mb-0">${Safe(Body)}</p>
-    </div>`;
-}
 
 // What identifies a device to the mark/remove calls, carried on the toggle and
 // on the conditions table.

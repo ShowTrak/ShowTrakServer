@@ -8,7 +8,7 @@
 import { CreateConditionSaveQueue } from './lib/condition-save-queue';
 import type { ClientView, NetworkCapabilities, NetworkInterfaceView } from '@showtrak/protocol';
 import { HandleNonFatalError, Safe } from './utils';
-import { ConditionsTableHtml } from './client-info-conditions';
+import { ConditionsTableHtml, MessageCard } from './client-info-sections';
 import {
   GetNetworkSectionState,
   HomeFamily,
@@ -43,14 +43,6 @@ const Saves = CreateConditionSaveQueue();
 let Pending: ClientView | null = null;
 
 const Token = (Name: string) => encodeURIComponent(Name);
-
-function MessageCard(Title: string, Body: string): string {
-  return `
-    <div class="rounded-3 p-2 bg-ghost">
-      <h6 class="mb-0">${Safe(Title)}</h6>
-      <p class="text-sm mb-0">${Safe(Body)}</p>
-    </div>`;
-}
 
 function ConditionInput(Name: string, Value: string, Default: string, Label: string): string {
   return `<input type="text" spellcheck="false" autocomplete="off" autocapitalize="off"

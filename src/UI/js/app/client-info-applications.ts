@@ -10,7 +10,7 @@ import type {
   RunningApplicationsViewStatus,
 } from '@showtrak/protocol';
 import { HandleNonFatalError, Safe } from './utils';
-import { ConditionsTableHtml, ConditionValueHtml } from './client-info-conditions';
+import { ConditionsTableHtml, ConditionValueHtml, MessageCard } from './client-info-sections';
 import { ClearRenderKeys, RenderKeyIs, SetRenderKey } from './lib/render-key';
 import {
   ApplicationBadge,
@@ -26,18 +26,6 @@ const LIST = '#SHOWTRAK_CLIENT_INFO_RUNNING_APPLICATIONS';
 // Saves of each application's conditions, chained so two quick ticks reach the
 // server in the order they were made.
 const Saves = CreateConditionSaveQueue();
-
-function MessageCard(Title: string, Body: string, Tone: 'ghost' | 'danger' = 'ghost'): string {
-  const Classes =
-    Tone === 'danger'
-      ? 'rounded-3 p-2 bg-danger bg-opacity-25 border border-danger-subtle'
-      : 'rounded-3 p-2 bg-ghost';
-  return `
-    <div class="${Classes}">
-      <h6 class="mb-0">${Safe(Title)}</h6>
-      <p class="text-sm mb-0">${Safe(Body)}</p>
-    </div>`;
-}
 
 function ConditionsTable(
   App: RunningApplicationViewItem,
