@@ -6,10 +6,9 @@ const path = require('node:path');
 //
 // The same question is asked on both sides of the app (the server decides
 // whether an alert fires or a script may run, the renderer decides which tags
-// badge a tile and which scripts appear in a menu), so the logic exists TWICE,
-// once per process (the renderer is bundled for the browser and cannot import
-// main-process modules). This file runs the SAME cases against both copies, so
-// the mirrors cannot drift apart silently.
+// badge a tile and which scripts appear in a menu). The logic lives once, in
+// src/common, and each process reaches it through its own entry point; this
+// file runs the SAME cases against both entry points as they are built.
 //
 // The arm that needs the care is Tags. A tag's membership is itself a scope
 // which may name further tags, so resolving one is a graph walk over data the
