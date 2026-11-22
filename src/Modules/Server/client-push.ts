@@ -23,7 +23,7 @@
 //
 // The public projection is computed at most once per client per flush and
 // shared by the Web UI and SDK surfaces, and only when one of them asks.
-import type { ClientView } from '@showtrak/protocol';
+import type { ClientPatch, ClientView } from '@showtrak/protocol';
 import { ToPublicClient } from './serializers';
 
 export type PushClient = Parameters<typeof ToPublicClient>[0];
@@ -37,17 +37,11 @@ export interface ClientPushBatch {
 
 export type ClientPushSink = (Batch: ClientPushBatch) => void;
 
-/**
- * A patch for one client: its UUID, every field whose value changed, and the
- * names of any fields the source no longer has. Values are compared by
- * reference, which is exact for the client's fields: every view is rebuilt
- * into a new object when it changes and left alone when it does not.
- */
-export interface ClientPatch {
-  UUID: string;
-  $Removed?: string[];
-  [Field: string]: unknown;
-}
+// A patch for one client is the protocol's ClientPatch: its UUID, every field
+// whose value changed, and the names of any fields the source no longer has.
+// Values are compared by reference, which is exact for the client's fields:
+// every view is rebuilt into a new object when it changes and left alone when
+// it does not.
 
 /** How long a change may wait before it is pushed. */
 export const CLIENT_PUSH_INTERVAL_MS = 250;

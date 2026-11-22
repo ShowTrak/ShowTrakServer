@@ -19,10 +19,18 @@
 import { EmitToSockets } from './push-fanout';
 import type { FanoutNamespace } from './push-fanout';
 import { DiffIntoBaseline, FlushClientPushes, RegisterClientPushSink } from './client-push';
-import type { ClientPatch } from './client-push';
 import crypto from 'crypto';
 import type { Server } from 'socket.io';
-import type { ClientToServerEvents, ServerToClientEvents, ClientView } from '@showtrak/protocol';
+import type {
+  ClientPatch,
+  ClientToServerEvents,
+  ClientView,
+  GroupView,
+  ServerToClientEvents,
+  WebUiClientToServerEvents,
+  WebUiConfig,
+  WebUiHandshakeAuth,
+} from '@showtrak/protocol';
 import { CreateLogger } from '../Logger';
 import { IsArray } from '../Utils/guards';
 import { Config } from '../Config';
@@ -73,17 +81,18 @@ import {
 const Logger = CreateLogger('WebServer');
 
 // The `/ui` namespace is a generic string-keyed transport: it emits push
-// channels and RPC events that are NOT part of the client wire contract, and it
-// stamps per-session auth state onto each socket. It is therefore modelled with
-// a purpose-built structural type rather than the strictly-typed socket.io
-// Socket, and obtained from the typed server via a single controlled assertion.
+// channels and RPC events that are NOT part of the client wire contract (its
+// own events are the protocol's webui.d.ts), and it stamps per-session auth
+// state onto each socket. It is therefore modelled with a purpose-built
+// structural type rather than the strictly-typed socket.io Socket, and obtained
+// from the typed server via a single controlled assertion.
 interface WebSocket {
   id: string;
   Authed?: boolean;
   SessionToken?: string | null;
   handshake: {
     address: string;
-    auth: { token?: string; [key: string]: unknown };
+    auth: WebUiHandshakeAuth & Record<string, unknown>;
     query: { token?: string; [key: string]: string | string[] | undefined };
   };
   emit(event: string, ...args: unknown[]): boolean;
@@ -99,13 +108,21 @@ interface WebNamespace {
 // The Socket.IO server bound to the shared client wire contract (as accepted by
 // SetupClientNamespace); the web namespace is derived from it.
 type WebIOServer = Server<ClientToServerEvents, ServerToClientEvents>;
-// Ack callback passed by the browser with each RPC-style event.
-type AckCallback = (response?: unknown) => void;
+// The ack the browser passes with one of the contract's requests, answered as
+// the contract declares. Nothing guarantees one was passed, hence the checks
+// before each call.
+type AckOf<Event extends keyof WebUiClientToServerEvents> =
+  | (Parameters<WebUiClientToServerEvents[Event]> extends [
+      ...unknown[],
+      infer Ack extends (response: never) => void,
+    ]
+      ? Ack
+      : never)
+  | undefined;
 
-// Source shapes accepted by the public serializers (used when transforming push
-// payloads for the web wire).
+// Source shape accepted by the public client serializer (used when transforming
+// push payloads for the web wire).
 type PublicClientInput = Parameters<typeof ToPublicClient>[0];
-type PublicGroupInput = Parameters<typeof ToPublicGroup>[0];
 
 // In-memory map of currently valid Web UI session tokens to their expiry (epoch
 // ms). Expiry is sliding: a token's lifetime is renewed on each validated use,
@@ -238,7 +255,7 @@ function TransformWebPush(channel: string, args: unknown[]): unknown[] {
     case 'SetFullClientList':
       return [
         ((args[0] as PublicClientInput[]) || []).map(ToPublicClient),
-        ((args[1] as PublicGroupInput[]) || []).map(ToPublicGroup),
+        ((args[1] as GroupView[]) || []).map(ToPublicGroup),
       ];
     case 'ClientUpdated':
       return [ToPublicClient(args[0] as PublicClientInput)];
@@ -315,7 +332,7 @@ const GetWebConfig = async () => {
 
 // Public-facing config (never leaks the password itself). Also carries the
 // capability hints the web renderer uses to build its Capabilities object.
-const GetPublicConfig = async (socket: WebSocket) => {
+const GetPublicConfig = async (socket: WebSocket): Promise<WebUiConfig> => {
   const Cfg = await GetWebConfig();
   return {
     Enabled: Cfg.Enabled,
@@ -569,7 +586,7 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
     // --- Authentication handlers -------------------------------------------
     socket.on(
       'auth:login',
-      async (payload: { password?: unknown } | undefined, cb: AckCallback) => {
+      async (payload: { password?: unknown } | undefined, cb: AckOf<'auth:login'>) => {
         try {
           const Cfg = await GetWebConfig();
           if (!Cfg.Enabled) {
@@ -607,7 +624,7 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
       }
     );
 
-    socket.on('auth:logout', async (cb: AckCallback) => {
+    socket.on('auth:logout', async (cb: AckOf<'auth:logout'>) => {
       try {
         if (socket.SessionToken) WebSessions.delete(socket.SessionToken);
         socket.Authed = false;
@@ -618,7 +635,7 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
       }
     });
 
-    socket.on('config:get', async (cb: AckCallback) => {
+    socket.on('config:get', async (cb: AckOf<'config:get'>) => {
       try {
         if (cb) cb({ data: await GetPublicConfig(socket) });
       } catch {
@@ -635,7 +652,7 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
     // Dispatches to the SAME IPC handler the desktop uses, after auth + a strict
     // allowlist + capability gate. `args` is the positional argument array; the
     // handler's first (Electron event) argument is passed as null.
-    socket.on('rpc', async (channel: unknown, args: unknown, cb: AckCallback) => {
+    socket.on('rpc', async (channel: unknown, args: unknown, cb: AckOf<'rpc'>) => {
       try {
         if (!(await IsAuthed(socket))) return cb && cb({ error: 'unauthorized' });
         if (typeof channel !== 'string') return cb && cb({ error: 'invalid_channel' });
@@ -660,7 +677,7 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
     // between open and close, so a browser without the console open costs no
     // bandwidth. Delivery stops on close, disconnect, or losing the session.
     const LogConsoleKey = `web:${socket.id}`;
-    socket.on('logconsole:open', async (Level: unknown, cb: AckCallback) => {
+    socket.on('logconsole:open', async (Level: unknown, cb: AckOf<'logconsole:open'>) => {
       try {
         if (!(await IsAuthed(socket))) return cb && cb({ error: 'unauthorized' });
         const Snapshot = OpenLogConsole(LogConsoleKey, Level, (Entries) => {
@@ -680,7 +697,7 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
     // only while its monitor view is open. A stream can hold a device's only
     // control connection, so it stops on close, disconnect, or losing the session.
     const LiveLevelsKey = `web:${socket.id}`;
-    socket.on('monitorlive:open', async (TargetID: unknown, cb: AckCallback) => {
+    socket.on('monitorlive:open', async (TargetID: unknown, cb: AckOf<'monitorlive:open'>) => {
       try {
         if (!(await IsAuthed(socket))) return cb && cb({ error: 'unauthorized' });
         const Snapshot = OpenMonitorLiveLevels(LiveLevelsKey, TargetID, (Frames) => {
@@ -695,7 +712,7 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
     socket.on('monitorlive:close', () => CloseMonitorLiveLevels(LiveLevelsKey));
     socket.on('disconnect', () => CloseMonitorLiveLevels(LiveLevelsKey));
     // The dashboard's tile meters, on the same terms.
-    socket.on('monitortiles:open', async (cb: AckCallback) => {
+    socket.on('monitortiles:open', async (cb: AckOf<'monitortiles:open'>) => {
       try {
         if (!(await IsAuthed(socket))) return cb && cb({ error: 'unauthorized' });
         const Snapshot = OpenMonitorTileLevels(LiveLevelsKey, (Frames) => {
@@ -712,7 +729,7 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
 
     // Rainbow Mode, toggled from the console. Same reasoning: kept off the rpc
     // bridge so it never appears in the documented surface.
-    socket.on('rainbow:get', async (cb: AckCallback) => {
+    socket.on('rainbow:get', async (cb: AckOf<'rainbow:get'>) => {
       try {
         if (!(await IsAuthed(socket))) return cb && cb({ error: 'unauthorized' });
         if (cb) cb({ result: GetRainbowMode() });
@@ -720,7 +737,7 @@ function SetupWebUiNamespace(io: WebIOServer, _ServerManager?: unknown) {
         if (cb) cb({ error: 'failed' });
       }
     });
-    socket.on('rainbow:set', async (Enabled: unknown, cb: AckCallback) => {
+    socket.on('rainbow:set', async (Enabled: unknown, cb: AckOf<'rainbow:set'>) => {
       try {
         if (!(await IsAuthed(socket))) return cb && cb({ error: 'unauthorized' });
         const Result = SetRainbowMode(Enabled);

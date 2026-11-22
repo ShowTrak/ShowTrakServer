@@ -22,12 +22,14 @@ import type {
   MonitorLiveLevelsSnapshot,
   MonitorTileLevelsSnapshot,
   ResultTuple,
+  WebUiResponse,
 } from '@showtrak/protocol';
 
 // The surface `window.API` has (see src/UI/types/global.d.ts).
 type RendererAPI = Window['API'];
 
-type Ack = { result?: unknown; error?: string };
+// The answer to a `/ui` request (the protocol's webui.d.ts).
+type Ack = WebUiResponse<unknown>;
 
 // How long a hidden-console request (log feed, Rainbow Mode) waits for its ack.
 const CONSOLE_ACK_TIMEOUT_MS = 10_000;
@@ -498,8 +500,8 @@ function createWebApi(socket: WebUiSocket): RendererAPI {
           resolve(Snapshot);
         };
         try {
-          socket.emit('logconsole:open', Level, (res: Ack) =>
-            Settle(res && res.result ? (res.result as LogConsoleSnapshot) : null)
+          socket.emit('logconsole:open', Level, (res: WebUiResponse<LogConsoleSnapshot>) =>
+            Settle(res && res.result ? res.result : null)
           );
         } catch {
           Settle(null);
@@ -525,8 +527,11 @@ function createWebApi(socket: WebUiSocket): RendererAPI {
           resolve(Snapshot);
         };
         try {
-          socket.emit('monitorlive:open', TargetID, (res: Ack) =>
-            Settle(res && res.result ? (res.result as MonitorLiveLevelsSnapshot) : null)
+          socket.emit(
+            'monitorlive:open',
+            TargetID,
+            (res: WebUiResponse<MonitorLiveLevelsSnapshot>) =>
+              Settle(res && res.result ? res.result : null)
           );
         } catch {
           Settle(null);
@@ -554,8 +559,8 @@ function createWebApi(socket: WebUiSocket): RendererAPI {
           resolve(Snapshot);
         };
         try {
-          socket.emit('monitortiles:open', (res: Ack) =>
-            Settle(res && res.result ? (res.result as MonitorTileLevelsSnapshot) : null)
+          socket.emit('monitortiles:open', (res: WebUiResponse<MonitorTileLevelsSnapshot>) =>
+            Settle(res && res.result ? res.result : null)
           );
         } catch {
           Settle(null);

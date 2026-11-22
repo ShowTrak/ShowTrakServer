@@ -12,7 +12,7 @@
 // body (including the `hasMainWindow()` guards that gate side effects such as
 // alert handling and history recording) is preserved so behavior is unchanged.
 
-import type { USBDevice } from '@showtrak/protocol';
+import type { USBDevice, ClientPatch } from '@showtrak/protocol';
 import { CreateLogger } from '../Modules/Logger';
 import {
   ALERT_BASELINE_SETTLE_MS,
@@ -51,7 +51,7 @@ import {
   QueueClientPush,
   RegisterClientPushSink,
 } from '../Modules/Server/client-push';
-import type { ClientPatch, ClientPushBatch, PushClient } from '../Modules/Server/client-push';
+import type { ClientPushBatch, PushClient } from '../Modules/Server/client-push';
 import { hasMainWindow } from './app-window';
 import {
   TriggerScriptDeployment,

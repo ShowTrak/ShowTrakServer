@@ -6,13 +6,7 @@
 // (see src/Modules/Server/client-push.ts). The renderer keeps one merged
 // client object per UUID and applies each patch to it in place, so every list
 // that holds that object (the full list, the context menu's copy) sees it.
-import type { ClientView } from '@showtrak/protocol';
-
-export interface ClientPatch {
-  UUID: string;
-  $Removed?: string[];
-  [Field: string]: unknown;
-}
+import type { ClientPatch, ClientView } from '@showtrak/protocol';
 
 /** Apply one patch to the merged client, in place. */
 export function ApplyClientPatch(Target: ClientView, Patch: ClientPatch): void {

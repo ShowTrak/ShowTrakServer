@@ -18,7 +18,6 @@ import {
 import { HandleNonFatalError, Safe } from './utils';
 import { GetCachedClient, ScheduleFullRender, UpdateClientTile } from './client-list';
 import { ApplyClientPatch } from './lib/client-patches';
-import type { ClientPatch } from './lib/client-patches';
 import {
   IsMonitorHistoryContextFor,
   LoadHistorySamplesForContext,
@@ -49,6 +48,7 @@ import { RefreshMonitorInfoEditor, RefreshMonitorInfoTags } from './monitor-info
 import { RefreshDummyInfoEditor, RefreshDummyInfoTags } from './dummy-info-edit';
 import { RefreshFreeKioskInfoEditor, RefreshFreeKioskInfoTags } from './freekiosk-info-edit';
 import { IsArray } from './lib/guards';
+import type { ClientPatch } from '@showtrak/protocol';
 
 /** One line rendered in the OSC/HTTP debug terminal. */
 interface OscHttpDebugEntry {

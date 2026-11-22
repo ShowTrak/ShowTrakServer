@@ -314,13 +314,7 @@ function subscribe<Args extends unknown[], Payload extends unknown[] = Args>(
   return () => ipcRenderer.removeListener(channel, handler);
 }
 
-// Server-internal channels on top of the shared contract (see the matching
-// declaration in src/UI/types/global.d.ts). The payload is passed through.
-interface ServerRendererAPI {
-  ClientPatches(Callback: (Patches: unknown[]) => void): () => void;
-}
-
-const API: ShowTrakAPI & ServerRendererAPI = {
+const API: ShowTrakAPI = {
   OpenDiscordInviteLinkInBrowser: async () => invoke('OpenDiscordInviteLinkInBrowser'),
   OpenShowTrakWebsiteInBrowser: async () => invoke('OpenShowTrakWebsiteInBrowser'),
   OpenShowTrakGithubInBrowser: async () => invoke('OpenShowTrakGithubInBrowser'),

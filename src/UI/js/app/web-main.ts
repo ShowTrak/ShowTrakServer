@@ -11,12 +11,18 @@
 import { createWebApi } from './web-api-shim';
 import type { WebUiSocket } from './web-api-shim';
 import type { CapabilityProfile } from './state';
+import type {
+  WebUiConfig,
+  WebUiConfigResponse,
+  WebUiHandshakeAuth,
+  WebUiLoginResponse,
+} from '@showtrak/protocol';
 
 // Socket.IO connect options actually passed below (the client is a vendored
 // browser global with no bundled types).
 interface IoConnectOptions {
   transports: string[];
-  auth: (cb: (data: { token?: string }) => void) => void;
+  auth: (cb: (data: WebUiHandshakeAuth) => void) => void;
   reconnection: boolean;
   reconnectionDelay: number;
   reconnectionDelayMax: number;
@@ -24,13 +30,6 @@ interface IoConnectOptions {
 }
 
 declare const io: (namespace: string, options: IoConnectOptions) => WebUiSocket;
-
-/** Ack payload for `auth:login`. */
-interface AuthLoginResponse {
-  ok?: boolean;
-  token?: string;
-  error?: string;
-}
 
 const TOKEN_KEY = 'showtrak_token';
 const PASS_KEY = 'showtrak_passcode';
@@ -83,7 +82,7 @@ try {
 // on polling always connects, and a failed upgrade just stays on polling.
 const socket = io('/ui', {
   transports: ['polling', 'websocket'],
-  auth: (cb: (data: { token?: string }) => void) =>
+  auth: (cb: (data: WebUiHandshakeAuth) => void) =>
     cb({ token: getStored(TOKEN_KEY) || undefined }),
   reconnection: true,
   reconnectionDelay: 800,
@@ -91,25 +90,8 @@ const socket = io('/ui', {
   timeout: 6000,
 });
 
-interface WebConfig {
-  Enabled: boolean;
-  PasswordProtection: boolean;
-  AllowRemoteScripts: boolean;
-  WOLEnabled: boolean;
-  UnassignedClientsEnabled: boolean;
-  AllowModeChange: boolean;
-  AllowAlertActionsToggle: boolean;
-  AllowClientManagement: boolean;
-  AllowMonitoringManagement: boolean;
-  Authed: boolean;
-  Mode?: string;
-  Version?: string;
-}
-
-/** Ack payload for `config:get`. */
-interface ConfigGetResponse {
-  data?: WebConfig;
-}
+// What the server says about the Web UI ('hello', 'config:get'), and the
+// answers to signing in, are the protocol's (webui.d.ts).
 
 let started = false;
 
@@ -142,7 +124,7 @@ function setThemeColor(color: string) {
 // Hide the desktop-only chrome. CSS (body.is-web) is the primary mechanism; this
 // is a defensive backup in case markup changes. The mode and alert-actions
 // controls stay live only when their Web UI permission is granted.
-function applyWebChrome(config: WebConfig) {
+function applyWebChrome(config: WebUiConfig) {
   try {
     setThemeColor('#6d5bd0');
     document.body.classList.add('is-web');
@@ -186,7 +168,7 @@ function applyWebChrome(config: WebConfig) {
 // than a return-type annotation, preserves the inferred object type so the
 // result still assigns to the `Record<string, unknown>`-typed window global.
 // This is the one capability-drift vector the WebUI parity tests don't cover.
-function buildCapabilities(config: WebConfig) {
+function buildCapabilities(config: WebUiConfig) {
   return {
     isWeb: true,
     showNavbar: false,
@@ -204,7 +186,7 @@ function buildCapabilities(config: WebConfig) {
 
 // Install the shim + capabilities, hide the login/loading overlays, then load
 // the shared renderer and request a fresh state snapshot once it has subscribed.
-async function startApp(config: WebConfig) {
+async function startApp(config: WebUiConfig) {
   if (started) {
     // Re-entered after a re-login while the app is already running: make sure
     // the auth overlays are gone before re-hydrating.
@@ -319,13 +301,13 @@ function submitLogin() {
     return;
   }
   setLoginError('');
-  socket.emit('auth:login', { password }, (res: AuthLoginResponse) => {
+  socket.emit('auth:login', { password }, (res: WebUiLoginResponse) => {
     if (res && res.ok) {
       if (res.token) setStored(TOKEN_KEY, res.token);
       // Remember the accepted passcode so reconnects (and future visits) can
       // re-authenticate without prompting.
       setStored(PASS_KEY, password);
-      socket.emit('config:get', (cfg: ConfigGetResponse) => {
+      socket.emit('config:get', (cfg: WebUiConfigResponse) => {
         if (cfg && cfg.data) startApp(cfg.data);
       });
       return;
@@ -343,14 +325,14 @@ function submitLogin() {
 function tryStoredLogin(onFail: () => void) {
   const stored = getStored(PASS_KEY);
   if (!stored) return onFail();
-  socket.emit('auth:login', { password: stored }, (res: AuthLoginResponse) => {
+  socket.emit('auth:login', { password: stored }, (res: WebUiLoginResponse) => {
     if (res && res.ok) {
       if (res.token) setStored(TOKEN_KEY, res.token);
       if (started) {
         hide('WEB_LOGIN_OVERLAY');
         return;
       }
-      socket.emit('config:get', (cfg: ConfigGetResponse) => {
+      socket.emit('config:get', (cfg: WebUiConfigResponse) => {
         if (cfg && cfg.data) startApp(cfg.data);
       });
       return;
@@ -396,7 +378,7 @@ function wireLogin() {
 wireLogin();
 
 // Server greeting: decides whether to prompt for a passcode or start directly.
-socket.on('hello', (config: WebConfig) => {
+socket.on('hello', (config: WebUiConfig) => {
   if (started) {
     // Reconnected after the app already booted, OR re-greeted because the Web UI
     // settings changed under a live session. If access was revoked, eject to the
