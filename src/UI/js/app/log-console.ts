@@ -7,6 +7,7 @@
 import type { LogConsoleEntry, LogConsoleSnapshot } from '@showtrak/protocol';
 import { closeModal, openModal } from './lib/modal';
 import { buildModalHeader } from '@showtrak/protocol/ui/modal-header';
+import { LEVEL_RANK } from '@showtrak/protocol/common';
 import { EntryChars, MAX_CHARS, MAX_LINES, NewestWithinBudget } from './lib/log-console-budget';
 import { CloseAllModals } from './modals';
 import { HandleNonFatalError } from './utils';
@@ -24,7 +25,6 @@ const KONAMI = [
   'a',
 ];
 
-const LEVEL_RANK: Record<string, number> = { error: 0, warn: 1, info: 2, debug: 3, trace: 4 };
 const DEFAULT_LEVEL = 'info';
 const LEVEL_STORAGE_KEY = 'ShowTrak:LogConsoleLevel';
 // How close to the bottom still counts as "following" the feed.

@@ -4,6 +4,7 @@
 // src/main/monitoring-live.ts); this lays out a card of horizontal meters and
 // works out each bar's width, colour zone and peak-hold marker.
 import type { MonitorLiveLevelsCheck } from '@showtrak/protocol';
+import { Safe } from '@showtrak/protocol/ui/html';
 
 /** The bottom of the meter scale; anything quieter reads as an empty bar. */
 export const METER_FLOOR_DB = -60;
@@ -97,15 +98,6 @@ export function LiveLevelsStatus(Check: MonitorLiveLevelsCheck): {
   return { Text: Check.Message || 'Levels unavailable', Kind: 'problem' };
 }
 
-function Escape(Value: unknown): string {
-  return String(Value == null ? '' : Value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
 /**
  * What the card's markup depends on. While it is unchanged the DOM is updated
  * in place (bar widths, values) rather than redrawn ten times a second.
@@ -137,13 +129,13 @@ export function LiveLevelsCardHtml(Check: MonitorLiveLevelsCheck): string {
       Groups.push(Group);
     }
     Group.Strips.push(
-      `<div class="live-levels-row live-levels-strip" data-index="${Index}" data-channel-id="${Escape(Channel.ID)}">` +
+      `<div class="live-levels-row live-levels-strip" data-index="${Index}" data-channel-id="${Safe(Channel.ID)}">` +
         '<div class="live-levels-strip-head">' +
         `<span class="live-levels-number">${ChannelNumber(Channel.ID, Group.Strips.length + 1)}</span>` +
-        `<span class="live-levels-label" title="${Escape(Channel.Label)}">${Escape(Channel.Label)}</span>` +
+        `<span class="live-levels-label" title="${Safe(Channel.Label)}">${Safe(Channel.Label)}</span>` +
         '<span class="live-levels-value">−∞</span>' +
         '</div>' +
-        `<span class="live-levels-bar" role="meter" aria-label="${Escape(Channel.Label)}" aria-valuemin="${METER_FLOOR_DB}" aria-valuemax="0">` +
+        `<span class="live-levels-bar" role="meter" aria-label="${Safe(Channel.Label)}" aria-valuemin="${METER_FLOOR_DB}" aria-valuemax="0">` +
         '<span class="live-levels-fill"></span><span class="live-levels-peak"></span></span>' +
         (Channel.Control ? ControlCellsHtml(Channel) : '') +
         '</div>'
@@ -151,14 +143,14 @@ export function LiveLevelsCardHtml(Check: MonitorLiveLevelsCheck): string {
   });
   const Body = Groups.map(
     (Group) =>
-      (Group.Name ? `<div class="live-levels-group">${Escape(Group.Name)}</div>` : '') +
+      (Group.Name ? `<div class="live-levels-group">${Safe(Group.Name)}</div>` : '') +
       `<div class="live-levels-strips">${Group.Strips.join('')}</div>`
   ).join('');
   return (
     `<div class="live-levels-card is-${Status.Kind}">` +
     '<div class="live-levels-head">' +
-    `<span class="live-levels-title">${Escape(Check.Name ? `${Check.Name} · Levels` : 'Levels')}</span>` +
-    `<span class="live-levels-status is-${Status.Kind}">${Escape(Status.Text)}</span>` +
+    `<span class="live-levels-title">${Safe(Check.Name ? `${Check.Name} · Levels` : 'Levels')}</span>` +
+    `<span class="live-levels-status is-${Status.Kind}">${Safe(Status.Text)}</span>` +
     '</div>' +
     (Body ? `<div class="live-levels-rows">${Body}</div>` : '') +
     '</div>'
@@ -173,11 +165,11 @@ function ChannelNumber(ID: string, Fallback: number): number {
 
 // A strip's fader (with its value) and mute, under its meter.
 function ControlCellsHtml(Channel: MonitorLiveLevelsCheck['Channels'][number]): string {
-  const Name = Escape(Channel.Label);
+  const Name = Safe(Channel.Label);
   return (
     '<div class="live-levels-strip-controls">' +
     `<input type="range" class="form-range live-levels-fader" min="${FADER_SLIDER_MIN}" max="${FADER_SLIDER_MAX}" step="${FADER_SLIDER_STEP}" value="${FaderToSlider(Channel.Fader)}" aria-label="${Name} fader">` +
-    `<span class="live-levels-fader-value">${Escape(FormatFader(Channel.Fader))}</span>` +
+    `<span class="live-levels-fader-value">${Safe(FormatFader(Channel.Fader))}</span>` +
     `<button type="button" class="btn btn-sm live-levels-mute${Channel.Muted ? ' is-muted' : ''}" aria-pressed="${Channel.Muted ? 'true' : 'false'}" aria-label="Mute ${Name}" title="Mute">` +
     '<i class="bi bi-volume-mute"></i></button>' +
     '</div>'
