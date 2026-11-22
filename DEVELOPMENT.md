@@ -238,6 +238,41 @@ npm run format
 npm run format:check
 ```
 
+## TypeScript
+
+All of `src/` is TypeScript; only the tests, their support code and the build
+scripts are JavaScript. `npm run typecheck` checks five programs, each with only
+the types its code can use at run time:
+
+| Program                        | Covers                                                                           |
+| ------------------------------ | -------------------------------------------------------------------------------- |
+| `tsconfig.json`                | The main process and its modules (`src/` but the renderer and Web UI)            |
+| `tsconfig.renderer.json`       | The renderer shared by the desktop and the Web UI (`src/UI/js/app`): DOM, jQuery |
+| `tsconfig.preloader.json`      | The splash window's page script: the DOM only                                    |
+| `tsconfig.service-worker.json` | The Web UI's offline-splash service worker: the WebWorker library only           |
+| `tsconfig.tooling.json`        | `forge.config.ts` and `eslint.config.ts`                                         |
+
+`tsconfig.renderer.test.json` compiles the renderer again, as CommonJS modules in
+`dist-test/`, for the tests to load; `npm test` builds it.
+
+ESLint lints these programs with type information. Explicit `any` is an error,
+and the `no-unsafe-*` rules reject any value typed `any` that is used unchecked
+(an untyped `require()`, a `JSON.parse` result, a loosely typed library
+callback): type it as `unknown` and narrow it (`src/Modules/Utils/guards.ts`,
+`src/UI/js/app/lib/guards.ts`).
+
+Every type that crosses a process or network boundary comes from
+`@showtrak/protocol`, the `shared/` submodule: the client wire, `/sdk`, the Web
+UI socket, the preload bridges and IPC, renderer pushes, and what show files
+record. Import them type-only (`import type { ClientView } from
+'@showtrak/protocol'`). Where the server holds more than it sends, extend the
+protocol's type rather than copying it (`OSCRouteEntry extends OSCRoute`), and
+check runtime lists against the protocol's unions with
+`AssertTrue<ChannelListCheck<...>>`, as `sdk-namespace.ts` does for its push
+allowlists. Types used inside one module stay local. A protocol type that is
+wrong or missing is fixed in ShowTrak-Protocol, then picked up by bumping the
+submodule.
+
 ## Networking and Runtime Notes
 
 - Main server/socket port defaults to `3000`.
@@ -302,7 +337,7 @@ Used by packaging and CI when signing/notarization is enabled:
 - `src/main.ts` - Electron main process and lifecycle orchestration
 - `src/main/` - main-process wiring: broadcast bridge, history stores, retention sweep, IPC registrars
 - `src/bridge_main.ts` - preload bridge and IPC channel allowlists
-- `shared/` - `@showtrak/protocol`, the wire types shared with ShowTrak Client (git submodule)
+- `shared/` - `@showtrak/protocol`: the wire and every other cross-boundary type, shared with the other ShowTrak apps (git submodule)
 - `src/UI/` - desktop renderer UI
 - `src/WebUI/` - browser-based companion UI
 - `src/Modules/` - domain modules and infrastructure
