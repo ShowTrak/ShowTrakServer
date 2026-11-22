@@ -66,8 +66,9 @@ export default defineConfig([
       // free of explicit `any`, so this is now enforced as an error to prevent
       // regressions. If you truly need a dynamic value, use `unknown` and narrow.
       '@typescript-eslint/no-explicit-any': 'error',
-      // Inline `require('../X')` is the documented workaround for not-yet-
-      // migrated managers with circular deps; removed in Phase 4.
+      // A require() stays where a module is loaded lazily on purpose (start-up
+      // cost, a circular dependency), typed as `require('x') as typeof
+      // import('x')`; every other module is imported.
       '@typescript-eslint/no-require-imports': 'off',
       // jQuery handler patterns legitimately alias `this` (e.g. into rAF closures).
       '@typescript-eslint/no-this-alias': 'off',
@@ -79,6 +80,42 @@ export default defineConfig([
           varsIgnorePattern: '^_[^_].*$|^_$',
         },
       ],
+    },
+  },
+  {
+    // No value typed `any` may be used unchecked. Explicit `any` is banned
+    // above; these rules catch the implicit kind: an untyped require(), a
+    // JSON.parse result, Array.isArray on an unknown value, jQuery's .data(), a
+    // library callback typed loosely. Type such a value as `unknown` and narrow
+    // it (src/Modules/Utils/guards.ts, src/UI/js/app/lib/guards.ts).
+    //
+    // They need type information, so every TypeScript file linted here must
+    // belong to one of these programs. shared/ (the ShowTrak-Protocol
+    // submodule) lints itself and keeps only the rules above.
+    files: ['**/*.ts'],
+    ignores: ['shared/**'],
+    languageOptions: {
+      parserOptions: {
+        project: [
+          './tsconfig.json',
+          './tsconfig.renderer.json',
+          './tsconfig.preloader.json',
+          './tsconfig.service-worker.json',
+          './tsconfig.tooling.json',
+        ],
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-unsafe-argument': 'error',
+      '@typescript-eslint/no-unsafe-assignment': 'error',
+      '@typescript-eslint/no-unsafe-call': 'error',
+      '@typescript-eslint/no-unsafe-declaration-merging': 'error',
+      '@typescript-eslint/no-unsafe-enum-comparison': 'error',
+      '@typescript-eslint/no-unsafe-function-type': 'error',
+      '@typescript-eslint/no-unsafe-member-access': 'error',
+      '@typescript-eslint/no-unsafe-return': 'error',
+      '@typescript-eslint/no-unsafe-unary-minus': 'error',
     },
   },
   {

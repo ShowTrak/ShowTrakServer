@@ -4,9 +4,10 @@
 # alone, which meant the two most common CI failures (a stray formatting diff
 # and a type error) were only discovered after pushing.
 #
-# Tests are deliberately NOT here: the suite rebuilds first and takes ~30s,
+# Tests are deliberately NOT here: the suite rebuilds first and takes minutes,
 # which is too slow to sit in front of every commit. CI remains the gate for
-# those. Everything below runs in roughly 8s combined.
+# those. Everything below runs in roughly 20s combined, half of it the lint,
+# whose rules against implicit `any` need type information.
 #
 # Ordered cheapest-signal-first so an obvious break fails fast.
 
