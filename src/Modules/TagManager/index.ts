@@ -17,7 +17,7 @@ import { CreateTagsRepository } from '../DB/repositories/tags';
 import { Manager as BroadcastManager } from '../Broadcast';
 import * as SlugService from '../Slug';
 import { SCRIPT_COLOURS, NormalizeIconName } from '../ScriptManager/schema';
-import { NormalizeScopeTags } from '../ScopeMatching';
+import { NormalizeStoredScope } from '../ScopeMatching';
 import { Ok, Fail } from '../Utils';
 import type { TagRow } from '../DB/rows';
 import type { TagView, TagScope, TagDisplayMode, Result } from '@showtrak/protocol';
@@ -72,24 +72,13 @@ function NormalizeDisplay(Value: unknown): TagDisplayMode {
 // Tags are numeric TagIDs of other tags this one absorbs. Anything malformed is
 // dropped rather than throwing.
 function NormalizeScope(Raw: unknown, SelfTagID?: number): TagScope {
-  const Obj = Raw && typeof Raw === 'object' ? (Raw as Record<string, unknown>) : {};
-  const Groups: number[] = [];
-  for (const Value of Array.isArray(Obj.Groups) ? Obj.Groups : []) {
-    const N = Number(Value);
-    if (Number.isFinite(N) && !Groups.includes(N)) Groups.push(N);
-  }
-  const Clients: string[] = [];
-  for (const Value of Array.isArray(Obj.Clients) ? Obj.Clients : []) {
-    const S = String(Value == null ? '' : Value).trim();
-    if (S && !Clients.includes(S)) Clients.push(S);
-  }
+  const Scope = NormalizeStoredScope(Raw);
   // A tag can absorb other tags, but never itself: a self-reference is the one
   // cycle that is unambiguously a mistake, and dropping it here keeps the
   // stored data clean (deeper cycles are tolerated at resolve time instead;
   // they can be authored across two edits, so refusing them here would just
   // move the problem).
-  const Tags = NormalizeScopeTags(Obj.Tags).filter((TagID) => TagID !== SelfTagID);
-  return { Workspace: !!Obj.Workspace, Groups, Clients, Tags };
+  return { ...Scope, Tags: Scope.Tags.filter((TagID) => TagID !== SelfTagID) };
 }
 
 // Parse a stored Scope JSON string. Returns an empty scope when unusable so a

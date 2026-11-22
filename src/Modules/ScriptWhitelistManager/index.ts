@@ -12,7 +12,7 @@
 import { CreateLogger } from '../Logger';
 import { Manager as DB } from '../DB';
 import { CreateScriptWhitelistRepository } from '../DB/repositories/script-whitelists';
-import { NormalizeScopeTags, ScopeCoversEntity } from '../ScopeMatching';
+import { NormalizeStoredScope, ScopeCoversEntity } from '../ScopeMatching';
 import type { ScopeTag } from '../ScopeMatching';
 import type { ScriptWhitelistScope } from '@showtrak/protocol';
 import { RecordEdit } from '../AuditLog/edits';
@@ -30,24 +30,8 @@ interface WhitelistClient {
   GroupID?: number | null;
 }
 
-// Coerce arbitrary parsed JSON into a well-formed scope. Groups are numeric
-// (GroupID); Clients are string UUIDs; Tags are numeric TagIDs. Anything
-// malformed is dropped rather than throwing so a single bad row can never break
-// script dispatch.
-function NormalizeScope(Raw: unknown): ScriptWhitelistScope {
-  const Obj = Raw && typeof Raw === 'object' ? (Raw as Record<string, unknown>) : {};
-  const Groups: number[] = [];
-  for (const Value of Array.isArray(Obj.Groups) ? Obj.Groups : []) {
-    const N = Number(Value);
-    if (Number.isFinite(N) && !Groups.includes(N)) Groups.push(N);
-  }
-  const Clients: string[] = [];
-  for (const Value of Array.isArray(Obj.Clients) ? Obj.Clients : []) {
-    const S = String(Value == null ? '' : Value).trim();
-    if (S && !Clients.includes(S)) Clients.push(S);
-  }
-  return { Workspace: !!Obj.Workspace, Groups, Clients, Tags: NormalizeScopeTags(Obj.Tags) };
-}
+// Clients are plain UUIDs here (scripts only run on remote clients).
+const NormalizeScope: (Raw: unknown) => ScriptWhitelistScope = NormalizeStoredScope;
 
 // Parse a stored Scope JSON string. Returns a normalized scope, or null when the
 // text is unusable (treated by callers as "unrestricted"; fail open, since this
