@@ -5,6 +5,7 @@
 // an auto-saving conditions table. The decisions live in lib/system-health.
 import type { ClientSystemCheckKey, ClientView, FreeKioskMetricSample } from '@showtrak/protocol';
 import { HandleNonFatalError, Safe } from './utils';
+import { ConditionsTableHtml } from './client-info-conditions';
 import { ClearRenderKeys, RenderKeyIs, SetRenderKey } from './lib/render-key';
 import { BuildMetricChartModel, RenderMetricChartSvg } from './lib/metric-chart';
 import {
@@ -90,26 +91,12 @@ function ConditionCell(Row: SystemConditionRow): string {
 }
 
 function ConditionsTable(Card: SystemCheckCard): string {
-  if (!Card.Rows.length) return '';
-  return `
-    <table class="SHOWTRAK_AUDIO_CONDITIONS SHOWTRAK_SYSTEM_CONDITIONS" data-check="${Card.Key}">
-      <tbody>
-        ${Card.Rows.map(
-          (Row) => `
-          <tr data-cond="${Row.Field}" class="${Row.Supported ? '' : 'is-unsupported'} ${Row.Failing ? 'is-failing' : ''}"
-            ${Row.Failing ? `title="${Safe(Row.Failing)}"` : ''}>
-            <th scope="row">${Safe(Row.Label)}</th>
-            <td>${ConditionCell(Row)}</td>
-            <td class="SHOWTRAK_AUDIO_COND_CHECK">${
-              Row.Supported && Row.Tickable
-                ? `<input type="checkbox" class="form-check-input" data-rule="${Row.Field}"
-                    ${Row.Checked ? 'checked' : ''} aria-label="Monitor ${Safe(Row.Label.toLowerCase())}" />`
-                : ''
-            }</td>
-          </tr>`
-        ).join('')}
-      </tbody>
-    </table>`;
+  return ConditionsTableHtml(Card.Rows, {
+    Class: 'SHOWTRAK_SYSTEM_CONDITIONS',
+    Attributes: `data-check="${Card.Key}"`,
+    Value: ConditionCell,
+    Tickable: (Row) => Row.Supported && Row.Tickable,
+  });
 }
 
 function Toggle(Card: SystemCheckCard): string {

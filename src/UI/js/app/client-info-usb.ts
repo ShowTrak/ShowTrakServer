@@ -5,6 +5,7 @@
 import { CreateConditionSaveQueue } from './lib/condition-save-queue';
 import type { ClientView, USBCapabilities, USBDeviceView } from '@showtrak/protocol';
 import { HandleNonFatalError, Safe } from './utils';
+import { ConditionsTableHtml, ConditionValueHtml } from './client-info-conditions';
 import {
   GetUSBSectionState,
   ParseUSBRuleFields,
@@ -51,27 +52,11 @@ function IdentityAttributes(Device: USBDeviceView): string {
 
 /** A critical device's conditions: key, value, and a tick to monitor it. Saves as it changes. */
 function ConditionsTable(Device: USBDeviceView, Capabilities: USBCapabilities | null): string {
-  const Rows = USBConditionRows(Device, Capabilities);
-  if (!Rows.length) return '';
-  return `
-    <table class="SHOWTRAK_AUDIO_CONDITIONS SHOWTRAK_USB_CONDITIONS" ${IdentityAttributes(Device)}>
-      <tbody>
-        ${Rows.map(
-          (Row) => `
-          <tr data-cond="${Row.Field}" class="${Row.Supported ? '' : 'is-unsupported'} ${Row.Failing ? 'is-failing' : ''}"
-            ${Row.Failing ? `title="${Safe(Row.Failing)}"` : ''}>
-            <th scope="row">${Safe(Row.Label)}</th>
-            <td><span class="SHOWTRAK_AUDIO_COND_VALUE">${Safe(Row.Value)}</span></td>
-            <td class="SHOWTRAK_AUDIO_COND_CHECK">${
-              Row.Supported
-                ? `<input type="checkbox" class="form-check-input" data-rule="${Row.Field}"
-                    ${Row.Checked ? 'checked' : ''} ${Row.Locked ? 'disabled' : ''} aria-label="Monitor ${Safe(Row.Label.toLowerCase())}" />`
-                : ''
-            }</td>
-          </tr>`
-        ).join('')}
-      </tbody>
-    </table>`;
+  return ConditionsTableHtml(USBConditionRows(Device, Capabilities), {
+    Class: 'SHOWTRAK_USB_CONDITIONS',
+    Attributes: IdentityAttributes(Device),
+    Value: ConditionValueHtml,
+  });
 }
 
 function Warning(Message: string): string {

@@ -5,6 +5,7 @@
 import { CreateConditionSaveQueue } from './lib/condition-save-queue';
 import type { ClientDisplayView, ClientView } from '@showtrak/protocol';
 import { HandleNonFatalError, Safe } from './utils';
+import { ConditionsTableHtml, ConditionValueHtml } from './client-info-conditions';
 import {
   DisplayBadge,
   DisplayConditionRows,
@@ -47,27 +48,11 @@ function MessageCard(Title: string, Body: string): string {
 
 /** A critical display's conditions: key, value, and a tick to monitor it. Saves as it changes. */
 function ConditionsTable(Display: ClientDisplayView): string {
-  const Rows = DisplayConditionRows(Display);
-  if (!Rows.length) return '';
-  return `
-    <table class="SHOWTRAK_AUDIO_CONDITIONS SHOWTRAK_DISPLAY_CONDITIONS" data-display="${Token(DisplayKey(Display))}">
-      <tbody>
-        ${Rows.map(
-          (Row) => `
-          <tr data-cond="${Row.Field}" class="${Row.Supported ? '' : 'is-unsupported'} ${Row.Failing ? 'is-failing' : ''}"
-            ${Row.Failing ? `title="${Safe(Row.Failing)}"` : ''}>
-            <th scope="row">${Safe(Row.Label)}</th>
-            <td><span class="SHOWTRAK_AUDIO_COND_VALUE">${Safe(Row.Value)}</span></td>
-            <td class="SHOWTRAK_AUDIO_COND_CHECK">${
-              Row.Supported
-                ? `<input type="checkbox" class="form-check-input" data-rule="${Row.Field}"
-                    ${Row.Checked ? 'checked' : ''} ${Row.Locked ? 'disabled' : ''} aria-label="Monitor ${Safe(Row.Label.toLowerCase())}" />`
-                : ''
-            }</td>
-          </tr>`
-        ).join('')}
-      </tbody>
-    </table>`;
+  return ConditionsTableHtml(DisplayConditionRows(Display), {
+    Class: 'SHOWTRAK_DISPLAY_CONDITIONS',
+    Attributes: `data-display="${Token(DisplayKey(Display))}"`,
+    Value: ConditionValueHtml,
+  });
 }
 
 function DisplayCard(Display: ClientDisplayView): string {

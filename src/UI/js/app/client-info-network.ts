@@ -8,6 +8,7 @@
 import { CreateConditionSaveQueue } from './lib/condition-save-queue';
 import type { ClientView, NetworkCapabilities, NetworkInterfaceView } from '@showtrak/protocol';
 import { HandleNonFatalError, Safe } from './utils';
+import { ConditionsTableHtml } from './client-info-conditions';
 import {
   GetNetworkSectionState,
   HomeFamily,
@@ -79,27 +80,11 @@ function ConditionsTable(
   Iface: NetworkInterfaceView,
   Capabilities: NetworkCapabilities | null
 ): string {
-  const Rows = NetworkConditionRows(Iface, Capabilities);
-  if (!Rows.length) return '';
-  return `
-    <table class="SHOWTRAK_AUDIO_CONDITIONS SHOWTRAK_NET_CONDITIONS" data-interface="${Token(Iface.Name)}">
-      <tbody>
-        ${Rows.map(
-          (Row) => `
-          <tr data-cond="${Row.Field}" class="${Row.Supported ? '' : 'is-unsupported'} ${Row.Failing ? 'is-failing' : ''}"
-            ${Row.Failing ? `title="${Safe(Row.Failing)}"` : ''}>
-            <th scope="row">${Safe(Row.Label)}</th>
-            <td>${ConditionCell(Row)}</td>
-            <td class="SHOWTRAK_AUDIO_COND_CHECK">${
-              Row.Supported
-                ? `<input type="checkbox" class="form-check-input" data-rule="${Row.Field}"
-                    ${Row.Checked ? 'checked' : ''} ${Row.Locked ? 'disabled' : ''} aria-label="Monitor ${Safe(Row.Label.toLowerCase())}" />`
-                : ''
-            }</td>
-          </tr>`
-        ).join('')}
-      </tbody>
-    </table>`;
+  return ConditionsTableHtml(NetworkConditionRows(Iface, Capabilities), {
+    Class: 'SHOWTRAK_NET_CONDITIONS',
+    Attributes: `data-interface="${Token(Iface.Name)}"`,
+    Value: ConditionCell,
+  });
 }
 
 function InterfaceCard(

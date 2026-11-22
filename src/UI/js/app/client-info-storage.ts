@@ -6,6 +6,7 @@
 import { CreateConditionSaveQueue } from './lib/condition-save-queue';
 import type { ClientView, StorageVolumeView } from '@showtrak/protocol';
 import { HandleNonFatalError, Safe } from './utils';
+import { ConditionsTableHtml } from './client-info-conditions';
 import {
   GetStorageSectionState,
   ParseStorageRuleFields,
@@ -57,27 +58,12 @@ function ConditionCell(Row: StorageConditionRow): string {
 
 /** A monitored volume's conditions: key, value, and a tick to monitor it. Saves as it changes. */
 function ConditionsTable(Volume: StorageVolumeView): string {
-  const Rows = StorageConditionRows(Volume);
-  if (!Rows.length) return '';
-  return `
-    <table class="SHOWTRAK_AUDIO_CONDITIONS SHOWTRAK_STORAGE_CONDITIONS" data-mount="${Token(Volume.MountPoint)}">
-      <tbody>
-        ${Rows.map(
-          (Row) => `
-          <tr data-cond="${Row.Field}" class="${Row.Supported ? '' : 'is-unsupported'} ${Row.Failing ? 'is-failing' : ''}"
-            ${Row.Failing ? `title="${Safe(Row.Failing)}"` : ''}>
-            <th scope="row">${Safe(Row.Label)}</th>
-            <td>${ConditionCell(Row)}</td>
-            <td class="SHOWTRAK_AUDIO_COND_CHECK">${
-              Row.Supported
-                ? `<input type="checkbox" class="form-check-input" data-rule="${Row.Field}"
-                    ${Row.Checked ? 'checked' : ''} ${Row.Locked ? 'disabled' : ''} aria-label="Monitor ${Safe(Row.Label.toLowerCase())}${Row.Input ? ` (${Safe(Row.Input.Unit)})` : ''}" />`
-                : ''
-            }</td>
-          </tr>`
-        ).join('')}
-      </tbody>
-    </table>`;
+  return ConditionsTableHtml(StorageConditionRows(Volume), {
+    Class: 'SHOWTRAK_STORAGE_CONDITIONS',
+    Attributes: `data-mount="${Token(Volume.MountPoint)}"`,
+    Value: ConditionCell,
+    LabelSuffix: (Row) => (Row.Input ? ` (${Safe(Row.Input.Unit)})` : ''),
+  });
 }
 
 function UsageBar(Volume: StorageVolumeView): string {

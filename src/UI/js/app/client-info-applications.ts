@@ -10,6 +10,7 @@ import type {
   RunningApplicationsViewStatus,
 } from '@showtrak/protocol';
 import { HandleNonFatalError, Safe } from './utils';
+import { ConditionsTableHtml, ConditionValueHtml } from './client-info-conditions';
 import { ClearRenderKeys, RenderKeyIs, SetRenderKey } from './lib/render-key';
 import {
   ApplicationBadge,
@@ -43,27 +44,11 @@ function ConditionsTable(
   Client: ClientView,
   Token: string
 ): string {
-  const Rows = ApplicationConditionRows(App, Client);
-  if (!Rows.length) return '';
-  return `
-    <table class="SHOWTRAK_AUDIO_CONDITIONS SHOWTRAK_APP_CONDITIONS" data-name="${Token}">
-      <tbody>
-        ${Rows.map(
-          (Row) => `
-          <tr data-cond="${Row.Field}" class="${Row.Supported ? '' : 'is-unsupported'} ${Row.Failing ? 'is-failing' : ''}"
-            ${Row.Failing ? `title="${Safe(Row.Failing)}"` : ''}>
-            <th scope="row">${Safe(Row.Label)}</th>
-            <td><span class="SHOWTRAK_AUDIO_COND_VALUE">${Safe(Row.Value)}</span></td>
-            <td class="SHOWTRAK_AUDIO_COND_CHECK">${
-              Row.Supported
-                ? `<input type="checkbox" class="form-check-input" data-rule="${Row.Field}"
-                    ${Row.Checked ? 'checked' : ''} ${Row.Locked ? 'disabled' : ''} aria-label="Monitor ${Safe(Row.Label.toLowerCase())}" />`
-                : ''
-            }</td>
-          </tr>`
-        ).join('')}
-      </tbody>
-    </table>`;
+  return ConditionsTableHtml(ApplicationConditionRows(App, Client), {
+    Class: 'SHOWTRAK_APP_CONDITIONS',
+    Attributes: `data-name="${Token}"`,
+    Value: ConditionValueHtml,
+  });
 }
 
 function ApplicationCard(App: RunningApplicationViewItem, Client: ClientView): string {
