@@ -1,10 +1,11 @@
-import { requestJson } from './_http-shared';
 import {
   AlertTitle,
-  ModeSettingField,
-  NormalizeMode,
+  NormalizeWebhookSettings,
   OneLineSummary,
-  type WebhookMode,
+  PostWebhook,
+  SeverityTone,
+  ValidateWebhookSettings,
+  WEBHOOK_SETTINGS,
 } from './_webhook-format';
 import type {
   ActionLogger,
@@ -16,48 +17,17 @@ import type {
 
 const ID = 'teams-webhook';
 
-const Settings: AlertActionSettingField[] = [
-  { Key: 'WebhookURL', Label: 'Webhook URL', Type: 'string', Default: '' },
-  ModeSettingField,
-  { Key: 'Timeout', Label: 'Timeout (ms)', Type: 'number', Default: 5000, Min: 250, Max: 60000 },
-];
-
-function NormalizeSettings(Input: unknown): {
-  WebhookURL: string;
-  Mode: WebhookMode;
-  Timeout: number;
-} {
-  const Next = (Input && typeof Input === 'object' ? Input : {}) as Record<string, unknown>;
-  const Timeout = Number(Next.Timeout);
-  return {
-    WebhookURL: String(Next.WebhookURL || '').trim(),
-    Mode: NormalizeMode(Next.Mode),
-    Timeout: Number.isFinite(Timeout) ? Math.max(250, Math.min(60000, Math.round(Timeout))) : 5000,
-  };
-}
-
-function ValidateSettings(SettingsInput: unknown): boolean {
-  const S = NormalizeSettings(SettingsInput);
-  if (!S.WebhookURL) throw new Error('WebhookURL is required');
-  try {
-    const Parsed = new URL(S.WebhookURL);
-    if (Parsed.protocol !== 'https:' && Parsed.protocol !== 'http:') {
-      throw new Error('WebhookURL must use HTTP/S');
-    }
-  } catch {
-    throw new Error('WebhookURL must be a valid URL');
-  }
-  return true;
-}
+const Settings: AlertActionSettingField[] = WEBHOOK_SETTINGS;
+const NormalizeSettings = NormalizeWebhookSettings;
+const ValidateSettings = ValidateWebhookSettings;
 
 // Adaptive Card text colors: default | good | warning | attention.
-function colorForSeverity(Severity: unknown): string {
-  const S = String(Severity || '').toLowerCase();
-  if (S === 'critical' || S === 'error') return 'attention';
-  if (S === 'warning') return 'warning';
-  if (S === 'success' || S === 'info') return 'good';
-  return 'default';
-}
+const COLOURS: Record<SeverityTone, string> = {
+  danger: 'attention',
+  warning: 'warning',
+  good: 'good',
+  neutral: 'default',
+};
 
 async function Execute(
   Action: AlertActionInput,
@@ -78,7 +48,7 @@ async function Execute(
             text: AlertTitle(Context),
             weight: 'Bolder',
             size: 'Large',
-            color: colorForSeverity(Context.Severity),
+            color: COLOURS[SeverityTone(Context.Severity)],
             wrap: true,
           },
           {
@@ -104,11 +74,9 @@ async function Execute(
     body: Body,
   };
 
-  const Response = await requestJson({
-    Url: S.WebhookURL,
-    Method: 'POST',
-    Timeout: S.Timeout,
-    Body: {
+  return PostWebhook(
+    S,
+    {
       type: 'message',
       attachments: [
         {
@@ -117,17 +85,9 @@ async function Execute(
         },
       ],
     },
-  });
-
-  if (!Response.Success) {
-    return {
-      Success: false,
-      Error: Response.Error || `Webhook request failed (${Response.StatusCode})`,
-    };
-  }
-
-  Logger.info('Microsoft Teams webhook alert action succeeded');
-  return { Success: true, StatusCode: Response.StatusCode };
+    Logger,
+    'Microsoft Teams'
+  );
 }
 
 export const Name = 'Microsoft Teams Webhook';

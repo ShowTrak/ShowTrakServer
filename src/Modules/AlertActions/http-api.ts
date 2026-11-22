@@ -1,4 +1,5 @@
 import { requestJson } from './_http-shared';
+import { TIMEOUT_SETTING_FIELD, NormalizeTimeout } from './_request-timeout';
 import type {
   ActionLogger,
   AlertActionInput,
@@ -15,7 +16,7 @@ const Settings: AlertActionSettingField[] = [
   { Key: 'Port', Label: 'Port', Type: 'number', Default: 8080, Min: 1, Max: 65535 },
   { Key: 'Route', Label: 'Route', Type: 'string', Default: '/api/alerts' },
   { Key: 'Method', Label: 'Method', Type: 'string', Default: 'POST' },
-  { Key: 'Timeout', Label: 'Timeout (ms)', Type: 'number', Default: 5000, Min: 250, Max: 60000 },
+  TIMEOUT_SETTING_FIELD,
 ];
 
 function NormalizeSettings(Input: unknown): {
@@ -32,7 +33,6 @@ function NormalizeSettings(Input: unknown): {
     .trim();
   const Protocol = ProtocolRaw === 'https' ? 'https' : 'http';
   const Port = Number(Next.Port);
-  const Timeout = Number(Next.Timeout);
   const RouteRaw = String(Next.Route || '/api/alerts').trim();
   return {
     Protocol,
@@ -43,7 +43,7 @@ function NormalizeSettings(Input: unknown): {
       String(Next.Method || 'POST')
         .toUpperCase()
         .trim() || 'POST',
-    Timeout: Number.isFinite(Timeout) ? Math.max(250, Math.min(60000, Math.round(Timeout))) : 5000,
+    Timeout: NormalizeTimeout(Next.Timeout),
   };
 }
 

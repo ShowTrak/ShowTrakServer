@@ -1,4 +1,6 @@
 import { requestJson } from './_http-shared';
+import { TIMEOUT_SETTING_FIELD, NormalizeTimeout } from './_request-timeout';
+import { SeverityTone } from './_webhook-format';
 import type {
   ActionLogger,
   AlertActionInput,
@@ -12,16 +14,15 @@ const ID = 'telegram-bot';
 const Settings: AlertActionSettingField[] = [
   { Key: 'BotToken', Label: 'Bot Token', Type: 'string', Default: '' },
   { Key: 'ChatID', Label: 'Chat ID', Type: 'string', Default: '' },
-  { Key: 'Timeout', Label: 'Timeout (ms)', Type: 'number', Default: 5000, Min: 250, Max: 60000 },
+  TIMEOUT_SETTING_FIELD,
 ];
 
 function NormalizeSettings(Input: unknown): { BotToken: string; ChatID: string; Timeout: number } {
   const Next = (Input && typeof Input === 'object' ? Input : {}) as Record<string, unknown>;
-  const Timeout = Number(Next.Timeout);
   return {
     BotToken: String(Next.BotToken || '').trim(),
     ChatID: String(Next.ChatID || '').trim(),
-    Timeout: Number.isFinite(Timeout) ? Math.max(250, Math.min(60000, Math.round(Timeout))) : 5000,
+    Timeout: NormalizeTimeout(Next.Timeout),
   };
 }
 
@@ -42,13 +43,12 @@ function escapeHtml(Value: unknown): string {
     .replace(/>/g, '&gt;');
 }
 
-function emojiForSeverity(Severity: unknown): string {
-  const S = String(Severity || '').toLowerCase();
-  if (S === 'critical' || S === 'error') return '🔴';
-  if (S === 'warning') return '🟠';
-  if (S === 'success' || S === 'info') return '🟢';
-  return '🔵';
-}
+const EMOJI: Record<SeverityTone, string> = {
+  danger: '🔴',
+  warning: '🟠',
+  good: '🟢',
+  neutral: '🔵',
+};
 
 async function Execute(
   Action: AlertActionInput,
@@ -58,7 +58,7 @@ async function Execute(
   const S = NormalizeSettings(Action && Action.Settings ? Action.Settings : {});
 
   const Lines = [
-    `${emojiForSeverity(Context.Severity)} <b>ShowTrak Alert: ${escapeHtml(Context.TriggerType || 'Unknown')}</b>`,
+    `${EMOJI[SeverityTone(Context.Severity)]} <b>ShowTrak Alert: ${escapeHtml(Context.TriggerType || 'Unknown')}</b>`,
     '',
     `<b>Entity:</b> ${escapeHtml(Context.EntityName || 'Unknown')}`,
     `<b>Type:</b> ${escapeHtml(Context.EntityType || 'Unknown')}`,

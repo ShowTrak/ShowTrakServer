@@ -1,10 +1,11 @@
-import { requestJson } from './_http-shared';
 import {
   AlertTitle,
-  ModeSettingField,
-  NormalizeMode,
+  NormalizeWebhookSettings,
   OneLineSummary,
-  type WebhookMode,
+  PostWebhook,
+  SeverityTone,
+  ValidateWebhookSettings,
+  WEBHOOK_SETTINGS,
 } from './_webhook-format';
 import type {
   ActionLogger,
@@ -16,47 +17,16 @@ import type {
 
 const ID = 'discord-webhook';
 
-const Settings: AlertActionSettingField[] = [
-  { Key: 'WebhookURL', Label: 'Webhook URL', Type: 'string', Default: '' },
-  ModeSettingField,
-  { Key: 'Timeout', Label: 'Timeout (ms)', Type: 'number', Default: 5000, Min: 250, Max: 60000 },
-];
+const Settings: AlertActionSettingField[] = WEBHOOK_SETTINGS;
+const NormalizeSettings = NormalizeWebhookSettings;
+const ValidateSettings = ValidateWebhookSettings;
 
-function NormalizeSettings(Input: unknown): {
-  WebhookURL: string;
-  Mode: WebhookMode;
-  Timeout: number;
-} {
-  const Next = (Input && typeof Input === 'object' ? Input : {}) as Record<string, unknown>;
-  const Timeout = Number(Next.Timeout);
-  return {
-    WebhookURL: String(Next.WebhookURL || '').trim(),
-    Mode: NormalizeMode(Next.Mode),
-    Timeout: Number.isFinite(Timeout) ? Math.max(250, Math.min(60000, Math.round(Timeout))) : 5000,
-  };
-}
-
-function ValidateSettings(SettingsInput: unknown): boolean {
-  const S = NormalizeSettings(SettingsInput);
-  if (!S.WebhookURL) throw new Error('WebhookURL is required');
-  try {
-    const Parsed = new URL(S.WebhookURL);
-    if (Parsed.protocol !== 'https:' && Parsed.protocol !== 'http:') {
-      throw new Error('WebhookURL must use HTTP/S');
-    }
-  } catch {
-    throw new Error('WebhookURL must be a valid URL');
-  }
-  return true;
-}
-
-function colorForSeverity(Severity: unknown): number {
-  const S = String(Severity || '').toLowerCase();
-  if (S === 'critical' || S === 'error') return 15158332;
-  if (S === 'warning') return 16098851;
-  if (S === 'success' || S === 'info') return 3066993;
-  return 3447003;
-}
+const COLOURS: Record<SeverityTone, number> = {
+  danger: 15158332,
+  warning: 16098851,
+  good: 3066993,
+  neutral: 3447003,
+};
 
 async function Execute(
   Action: AlertActionInput,
@@ -76,7 +46,7 @@ async function Execute(
           embeds: [
             {
               title: AlertTitle(Context),
-              color: colorForSeverity(Context.Severity),
+              color: COLOURS[SeverityTone(Context.Severity)],
               fields: [
                 { name: 'Entity', value: String(Context.EntityName || 'Unknown'), inline: true },
                 { name: 'IP', value: String(Context.IP || 'N/A'), inline: true },
@@ -89,22 +59,7 @@ async function Execute(
           ],
         };
 
-  const Response = await requestJson({
-    Url: S.WebhookURL,
-    Method: 'POST',
-    Timeout: S.Timeout,
-    Body,
-  });
-
-  if (!Response.Success) {
-    return {
-      Success: false,
-      Error: Response.Error || `Webhook request failed (${Response.StatusCode})`,
-    };
-  }
-
-  Logger.info('Discord webhook alert action succeeded');
-  return { Success: true, StatusCode: Response.StatusCode };
+  return PostWebhook(S, Body, Logger, 'Discord');
 }
 
 export const Name = 'Discord Webhook';
