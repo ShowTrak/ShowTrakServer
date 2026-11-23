@@ -686,21 +686,62 @@ test('before-quit with no main window goes straight to cleanup', async () => {
 
 // --- Update install path ----------------------------------------------------
 
-test('quitting to install an update bypasses every shutdown guard', async () => {
+test('quitting to install an update bypasses the confirmation and save prompts', async () => {
   const C = freshCoordinator({ mode: 'SHOW', hasUnsavedChanges: true });
   C.setAccidentalShutdownProtection(true);
-  C.handleBeforeQuitForUpdate();
+  void C.handleBeforeQuitForUpdate();
+  await flush();
 
-  // No confirmation, no save prompt, no preventDefault: the updater has already
-  // taken responsibility for the restart.
+  // No confirmation, no save prompt, no held window close: the updater has
+  // already taken responsibility for the restart.
   await C.handleMainWindowClose(mainWindowStub, cancelableEvent());
   assert.equal(calls.messageBox.length, 0);
   assert.equal(calls.preventDefault, 0);
+});
 
-  C.handleBeforeQuit(cancelableEvent());
+test('quitting to install an update still closes the database before the app exits', async () => {
+  // Exiting with a SQLite write in flight aborts the process (a macOS crash
+  // report on every unlucky update), so the update quit runs the cleanup too.
+  const C = freshCoordinator();
+  const Ready = C.handleBeforeQuitForUpdate();
+  // Native macOS: before-quit arrives while the cleanup is still running, and
+  // is held until it finishes.
+  const Early = cancelableEvent();
+  calls.quit = 0;
+  C.handleBeforeQuit(Early);
+  assert.equal(calls.preventDefault, 1);
+  assert.equal(calls.windowClose, 0, 'an update quit does not route through the window');
+  await Ready;
   await flush();
-  assert.equal(calls.preventDefault, 0, 'blocking here would abort the update install');
-  assert.deepEqual(calls.dbShutdown, []);
+  assert.deepEqual(calls.dbShutdown, [{ TimeoutMs: 5000 }]);
+  assert.equal(calls.stopAutosave, 1);
+  assert.equal(calls.quit, 1, 'the held quit goes ahead once the cleanup is done');
+
+  // The quit that follows goes straight through, and nothing is closed twice.
+  calls.preventDefault = 0;
+  C.handleBeforeQuit(cancelableEvent());
+  assert.equal(calls.preventDefault, 0);
+  assert.equal(calls.dbShutdown.length, 1);
+});
+
+test('on Windows the update hook resolves only after the cleanup, so the quit is not held', async () => {
+  // Squirrel starts the new version as soon as the updater hands over, so the
+  // updater waits for this promise first; the quit after it must not wait again.
+  const C = freshCoordinator();
+  await C.handleBeforeQuitForUpdate();
+  assert.deepEqual(calls.dbShutdown, [{ TimeoutMs: 5000 }]);
+  C.handleBeforeQuit(cancelableEvent());
+  assert.equal(calls.preventDefault, 0);
+  assert.equal(calls.dbShutdown.length, 1);
+});
+
+test('a hanging cleanup does not hold an update install past the deadline', async () => {
+  const C = freshCoordinator({ monitoringHangs: true });
+  C.setShutdownCleanupDeadline(30);
+  const Ready = C.handleBeforeQuitForUpdate();
+  await Ready; // resolves at the deadline
+  C.handleBeforeQuit(cancelableEvent());
+  assert.equal(calls.preventDefault, 0);
 });
 
 // --- The cleanup deadline -----------------------------------------------------

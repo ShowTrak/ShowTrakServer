@@ -526,7 +526,7 @@ powerMonitor.on('shutdown', (...Args: unknown[]) =>
 
 // macOS's updater emits this; Windows' (Squirrel) does not, so the updater
 // also calls the hook itself just before a Squirrel install quits.
-nativeAutoUpdater.on('before-quit-for-update', handleBeforeQuitForUpdate);
+nativeAutoUpdater.on('before-quit-for-update', () => void handleBeforeQuitForUpdate());
 AppUpdater.SetBeforeQuitForUpdate(handleBeforeQuitForUpdate);
 
 // Final shutdown hook: place for flushing buffers/closing resources if needed.

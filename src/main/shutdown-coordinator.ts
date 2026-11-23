@@ -71,7 +71,6 @@ let closePromptInFlight = false;
 let quitRequested = false;
 let accidentalShutdownProtectionEnabled = false;
 let bypassShutdownConfirmation = false;
-let shutdownCleanupInFlight = false;
 let shutdownCleanupComplete = false;
 let quittingForUpdate = false;
 
@@ -317,17 +316,43 @@ async function runShutdownCleanup(): Promise<void> {
   }
 }
 
+// Runs the quit cleanup once, however many quit paths ask for it, and resolves
+// when it has finished or its deadline has passed.
+let shutdownCleanupRun: Promise<'done' | 'timeout'> | null = null;
+let quitAfterCleanupScheduled = false;
+
+function runShutdownCleanupOnce(): Promise<'done' | 'timeout'> {
+  if (shutdownCleanupRun) return shutdownCleanupRun;
+  let deadlineTimer: ReturnType<typeof setTimeout> | null = null;
+  const deadline = new Promise<'timeout'>((resolve) => {
+    deadlineTimer = setTimeout(() => resolve('timeout'), shutdownCleanupDeadlineMs);
+  });
+  shutdownCleanupRun = Promise.race([
+    runShutdownCleanup().then(
+      () => 'done' as const,
+      (Err: unknown) => {
+        Logger.error('Unexpected error during shutdown cleanup:', Err);
+        return 'done' as const;
+      }
+    ),
+    deadline,
+  ]).then((outcome) => {
+    if (deadlineTimer) clearTimeout(deadlineTimer);
+    shutdownCleanupComplete = true;
+    return outcome;
+  });
+  return shutdownCleanupRun;
+}
+
 // app 'before-quit': route through window close first (so save prompts fire),
-// then run cleanup exactly once before allowing the real quit.
+// then run cleanup exactly once before allowing the real quit. A quit for an
+// update skips the window close and its prompts, but not the cleanup: exiting
+// with a database write still in flight aborts the process.
 function handleBeforeQuit(event: CancelableEvent): void {
   quitRequested = true;
 
-  if (quittingForUpdate) {
-    return;
-  }
-
   const Window = getMainWindow();
-  if (!mainWindowCloseApproved && Window) {
+  if (!quittingForUpdate && !mainWindowCloseApproved && Window) {
     event.preventDefault();
     Window.close();
     return;
@@ -335,22 +360,10 @@ function handleBeforeQuit(event: CancelableEvent): void {
 
   if (shutdownCleanupComplete) return;
   event.preventDefault();
-  if (shutdownCleanupInFlight) return;
+  if (quitAfterCleanupScheduled) return;
 
-  shutdownCleanupInFlight = true;
-  let deadlineTimer: ReturnType<typeof setTimeout> | null = null;
-  const deadline = new Promise<'timeout'>((resolve) => {
-    deadlineTimer = setTimeout(() => resolve('timeout'), shutdownCleanupDeadlineMs);
-  });
-  Promise.race([
-    runShutdownCleanup().catch((Err) => {
-      Logger.error('Unexpected error during shutdown cleanup:', Err);
-    }),
-    deadline,
-  ]).then((outcome) => {
-    if (deadlineTimer) clearTimeout(deadlineTimer);
-    shutdownCleanupComplete = true;
-    shutdownCleanupInFlight = false;
+  quitAfterCleanupScheduled = true;
+  void runShutdownCleanupOnce().then((outcome) => {
     if (outcome === 'timeout') {
       // exit, not quit: a quit would wait on whatever the cleanup is stuck on.
       Logger.error('Shutdown cleanup did not finish in time; exiting without it');
@@ -369,11 +382,17 @@ function handlePowerMonitorShutdown(event: CancelableEvent): void {
   app.quit();
 }
 
-function handleBeforeQuitForUpdate(): void {
+// An update is about to quit the app: skip the confirmation and save prompts,
+// and start the cleanup now. The Windows install waits for the returned promise
+// before it hands over, because Squirrel starts the new version straight away;
+// on macOS, before-quit holds the quit until the cleanup is done (the installer
+// waits for the app to exit).
+function handleBeforeQuitForUpdate(): Promise<void> {
   Logger.log('Update install requested, bypassing shutdown guards');
   quittingForUpdate = true;
   bypassShutdownConfirmation = true;
   quitRequested = true;
+  return runShutdownCleanupOnce().then(() => undefined);
 }
 
 export {
