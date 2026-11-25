@@ -30,9 +30,15 @@ function loggerStub() {
   return { CreateLogger: () => logger };
 }
 
+// The real Config, but as if this were ShowTrak Server `Version`.
+function ConfigAtVersion(Version) {
+  const { Config } = require(path.join(__dirname, '..', 'dist', 'Modules', 'Config', 'index.js'));
+  return { Config: { ...Config, Application: { ...Config.Application, Version } } };
+}
+
 // A fresh BackupManager (and working database) rooted in its own temp folder.
 // StateFilePath, when given, seeds the show file left open "last session".
-function loadBackupManager(Root, { CurrentFilePath } = {}) {
+function loadBackupManager(Root, { CurrentFilePath, Version } = {}) {
   const Storage = path.join(Root, 'Storage');
   const Backups = path.join(Root, 'Backups');
   fs.mkdirSync(Storage, { recursive: true });
@@ -51,6 +57,7 @@ function loadBackupManager(Root, { CurrentFilePath } = {}) {
       '../Logger': loggerStub(),
       '../AppData': AppData,
       '../Broadcast': { Manager: { emit() {} } },
+      ...(Version ? { '../Config': ConfigAtVersion(Version) } : {}),
     },
     { alsoEvict: [DBModulePath] }
   );
@@ -299,6 +306,28 @@ test('opening a file that is not a show file fails without asking to upgrade it'
   assert.match(String(Err), /not a valid ShowTrak file/i);
   assert.equal(Outcome, null);
   assert.equal(BackupManager.GetPendingUpgrade(), null);
+
+  await DB.Shutdown();
+});
+
+test('a show file is older when a pre-release of this version or an earlier version saved it', async () => {
+  const Root = tempRoot();
+  const { BackupManager, DB } = loadBackupManager(Root, { Version: '3.37.0' });
+  const NeedsUpgrade = async (SavedVersion) => {
+    const ShowPath = path.join(Root, `Saved by ${SavedVersion}.ShowTrak`);
+    await writeOlderShowFile(DB, ShowPath, SavedVersion);
+    const [Err, Result] = await BackupManager.InspectFile(ShowPath);
+    assert.equal(Err, null);
+    return Result.NeedsUpgrade;
+  };
+
+  // A beta of the release ranks below the release, so stable backs the file up
+  // before rewriting it. Read as plain numbers, "3.37.0-beta.2" ranked above.
+  assert.equal(await NeedsUpgrade('3.37.0-beta.2'), true);
+  assert.equal(await NeedsUpgrade('3.9.0'), true);
+  assert.equal(await NeedsUpgrade('3.37.0'), false);
+  assert.equal(await NeedsUpgrade('3.37.1-beta.1'), false);
+  assert.equal(await NeedsUpgrade('3.38.0'), false);
 
   await DB.Shutdown();
 });

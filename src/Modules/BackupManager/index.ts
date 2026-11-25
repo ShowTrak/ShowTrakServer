@@ -6,8 +6,7 @@ import { Manager as DB } from '../DB';
 import { Manager as AppDataManager } from '../AppData';
 import { Manager as Broadcast } from '../Broadcast';
 import { Config } from '../Config';
-import { CompareVersions } from '../Utils';
-import { IsObject } from '@showtrak/protocol/common';
+import { CompareLooseVersions, IsObject } from '@showtrak/protocol/common';
 import { CreateShowFileInfoRepository } from '../DB/repositories/show-file-info';
 import type { ResultTuple, ShowFileOpenOutcome, ShowFileUpgrade } from '@showtrak/protocol';
 
@@ -109,8 +108,11 @@ const Manager = {
     const [Err, Info] = await DB.ReadFileInfo(FilePath);
     if (Err || !Info) return [ErrorMessage(Err), null];
     const FileVersion = Info.SavedWithVersion;
+    // Loose ordering: the stamp is whatever version string saved the file, and
+    // it has to rank a pre-release below its release, so a show saved by
+    // 3.37.0-beta.2 is backed up before 3.37.0 rewrites it.
     const NeedsUpgrade =
-      !FileVersion || CompareVersions(FileVersion, Config.Application.Version) < 0;
+      !FileVersion || CompareLooseVersions(FileVersion, Config.Application.Version) < 0;
     return [null, { NeedsUpgrade, FileVersion }];
   },
 
