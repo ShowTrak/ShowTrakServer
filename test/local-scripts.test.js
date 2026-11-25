@@ -41,6 +41,27 @@ test('resolveContainedScriptFile rejects escaping or absolute relative paths', (
   assert.deepEqual(resolveContainedScriptFile(root, 'Deploy', ''), ['Invalid file path', null]);
 });
 
+test("resolveContainedScriptFile applies the Client's rules", () => {
+  const root = path.resolve('/tmp/showtrak-scripts');
+  // A `..` is refused even when it would come back inside the folder, as the
+  // Client refuses it, so a path that works here works on a client too.
+  assert.deepEqual(resolveContainedScriptFile(root, 'Deploy', 'bin/../run.sh'), [
+    'Invalid file path',
+    null,
+  ]);
+  assert.deepEqual(resolveContainedScriptFile(root, 'Deploy', '..\\Other\\run.bat'), [
+    'Invalid file path',
+    null,
+  ]);
+  // The folder itself is not a file.
+  assert.deepEqual(resolveContainedScriptFile(root, 'Deploy', '.'), ['Invalid file path', null]);
+  // A Windows-authored path resolves to the same file on every platform.
+  assert.deepEqual(resolveContainedScriptFile(root, 'Deploy', '.\\bin\\run.sh'), [
+    null,
+    path.join(root, 'Deploy', 'bin', 'run.sh'),
+  ]);
+});
+
 test('normalizeRelativePathForCompare normalizes slashes and leading ./', () => {
   assert.equal(normalizeRelativePathForCompare('.\\sub\\file.sh'), 'sub/file.sh');
   assert.equal(normalizeRelativePathForCompare('./a/b'), 'a/b');

@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 
 const { loadWithMocks } = require('../test-support/load-with-mocks');
@@ -55,7 +57,11 @@ function load({ platform = process.platform, exec, chmodThrows = false } = {}) {
   const Mod = loadWithMocks(MODULE_PATH, {
     '../Modules/Logger': loggerStub,
     path: require('node:path'),
+    // The real fs underneath: the shared launcher (@showtrak/protocol/runtime,
+    // cached with whichever fs the first load handed it) reads an extensionless
+    // file's first bytes.
     fs: {
+      ...fs,
       chmodSync: (Target, Mode) => {
         Calls.chmod.push([Target, Mode]);
         if (chmodThrows) throw new Error('EROFS: read-only file system');
@@ -145,7 +151,8 @@ test('POSIX shells are chosen per extension', () => {
     assert.deepEqual(Resolve('/s/run.sh'), { command: '/bin/sh', args: ['/s/run.sh'] });
     assert.deepEqual(Resolve('/s/run.command'), { command: '/bin/sh', args: ['/s/run.command'] });
     assert.deepEqual(Resolve('/s/run.bash'), { command: '/bin/bash', args: ['/s/run.bash'] });
-    assert.deepEqual(Resolve('/s/run.zsh'), { command: '/bin/bash', args: ['/s/run.zsh'] });
+    // zsh, not bash: the Client runs .zsh under zsh too (shared launcher).
+    assert.deepEqual(Resolve('/s/run.zsh'), { command: 'zsh', args: ['/s/run.zsh'] });
   }
 });
 
@@ -161,11 +168,25 @@ test('python and node scripts get their own runtimes', () => {
   });
 });
 
-test('an extensionless or unknown POSIX file is executed directly', () => {
+test('an unknown POSIX extension is executed directly', () => {
   // Relies on the shebang, which is why the executable bit is set below.
   const { Mod } = load({ platform: 'linux' });
-  assert.deepEqual(Mod.resolveLocalScriptLauncher('/s/run'), { command: '/s/run', args: [] });
   assert.deepEqual(Mod.resolveLocalScriptLauncher('/s/run.pl'), { command: '/s/run.pl', args: [] });
+});
+
+test('an extensionless POSIX file runs directly with a shebang, and under sh without one', (t) => {
+  // The Client's rule too: a binary or a `#!` file is executed as it is, and a
+  // plain shell script without a shebang still runs.
+  const Dir = fs.mkdtempSync(path.join(os.tmpdir(), 'showtrak-local-script-'));
+  t.after(() => fs.rmSync(Dir, { recursive: true, force: true }));
+  const WithShebang = path.join(Dir, 'with-shebang');
+  const Plain = path.join(Dir, 'plain');
+  fs.writeFileSync(WithShebang, '#!/usr/bin/env python3\nprint(1)\n');
+  fs.writeFileSync(Plain, 'echo hi\n');
+
+  const { Mod } = load({ platform: 'linux' });
+  assert.deepEqual(Mod.resolveLocalScriptLauncher(WithShebang), { command: WithShebang, args: [] });
+  assert.deepEqual(Mod.resolveLocalScriptLauncher(Plain), { command: '/bin/sh', args: [Plain] });
 });
 
 test('extension matching is case-insensitive', () => {

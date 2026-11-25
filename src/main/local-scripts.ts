@@ -1,54 +1,45 @@
 // Local script helpers (main process).
 //
-// Pure/self-contained utilities for resolving and running script files on the
-// host OS, plus small path/version normalizers. Extracted from main.js so they
-// can be unit-tested in isolation. Behavior is identical to the original inline
-// implementations.
+// Utilities for resolving and running script files on the host OS, plus small
+// path/version normalizers. The launcher table and the path check are the
+// Client's own (@showtrak/protocol/runtime), so a script the operator runs on
+// this machine runs the way it does when dispatched to a client.
 import path from 'path';
 import fs from 'fs';
 import { execFile } from 'child_process';
 
+import {
+  IsSafeScriptID,
+  NormalizeScriptRelativePath,
+  ResolveScriptFile,
+  ResolveScriptLauncher,
+} from '@showtrak/protocol/runtime';
 import { CreateLogger } from '../Modules/Logger';
 
 const Logger = CreateLogger('LocalScripts');
 
 // Resolve a script-relative file path to an absolute path while enforcing that
 // it stays inside the script's own folder. This is the single traversal guard
-// shared by Scripts:OpenFile and Scripts:RunLocalFile. It rejects folder IDs
-// that contain a path separator or "..", absolute relative paths, and any
-// resolved path that escapes the script folder. Returns the standard
-// `[Err, TargetFilePath]` tuple; existence/stat checks stay with the caller.
+// shared by Scripts:OpenFile and Scripts:RunLocalFile, and it is the Client's
+// guard too (@showtrak/protocol/runtime ResolveScriptFile): the ID must be one
+// safe folder name, and the path, normalized the way the Client normalizes it,
+// must have no `..` at all and land strictly inside that folder. Returns the
+// standard `[Err, TargetFilePath]` tuple; existence/stat checks stay with the
+// caller.
 function resolveContainedScriptFile(
   scriptsDirectory: string,
   ID: unknown,
   RelativeFilePath: unknown
 ): [string, null] | [null, string] {
-  if (typeof ID !== 'string' || !ID.trim()) return ['Invalid script ID', null];
-  if (typeof RelativeFilePath !== 'string' || !RelativeFilePath.trim()) {
-    return ['Invalid file path', null];
-  }
-  if (ID.includes('..') || ID.includes('/') || ID.includes('\\')) {
-    return ['Invalid script ID', null];
-  }
-  if (path.isAbsolute(RelativeFilePath)) return ['Invalid file path', null];
-
-  const ScriptFolderPath = path.resolve(scriptsDirectory, ID);
-  const TargetFilePath = path.resolve(ScriptFolderPath, RelativeFilePath);
-  const ScriptFolderPrefix = ScriptFolderPath.endsWith(path.sep)
-    ? ScriptFolderPath
-    : `${ScriptFolderPath}${path.sep}`;
-  if (TargetFilePath !== ScriptFolderPath && !TargetFilePath.startsWith(ScriptFolderPrefix)) {
-    return ['Invalid file path', null];
-  }
+  if (!IsSafeScriptID(ID)) return ['Invalid script ID', null];
+  const TargetFilePath = ResolveScriptFile(scriptsDirectory, ID, RelativeFilePath);
+  if (!TargetFilePath) return ['Invalid file path', null];
   return [null, TargetFilePath];
 }
 
 // Normalize a relative path for comparison (forward slashes, no leading "./").
 function normalizeRelativePathForCompare(value: unknown) {
-  return String(value || '')
-    .trim()
-    .replace(/\\/g, '/')
-    .replace(/^\.\//, '');
+  return NormalizeScriptRelativePath(value);
 }
 
 // Map the running platform to the ShowTrak platform key used in script configs.
@@ -67,41 +58,10 @@ function normalizeVersionToken(value: unknown) {
 }
 
 // Resolve the command + args used to execute a script file based on its
-// extension and the host platform.
+// extension and the host platform. The Client runs dispatched scripts with the
+// same table (@showtrak/protocol/runtime ResolveScriptLauncher).
 function resolveLocalScriptLauncher(scriptPath: string) {
-  const extension = path.extname(scriptPath).toLowerCase();
-
-  if (process.platform === 'win32') {
-    switch (extension) {
-      case '.bat':
-      case '.cmd':
-        return { command: 'cmd.exe', args: ['/c', scriptPath] };
-      case '.ps1':
-        return {
-          command: 'powershell.exe',
-          args: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath],
-        };
-      case '.exe':
-        return { command: scriptPath, args: [] };
-      default:
-        return { command: 'cmd.exe', args: ['/c', scriptPath] };
-    }
-  }
-
-  switch (extension) {
-    case '.sh':
-    case '.command':
-      return { command: '/bin/sh', args: [scriptPath] };
-    case '.bash':
-    case '.zsh':
-      return { command: '/bin/bash', args: [scriptPath] };
-    case '.py':
-      return { command: 'python3', args: [scriptPath] };
-    case '.js':
-      return { command: 'node', args: [scriptPath] };
-    default:
-      return { command: scriptPath, args: [] };
-  }
+  return ResolveScriptLauncher(scriptPath);
 }
 
 // Execute a local script file, resolving to null on success or an error message
