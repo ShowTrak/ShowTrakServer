@@ -126,6 +126,8 @@ test('the packager leaves sources, configs and per-file output out of the app', 
     '/node_modules/@showtrak/protocol/src/ui/toasts.ts',
     '/node_modules/@showtrak/protocol/scripts/dev.js',
     '/node_modules/@showtrak/protocol/spec/ui/toasts.spec.js',
+    '/out',
+    '/out/make/zip/darwin/arm64/ShowTrak Server.zip',
   ]) {
     assert.equal(ignored(file), true, `${file} should be left out`);
   }

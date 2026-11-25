@@ -83,6 +83,10 @@ const config: ForgeConfig = {
       /^\/test-support($|\/)/,
       /^\/dist-test($|\/)/,
       /^\/coverage($|\/)/,
+      // Forge's own output folder. Packager skips the folder Forge is writing
+      // to, but with ELECTRON_FORGE_OUT_DIR pointed elsewhere a leftover out/
+      // from an earlier build would otherwise be copied into the new app.
+      /^\/out($|\/)/,
       // Repo/tooling directories.
       /^\/\.github($|\/)/,
       /^\/\.husky($|\/)/,
