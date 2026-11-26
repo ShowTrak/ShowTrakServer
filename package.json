@@ -95,7 +95,7 @@
     "@types/node": "^26.6.6",
     "bootstrap-icons": "^1.13.2",
     "c8": "^12.0.0",
-    "electron": "^45.3.3",
+    "electron": "^45.4.1",
     "esbuild": "^0.28.2",
     "eslint": "^10.15.0",
     "eslint-config-prettier": "^10.1.8",
@@ -104,7 +104,7 @@
     "prettier": "^3.10.1",
     "tsx": "^4.23.15",
     "typescript": "~5.7",
-    "typescript-eslint": "^8.72.2"
+    "typescript-eslint": "^8.73.0"
   },
   "dependencies": {
     "@showtrak/protocol": "file:./shared",
