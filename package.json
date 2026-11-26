@@ -88,7 +88,7 @@
     "@eslint/css": "^2.0.1",
     "@eslint/js": "^10.0.1",
     "@eslint/json": "^2.1.1",
-    "@eslint/markdown": "^8.0.3",
+    "@eslint/markdown": "^9.0.0",
     "@types/express": "^5.0.6",
     "@types/jquery": "^4.0.1",
     "@types/net-snmp": "^3.23.0",
